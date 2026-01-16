@@ -12,7 +12,7 @@ import type { TaxTariff } from '@/types';
 
 export function SingleQueryTab() {
   const [code, setCode] = useState('');
-  const [fuzzyMode, setFuzzyMode] = useState(false);
+  const [fuzzyMode, setFuzzyMode] = useState(true);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<TaxTariff[]>([]);
   const [searched, setSearched] = useState(false); // 标记是否已搜索
