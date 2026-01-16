@@ -25,7 +25,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # HTTP 请求（异步）
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["json", "stream"] }
 
 # HTML 解析
 scraper = "0.20"
@@ -50,4 +50,10 @@ tokio = { version = "1", features = ["full"] }
 
 # 日期时间
 chrono = { version = "0.4", features = ["serde"] }
+
+# 字符串相似度
+strsim = "0.11"
+
+# 异步工具
+futures-util = "0.3"
 

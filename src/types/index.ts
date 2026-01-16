@@ -35,9 +35,13 @@ export interface TaxTariff {
   code: string;
   rate: string;
   url: string;
-  northIrelandRate: string;
-  northIrelandUrl: string;
+  north_ireland_rate?: string;
+  north_ireland_url?: string;
+  northIrelandRate?: string; // 向后兼容
+  northIrelandUrl?: string; // 向后兼容
   description?: string;
+  other_rate?: string;
+  last_updated?: string;
   similarity?: number;
 }
 
@@ -52,7 +56,8 @@ export interface TaxVersionInfo {
     records: number;
     date: string;
   };
-  hasUpdate: boolean;
+  has_update: boolean;
+  hasUpdate?: boolean; // 向后兼容
   changelog?: {
     date: string;
     message: string;

@@ -5,6 +5,7 @@ mod models;
 use commands::alta::*;
 use commands::alta::database::DatabaseManager;
 use commands::alta::matcher::HSCodeMatcher;
+use commands::tax::*;
 use log::info;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -71,6 +72,14 @@ pub fn run() {
             download_template,
             test_database_connection,
             test_alta_connection,
+            // Tax commands
+            tax_exact_search,
+            tax_fuzzy_search,
+            tax_batch_query,
+            tax_download_template,
+            tax_check_update,
+            tax_download_update,
+            tax_open_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
