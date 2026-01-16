@@ -92,10 +92,9 @@ impl TaxExcelProcessor {
             .set_bold()
             .set_background_color(rust_xlsxwriter::Color::RGB(0xD3D3D3));
         
-        // 写入表头
+        // 写入表头（移除描述列）
         let headers = vec![
             "商品编码",
-            "商品描述",
             "英国税率",
             "英国URL",
             "北爱尔兰税率",
@@ -107,34 +106,33 @@ impl TaxExcelProcessor {
             worksheet.write_with_format(0, col as u16, *header, &header_format)?;
         }
         
-        // 写入数据
+        // 写入数据（移除描述列）
         for (row, (code, tariff_opt)) in results.iter().enumerate() {
             let row_num = (row + 1) as u32;
             
             worksheet.write(row_num, 0, code)?;
             
             if let Some(tariff) = tariff_opt {
-                worksheet.write(row_num, 1, tariff.description.as_deref().unwrap_or(""))?;
-                worksheet.write(row_num, 2, &tariff.rate)?;
-                worksheet.write(row_num, 3, &tariff.url)?;
+                worksheet.write(row_num, 1, &tariff.rate)?;
+                worksheet.write(row_num, 2, &tariff.url)?;
                 worksheet.write(
                     row_num,
-                    4,
+                    3,
                     tariff.north_ireland_rate.as_deref().unwrap_or(""),
                 )?;
                 worksheet.write(
                     row_num,
-                    5,
+                    4,
                     tariff.north_ireland_url.as_deref().unwrap_or(""),
                 )?;
-                worksheet.write(row_num, 6, "成功")?;
+                worksheet.write(row_num, 5, "成功")?;
             } else {
-                worksheet.write(row_num, 6, "未找到")?;
+                worksheet.write(row_num, 5, "未找到")?;
             }
         }
         
-        // 自动调整列宽
-        for col in 0..7 {
+        // 自动调整列宽（现在是6列）
+        for col in 0..6 {
             worksheet.set_column_width(col, 20)?;
         }
         

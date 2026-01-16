@@ -144,4 +144,32 @@ export const taxApi = {
       throw error;
     }
   },
+
+  /**
+   * 更新单行税率数据
+   */
+  async updateSingleRow(code: string): Promise<UpdateResult> {
+    try {
+      const result = await invoke<UpdateResult>('tax_update_single_row', { code });
+      return result;
+    } catch (error) {
+      console.error('更新单行数据失败:', error);
+      throw error;
+    }
+  },
 };
+
+/**
+ * 单行更新结果
+ */
+export interface UpdateResult {
+  success: boolean;
+  message: string;
+  ukUpdated: boolean;
+  niUpdated: boolean;
+  oldUkRate?: string;
+  newUkRate?: string;
+  oldNiRate?: string;
+  newNiRate?: string;
+  newDescription?: string;
+}

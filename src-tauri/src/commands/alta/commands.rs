@@ -195,21 +195,10 @@ pub async fn get_database_info(
 
 /// 下载Excel模板
 #[tauri::command]
-pub async fn download_template(app_handle: tauri::AppHandle) -> Result<String, CommandError> {
-    use tauri::Manager;
+pub async fn download_template(output_path: String) -> Result<(), CommandError> {
+    info!("生成Excel模板: {}", output_path);
 
-    info!("生成Excel模板");
-
-    // 获取下载目录
-    let downloads_dir = app_handle
-        .path()
-        .download_dir()
-        .map_err(|e| {
-            error!("无法获取下载目录: {}", e);
-            CommandError::new("无法获取下载目录", "PATH_ERROR")
-        })?;
-
-    let template_path = downloads_dir.join("Alta查询模板.xlsx");
+    let template_path = PathBuf::from(&output_path);
 
     // 生成模板
     ExcelProcessor::generate_template(&template_path).map_err(|e| {
@@ -217,7 +206,9 @@ pub async fn download_template(app_handle: tauri::AppHandle) -> Result<String, C
         CommandError::from(e)
     })?;
 
-    Ok(template_path.to_string_lossy().to_string())
+    info!("模板已生成: {:?}", template_path);
+
+    Ok(())
 }
 
 /// 测试数据库连接

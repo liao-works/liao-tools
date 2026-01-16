@@ -1,14 +1,29 @@
 import { useState, useEffect } from 'react';
-import { Search, Loader2, Copy, ExternalLink, AlertCircle, RefreshCw } from 'lucide-react';
+import { Search, Loader2, Copy, ExternalLink, AlertCircle, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { taxApi } from '@/lib/api/tax';
+import { listen } from '@tauri-apps/api/event';
 import type { TaxTariff } from '@/types';
+
+interface UpdateLog {
+  code: string;
+  message: string;
+  level: 'info' | 'success' | 'error';
+  timestamp: number;
+}
+
+interface UpdateProgress {
+  code: string;
+  progress: number;
+  stage: string;
+}
 
 export function SingleQueryTab() {
   const [code, setCode] = useState('');
@@ -17,6 +32,10 @@ export function SingleQueryTab() {
   const [results, setResults] = useState<TaxTariff[]>([]);
   const [searched, setSearched] = useState(false); // 标记是否已搜索
   const [hasData, setHasData] = useState<boolean | null>(null);
+  const [updatingCode, setUpdatingCode] = useState<string | null>(null); // 正在更新的商品编码
+  const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null);
+  const [updateLogs, setUpdateLogs] = useState<UpdateLog[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
   const { toast } = useToast();
 
   // 检查数据是否存在
@@ -26,6 +45,75 @@ export function SingleQueryTab() {
       setHasData(exists);
     };
     checkData();
+  }, []);
+
+  // 监听更新进度和日志事件
+  useEffect(() => {
+    let isMounted = true;
+    let progressUnlisten: (() => void) | undefined;
+    let logUnlisten: (() => void) | undefined;
+
+    const setupListeners = async () => {
+      // 监听进度事件
+      const progressListener = await listen<UpdateProgress>('update-progress', (event) => {
+        if (!isMounted) return;
+        setUpdateProgress(event.payload);
+        if (event.payload.progress === 100) {
+          // 更新完成后2秒清除进度条和关闭日志窗口
+          setTimeout(() => {
+            if (isMounted) {
+              setUpdateProgress(null);
+              setShowLogs(false);
+              // 再延迟一点清理日志数据
+              setTimeout(() => {
+                if (isMounted) {
+                  setUpdateLogs([]);
+                }
+              }, 300);
+            }
+          }, 2000);
+        }
+      });
+
+      // 监听日志事件
+      const logListener = await listen<Omit<UpdateLog, 'timestamp'>>('update-log', (event) => {
+        if (!isMounted) return;
+        const log: UpdateLog = {
+          ...event.payload,
+          timestamp: Date.now(),
+        };
+        setUpdateLogs((prev) => {
+          // 防止重复日志（检查最后一条日志是否相同）
+          const lastLog = prev[prev.length - 1];
+          if (lastLog && 
+              lastLog.code === log.code && 
+              lastLog.message === log.message && 
+              Math.abs(lastLog.timestamp - log.timestamp) < 100) {
+            // 如果是100毫秒内的相同日志，认为是重复的
+            return prev;
+          }
+          return [...prev, log];
+        });
+        setShowLogs(true);
+      });
+
+      if (isMounted) {
+        progressUnlisten = progressListener;
+        logUnlisten = logListener;
+      } else {
+        // 如果组件已卸载，立即清理
+        progressListener();
+        logListener();
+      }
+    };
+
+    setupListeners();
+
+    return () => {
+      isMounted = false;
+      if (progressUnlisten) progressUnlisten();
+      if (logUnlisten) logUnlisten();
+    };
   }, []);
 
   const handleSearch = async () => {
@@ -83,10 +171,49 @@ export function SingleQueryTab() {
   };
 
   const handleAutoUpdate = async (tariff: TaxTariff) => {
-    toast({
-      title: '开发中',
-      description: '自动更新功能正在开发中',
-    });
+    setUpdatingCode(tariff.code);
+    setUpdateLogs([]); // 清空之前的日志
+    
+    try {
+      const result = await taxApi.updateSingleRow(tariff.code);
+      
+      if (result.success) {
+        // 更新本地状态中的数据
+        setResults((prev) =>
+          prev.map((item) => {
+            if (item.code === tariff.code) {
+              return {
+                ...item,
+                rate: result.newUkRate || item.rate,
+                north_ireland_rate: result.newNiRate || item.north_ireland_rate,
+                description: result.newDescription || item.description,
+              };
+            }
+            return item;
+          })
+        );
+        
+        toast({
+          title: '更新成功',
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: '更新失败',
+          description: result.message,
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('更新失败:', error);
+      toast({
+        title: '更新失败',
+        description: String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingCode(null);
+    }
   };
 
   return (
@@ -246,9 +373,14 @@ export function SingleQueryTab() {
                           size="icon"
                           className="h-8 w-8"
                           onClick={() => handleAutoUpdate(result)}
+                          disabled={updatingCode === result.code}
                           title="自动更新当前行"
                         >
-                          <RefreshCw className="h-3 w-3" />
+                          {updatingCode === result.code ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3 w-3" />
+                          )}
                         </Button>
                       </div>
                     </TableCell>
@@ -270,6 +402,69 @@ export function SingleQueryTab() {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* 底部进度条 */}
+      {updateProgress && (
+        <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 z-50">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm font-medium">
+                  正在更新商品 {updateProgress.code}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {updateProgress.stage}
+                </span>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {updateProgress.progress}%
+              </span>
+            </div>
+            <Progress value={updateProgress.progress} className="h-2" />
+          </div>
+        </div>
+      )}
+
+      {/* 右下角日志窗口 */}
+      {showLogs && updateLogs.length > 0 && (
+        <div className="fixed bottom-20 right-4 w-96 bg-background border rounded-lg shadow-lg z-50">
+          <div className="flex items-center justify-between p-3 border-b">
+            <h3 className="text-sm font-medium">更新日志</h3>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => {
+                setShowLogs(false);
+                // 关闭时清理日志，避免下次显示旧日志
+                setTimeout(() => setUpdateLogs([]), 300);
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="max-h-80 overflow-y-auto p-3 space-y-2 text-sm font-mono">
+            {updateLogs.map((log, index) => (
+              <div
+                key={index}
+                className={`flex gap-2 ${
+                  log.level === 'error'
+                    ? 'text-red-600'
+                    : log.level === 'success'
+                    ? 'text-green-600'
+                    : 'text-muted-foreground'
+                }`}
+              >
+                <span className="text-xs opacity-60">
+                  {new Date(log.timestamp).toLocaleTimeString()}
+                </span>
+                <span>{log.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

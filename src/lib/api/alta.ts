@@ -108,9 +108,9 @@ export const altaApi = {
   /**
    * 下载Excel模板
    */
-  async downloadTemplate(): Promise<string> {
+  async downloadTemplate(outputPath: string): Promise<void> {
     try {
-      return await invoke<string>('download_template');
+      await invoke('download_template', { outputPath });
     } catch (error) {
       console.error('下载模板失败:', error);
       throw error;

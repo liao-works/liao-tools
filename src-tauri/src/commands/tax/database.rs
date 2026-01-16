@@ -199,6 +199,73 @@ impl TaxDatabase {
         Ok(())
     }
     
+    /// 部分更新字段
+    pub fn update_tariff_fields(
+        &self,
+        code: &str,
+        rate: Option<&str>,
+        north_ireland_rate: Option<&str>,
+        description: Option<&str>,
+    ) -> Result<()> {
+        // 构建动态 SQL
+        let mut updates = Vec::new();
+        
+        if rate.is_some() {
+            updates.push("rate = ?");
+        }
+        
+        if north_ireland_rate.is_some() {
+            updates.push("north_ireland_rate = ?");
+        }
+        
+        if description.is_some() {
+            updates.push("description = ?");
+        }
+        
+        if updates.is_empty() {
+            return Ok(()); // 没有需要更新的字段
+        }
+        
+        // 添加 last_updated
+        updates.push("last_updated = datetime('now')");
+        
+        let sql = format!(
+            "UPDATE tariffs SET {} WHERE code = ?",
+            updates.join(", ")
+        );
+        
+        // 使用 rusqlite::params! 宏来构建参数
+        match (rate, north_ireland_rate, description) {
+            (Some(r), Some(nir), Some(d)) => {
+                self.conn.execute(&sql, params![r, nir, d, code])?;
+            }
+            (Some(r), Some(nir), None) => {
+                self.conn.execute(&sql, params![r, nir, code])?;
+            }
+            (Some(r), None, Some(d)) => {
+                self.conn.execute(&sql, params![r, d, code])?;
+            }
+            (None, Some(nir), Some(d)) => {
+                self.conn.execute(&sql, params![nir, d, code])?;
+            }
+            (Some(r), None, None) => {
+                self.conn.execute(&sql, params![r, code])?;
+            }
+            (None, Some(nir), None) => {
+                self.conn.execute(&sql, params![nir, code])?;
+            }
+            (None, None, Some(d)) => {
+                self.conn.execute(&sql, params![d, code])?;
+            }
+            (None, None, None) => {
+                // 已经在前面检查过了，这里不会到达
+                unreachable!()
+            }
+        }
+        
+        Ok(())
+    }
+    
     /// 清空所有记录（用于数据更新）
     pub fn clear_all(&self) -> Result<()> {
         self.conn.execute("DELETE FROM tariffs", [])?;

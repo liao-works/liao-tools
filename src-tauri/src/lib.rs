@@ -80,6 +80,7 @@ pub fn run() {
             tax_check_update,
             tax_download_update,
             tax_open_url,
+            tax_update_single_row,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

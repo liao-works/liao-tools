@@ -69,3 +69,17 @@ pub struct DownloadUrls {
     #[serde(default)]
     pub mirror: Vec<String>,
 }
+
+/// 单行更新结果
+#[derive(Debug, Clone, Serialize)]
+pub struct UpdateResult {
+    pub success: bool,
+    pub message: String,
+    pub uk_updated: bool,
+    pub ni_updated: bool,
+    pub old_uk_rate: Option<String>,
+    pub new_uk_rate: Option<String>,
+    pub old_ni_rate: Option<String>,
+    pub new_ni_rate: Option<String>,
+    pub new_description: Option<String>,
+}

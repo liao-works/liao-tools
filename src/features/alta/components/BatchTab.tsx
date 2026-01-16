@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { altaApi } from '@/lib/api/alta';
 import type { AltaBatchResult } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { open, save } from '@tauri-apps/plugin-dialog';
 
 const MATCH_OPTIONS = [
   { value: 4, label: '4位匹配' },
@@ -27,8 +28,7 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
 
   const handleSelectFile = async () => {
     try {
-      const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
-      const selected = await openDialog({
+      const selected = await open({
         multiple: false,
         filters: [{
           name: 'Excel Files',
@@ -36,8 +36,8 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
         }]
       });
 
-      if (selected) {
-        setFilePath(selected as string);
+      if (selected && typeof selected === 'string') {
+        setFilePath(selected);
         setResult(null);
       }
     } catch (error) {
@@ -95,12 +95,23 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
 
   const handleDownloadTemplate = async () => {
     try {
-      const templatePath = await altaApi.downloadTemplate();
-      toast({
-        title: '模板已下载',
-        description: templatePath,
-        duration: 5000,
+      const path = await save({
+        defaultPath: 'Alta查询模板.xlsx',
+        filters: [
+          {
+            name: 'Excel',
+            extensions: ['xlsx'],
+          },
+        ],
       });
+
+      if (path) {
+        await altaApi.downloadTemplate(path);
+        toast({
+          title: '下载成功',
+          description: '模板已保存',
+        });
+      }
     } catch (error: any) {
       console.error('下载模板失败:', error);
       toast({
