@@ -92,7 +92,13 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Antigravity Tools ${{ github.ref_name }}"
-          releaseBody: "See the assets to download this version and install."
+          releaseBody: ""
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Generate release notes
+        shell: bash
+        run: gh release edit ${{ github.ref_name }} --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
