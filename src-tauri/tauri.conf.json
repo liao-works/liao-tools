@@ -10,6 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "withGlobalTauri": false,
     "windows": [
       {
         "title": "Liao Tools",
@@ -18,7 +19,10 @@
         "minWidth": 1024,
         "minHeight": 600,
         "center": true,
-        "resizable": true
+        "resizable": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "transparent": true
       }
     ],
     "security": {
@@ -37,6 +41,9 @@
     ],
     "resources": [
       "resources/templates/*"
-    ]
+    ],
+    "macOS": {
+      "entitlements": "Entitlements.plist"
+    }
   }
 }
