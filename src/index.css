@@ -1,56 +1,6 @@
 @import "tailwindcss";
 
 /* ============================================
-   🎨 TYPOGRAPHY SYSTEM - Tool Application
-   工具类应用字体系统：IBM Plex Sans + JetBrains Mono
-   专业、清晰、技术感
-   ============================================ */
-
-@layer base {
-  /* 导入 IBM Plex Sans (含简体中文) + JetBrains Mono */
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-  
-  html {
-    /* 
-     * 字体栈策略:
-     * IBM Plex Sans SC (中文) - IBM 出品，工业设计感
-     * IBM Plex Sans (英文) - 技术专业感
-     * 系统字体作为后备
-     */
-    font-family: 
-      "IBM Plex Sans SC",
-      "IBM Plex Sans",
-      "PingFang SC",
-      "Microsoft YaHei",
-      system-ui,
-      sans-serif;
-    
-    /* 15px 基础大小 - 比 16px 更精致 */
-    font-size: 15px;
-    line-height: 1.6;
-    
-    /* 字体渲染优化 */
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-    
-    /* 字母间距微调 - 让文字更透气 */
-    letter-spacing: 0.01em;
-  }
-  
-  /* 代码字体 - JetBrains Mono */
-  code, kbd, samp, pre {
-    font-family: 
-      "JetBrains Mono",
-      "Fira Code",
-      "Cascadia Code",
-      Consolas,
-      monospace;
-    font-feature-settings: "liga", "calt";
-  }
-}
-
-/* ============================================
    🎨 COLOR TOKENS
    ============================================ */
 
@@ -124,10 +74,36 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
-  
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
+
+  /* Accordion animations */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+}
+
+/* ============================================
+   🎬 ACCORDION ANIMATIONS
+   ============================================ */
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
 }
 
 /* ============================================
@@ -139,10 +115,23 @@
   border-color: hsl(var(--border));
 }
 
+/* 全局样式 */
 body {
-  background-color: hsl(var(--background));
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #FAFBFC;
   color: hsl(var(--foreground));
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dark mode override for body strictly */
+.dark body {
+  background-color: #1d232a;
+  /* matches base-300 commonly used */
 }
 
 /* ============================================
@@ -221,186 +210,79 @@ small {
   line-height: 1.5;
   color: hsl(var(--muted-foreground));
 }
-
-/* ============================================
-   💻 CODE
-   ============================================ */
-
-code {
-  font-size: 0.8125rem;
-  padding: 0.15em 0.4em;
-  border-radius: 0.25rem;
-  background-color: hsl(var(--muted));
-  color: hsl(var(--foreground));
-  font-weight: 500;
+#root {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: none;
 }
 
-pre {
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  background-color: hsl(var(--muted));
-  overflow-x: auto;
+/* 移除默认的 tap 高亮 */
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* ============================================
-   🔘 INTERACTIVE ELEMENTS
-   ============================================ */
-
-button {
-  font-size: 0.875rem;       /* 14px */
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  line-height: 1;
-}
-
-input,
-textarea,
-select {
-  font-size: 0.9375rem;      /* 15px */
-  line-height: 1.5;
-  color: hsl(var(--foreground));
-}
-
-input::placeholder,
-textarea::placeholder {
-  color: hsl(var(--muted-foreground) / 0.7);
-  font-weight: 400;
-}
-
-label {
-  font-size: 0.8125rem;      /* 13px */
-  font-weight: 500;
-  line-height: 1.4;
-  letter-spacing: 0.01em;
-  color: hsl(var(--foreground));
-}
-
-/* ============================================
-   🃏 CARD COMPONENTS
-   ============================================ */
-
-[class*="CardTitle"] {
-  font-size: 1.0625rem;      /* 17px */
-  font-weight: 600;
-  line-height: 1.35;
-  letter-spacing: -0.01em;
-  color: hsl(var(--foreground));
-}
-
-[class*="CardDescription"] {
-  font-size: 0.875rem;       /* 14px */
-  line-height: 1.55;
-  color: hsl(var(--muted-foreground));
-  margin-top: 0.25rem;
-}
-
-/* ============================================
-   📊 DATA DISPLAY
-   ============================================ */
-
-table {
-  font-size: 0.875rem;
-}
-
-thead th {
-  font-size: 0.75rem;        /* 12px */
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: hsl(var(--muted-foreground));
-}
-
-tbody td {
-  font-size: 0.875rem;
-  color: hsl(var(--foreground) / 0.9);
-}
-
-/* 数字等宽显示 */
-.tabular-nums,
-[data-numeric],
-table td:has(input[type="number"]) {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
-}
-
-/* ============================================
-   🧭 NAVIGATION
-   ============================================ */
-
-nav a {
-  font-size: 0.875rem;       /* 14px */
-  font-weight: 500;
-  letter-spacing: 0.01em;
-}
-
-/* Tab 标签 */
-[role="tablist"] button,
-[data-state] {
-  font-size: 0.875rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-}
-
-/* ============================================
-   ⚡ TRANSITIONS
-   平滑的主题切换动画
-   ============================================ */
-
-*,
-*::before,
-*::after {
-  transition-property: background-color, border-color, color, fill, stroke;
-  transition-duration: 0.3s;
-  transition-timing-function: ease;
-}
-
-/* 交互元素更快响应 */
-button,
-input,
-select,
-textarea,
+/* 只移除链接的默认下划线，不强制颜色 */
 a {
-  transition-duration: 0.15s;
-}
-
-/* ============================================
-   🎯 UTILITY CLASSES
-   ============================================ */
-
-/* 页面标题区域 */
-.page-header {
-  margin-bottom: 1.5rem;
-}
-
-.page-header h1 {
-  margin-bottom: 0.375rem;
-}
-
-.page-header p,
-.page-header .description {
-  font-size: 0.9375rem;
-  color: hsl(var(--muted-foreground));
-  margin-bottom: 0;
-}
-
-/* 强调文字 */
-strong, b {
-  font-weight: 600;
-  color: hsl(var(--foreground));
-}
-
-/* 链接样式 */
-a:not([class]) {
-  color: hsl(var(--primary));
   text-decoration: none;
-  font-weight: 500;
 }
 
-a:not([class]):hover {
-  text-decoration: underline;
-  text-underline-offset: 2px;
+/* 滚动条优化 - 彻底隐藏但保留功能 */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* View Transitions API 主题切换动画 */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
+.dark::view-transition-old(root) {
+  z-index: 9999;
+}
+
+.dark::view-transition-new(root) {
+  z-index: 1;
+}
+
+/* 暗色模式下 select 下拉菜单样式 */
+.dark select,
+.dark select option,
+.dark select optgroup {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
+
+.dark select option:checked {
+  background-color: #3b82f6;
+  color: white;
 }
 
 /* ============================================
@@ -411,15 +293,15 @@ a:not([class]):hover {
   html {
     font-size: 14px;
   }
-  
+
   h1 {
     font-size: 1.625rem;     /* 26px */
   }
-  
+
   h2 {
     font-size: 1.375rem;     /* 22px */
   }
-  
+
   h3 {
     font-size: 1.125rem;     /* 18px */
   }
@@ -430,68 +312,4 @@ a:not([class]):hover {
   html {
     font-size: 16px;
   }
-}
-
-/* ============================================
-   🎨 CUSTOM SCROLLBAR
-   现代化滚动条样式 - 极简优雅
-   ============================================ */
-
-/* Firefox 滚动条样式 */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--border)) transparent;
-}
-
-/* Webkit 浏览器滚动条样式 (Chrome, Safari, Edge) */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-  margin: 2px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.3);
-}
-
-::-webkit-scrollbar-thumb:active {
-  background: hsl(var(--muted-foreground) / 0.4);
-}
-
-/* 滚动条拐角 */
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-/* 针对特定区域的滚动条样式优化 */
-main::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-}
-
-main::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary) / 0.15);
-}
-
-/* 侧边栏滚动条（更细更隐蔽） */
-aside::-webkit-scrollbar {
-  width: 6px;
-}
-
-aside::-webkit-scrollbar-thumb {
-  background: hsl(var(--border) / 0.5);
-  border-radius: 3px;
-}
-
-aside::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--border));
 }

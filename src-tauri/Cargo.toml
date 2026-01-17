@@ -36,6 +36,7 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 # Excel 处理
 calamine = "0.26"
 rust_xlsxwriter = "0.79"
+image = { version = "0.25", features = ["webp", "jpeg", "png", "gif", "bmp"] }
 
 # 错误处理
 thiserror = "1.0"
@@ -56,4 +57,13 @@ strsim = "0.11"
 
 # 异步工具
 futures-util = "0.3"
+
+# 系统目录
+dirs = "5.0"
+
+# ZIP 解析（用于读取 xlsx 中的合并单元格信息）
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
+
+# XML 解析
+quick-xml = "0.31"
 
