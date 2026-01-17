@@ -3,9 +3,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::commands::error::CommandError;
 
 // GitHub 仓库配置
-const GITHUB_API_URL: &str = "https://api.github.com/repos/YOUR_GITHUB_USERNAME/liao-tools/releases/latest";
+const GITHUB_REPO: &str = "liao-works/liao-tools";
+const GITHUB_API_URL: &str = "https://api.github.com/repos/liao-works/liao-tools/releases/latest";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_CHECK_INTERVAL_HOURS: u64 = 24;
+
+// 可选的 GitHub Token（用于访问私有仓库）
+// 可以通过环境变量 GITHUB_TOKEN 设置
+fn get_github_token() -> Option<String> {
+    std::env::var("GITHUB_TOKEN").ok()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateInfo {
@@ -57,18 +64,41 @@ pub async fn check_for_updates() -> Result<UpdateInfo, CommandError> {
         .map_err(|e| CommandError::new(format!("创建 HTTP 客户端失败: {}", e), "NETWORK_ERROR"))?;
 
     println!("正在从 GitHub 检查新版本...");
+    println!("仓库: {}", GITHUB_REPO);
+    println!("API 地址: {}", GITHUB_API_URL);
 
-    let response = client
-        .get(GITHUB_API_URL)
+    // 构建请求，如果有 Token 则添加认证头
+    let mut request = client.get(GITHUB_API_URL);
+    if let Some(token) = get_github_token() {
+        println!("使用 GitHub Token 进行认证");
+        request = request.header("Authorization", format!("Bearer {}", token));
+    }
+
+    let response = request
         .send()
         .await
         .map_err(|e| CommandError::new(format!("获取版本信息失败: {}", e), "NETWORK_ERROR"))?;
 
     if !response.status().is_success() {
-        return Err(CommandError::new(
-            format!("GitHub API 返回错误状态: {}", response.status()),
-            "API_ERROR"
-        ));
+        let status = response.status();
+        let error_body = response.text().await.unwrap_or_else(|_| "无法读取错误信息".to_string());
+
+        if status.as_u16() == 404 {
+            return Err(CommandError::new(
+                format!("仓库 {} 未找到 Release，请确保已发布至少一个版本", GITHUB_REPO),
+                "NOT_FOUND"
+            ));
+        } else if status.as_u16() == 403 || status.as_u16() == 401 {
+            return Err(CommandError::new(
+                format!("访问私有仓库失败，请设置 GITHUB_TOKEN 环境变量。错误: {}", error_body),
+                "AUTH_ERROR"
+            ));
+        } else {
+            return Err(CommandError::new(
+                format!("GitHub API 返回错误状态: {} - {}", status, error_body),
+                "API_ERROR"
+            ));
+        }
     }
 
     let release: GitHubRelease = response
@@ -93,7 +123,7 @@ pub async fn check_for_updates() -> Result<UpdateInfo, CommandError> {
         latest_version,
         has_update,
         download_url: release.html_url,
-        release_notes: release.body.unwrap_or_else(|| "暂无更新说明".to_string()),
+        release_notes: release.body.unwrap_or("暂无更新说明".to_string()),
         published_at: release.published_at,
     })
 }

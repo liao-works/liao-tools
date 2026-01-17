@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { FileBarChart, FileSpreadsheet, Settings, Percent, ChevronLeft, ChevronRight, Moon, Sun, Palette, Package, Download } from 'lucide-react';
+import { FileBarChart, FileSpreadsheet, Settings, Percent, ChevronLeft, ChevronRight, Moon, Sun, Palette, Package, Download, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useTheme } from '@/hooks/use-theme';
 import { useDarkMode } from '@/hooks/use-dark-mode';
 import { UpdateDialog } from '@/components/UpdateDialog';
@@ -43,9 +44,10 @@ const navItems = [
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const navigate = useNavigate();
-  const { currentTheme } = useTheme();
+  const { currentTheme, themes, changeTheme } = useTheme();
   const { isDark, toggleDarkMode } = useDarkMode();
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  const [themePopoverOpen, setThemePopoverOpen] = useState(false);
 
   return (
     <aside
@@ -117,7 +119,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50">
                 <div
                   className="h-3 w-3 rounded-full shadow-sm shrink-0"
-                  style={{ backgroundColor: `hsl(${currentTheme.colors.primary})` }}
+                  style={{ backgroundColor: 'hsl(var(--primary))' }}
                 />
                 <span className="text-sm font-medium truncate">{currentTheme.name}</span>
               </div>
@@ -155,16 +157,53 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             />
           </Button>
 
-          {/* 主题设置按钮 */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/settings')}
-            title="主题设置"
-            className="shrink-0 h-9 w-9"
-          >
-            <Palette className="h-4 w-4" />
-          </Button>
+          {/* 配色方案按钮 */}
+          <Popover open={themePopoverOpen} onOpenChange={setThemePopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="配色方案"
+                className="group relative shrink-0 h-9 w-9"
+              >
+                <Palette className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 p-2">
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground px-2 py-1">配色方案</p>
+                {themes.map((theme) => (
+                  <button
+                    key={theme.id}
+                    onClick={() => {
+                      changeTheme(theme.id);
+                      setThemePopoverOpen(false);
+                    }}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-2 py-2 rounded-md transition-colors',
+                      'hover:bg-accent hover:text-accent-foreground',
+                      currentTheme.id === theme.id && 'bg-accent'
+                    )}
+                  >
+                    <div className="flex gap-1">
+                      <div
+                        className="h-4 w-4 rounded-sm shadow-sm"
+                        style={{ backgroundColor: `hsl(${theme.colors.primary})` }}
+                      />
+                      <div
+                        className="h-4 w-4 rounded-sm shadow-sm"
+                        style={{ backgroundColor: `hsl(${theme.colors.secondary})` }}
+                      />
+                    </div>
+                    <span className="text-sm flex-1 text-left">{theme.name}</span>
+                    {currentTheme.id === theme.id && (
+                      <Check className="h-4 w-4 text-primary" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
 
           {/* 检查更新按钮 */}
           <Button

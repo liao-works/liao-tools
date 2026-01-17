@@ -7,10 +7,12 @@ import { UpsUpdPage } from './features/ups-dpd/UpsUpdPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { Toaster } from './components/ui/toaster';
 import { useDarkMode } from './hooks/use-dark-mode';
+import { useTheme } from './hooks/use-theme';
 
 function App() {
-  // 初始化暗色模式
+  // 初始化暗色模式和主题
   useDarkMode();
+  useTheme();
 
   return (
     <BrowserRouter>

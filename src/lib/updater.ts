@@ -49,3 +49,17 @@ export async function updateLastCheckTime(): Promise<void> {
 export async function getCurrentVersion(): Promise<string> {
   return await invoke('get_current_version');
 }
+
+/**
+ * 保存 GitHub Token
+ */
+export async function saveGithubToken(token: string): Promise<void> {
+  return await invoke('save_github_token', { token });
+}
+
+/**
+ * 加载 GitHub Token
+ */
+export async function loadGithubToken(): Promise<string> {
+  return await invoke('load_github_token');
+}
