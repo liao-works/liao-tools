@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Upload, Download, Loader2, FileCheck, ExternalLink } from 'lucide-react';
+import { Upload, Download, Loader2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -65,7 +65,7 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
       });
     } catch (error: any) {
       console.error('处理失败:', error);
-      
+
       // 检查是否是数据库为空的错误
       if (error.code === 'DATABASE_EMPTY') {
         toast({
@@ -242,8 +242,8 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
                     <p className="text-xs text-muted-foreground">输出文件：</p>
                     <p className="text-sm font-mono truncate">{result.output_path}</p>
                   </div>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="ghost"
                     onClick={() => copyPathToClipboard(result.output_path)}
                     className="ml-2 shrink-0"

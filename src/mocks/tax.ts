@@ -57,7 +57,7 @@ export const mockVersionInfo: TaxVersionInfo = {
     records: 5100,
     date: '2024-01-15',
   },
-  hasUpdate: true,
+  has_update: true,
   changelog: [
     { date: '2024-01-15', message: '新增100条税率数据' },
     { date: '2024-01-14', message: '修复北爱尔兰URL错误' },
@@ -70,7 +70,7 @@ export const mockVersionInfo: TaxVersionInfo = {
  */
 export const mockExactSearch = async (code: string): Promise<TaxTariff | null> => {
   await delay(500);
-  
+
   const found = mockTariffs.find(t => t.code === code);
   return found || null;
 };
@@ -80,16 +80,16 @@ export const mockExactSearch = async (code: string): Promise<TaxTariff | null> =
  */
 export const mockFuzzySearch = async (code: string): Promise<TaxTariff[]> => {
   await delay(700);
-  
+
   // 查找包含输入code的所有记录
   const results = mockTariffs
-    .filter(t => t.code.includes(code) || t.description.toLowerCase().includes(code.toLowerCase()))
+    .filter(t => t.code.includes(code) || t.description?.toLowerCase().includes(code.toLowerCase()))
     .map(t => ({
       ...t,
       similarity: Math.random() * 0.3 + 0.7, // 0.7-1.0之间的相似度
     }))
     .sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
-  
+
   return results;
 };
 
@@ -97,11 +97,11 @@ export const mockFuzzySearch = async (code: string): Promise<TaxTariff[]> => {
  * 模拟批量查询
  */
 export const mockBatchQuery = async (
-  file: File,
+  _file: File,
   onProgress?: (current: number, total: number) => void
 ): Promise<{ results: TaxTariff[]; errors: string[] }> => {
   const total = 50;
-  
+
   // 模拟进度
   for (let i = 0; i <= total; i++) {
     if (onProgress) {
@@ -109,7 +109,7 @@ export const mockBatchQuery = async (
     }
     await delay(50);
   }
-  
+
   return {
     results: mockTariffs,
     errors: ['第5行：编码格式不正确', '第12行：编码不存在'],
@@ -132,18 +132,18 @@ export const mockDownloadUpdate = async (
 ): Promise<boolean> => {
   const total = 10485760; // 10MB
   const steps = 100;
-  
+
   for (let i = 0; i <= steps; i++) {
     const downloaded = (total * i) / steps;
     const percentage = (i / steps) * 100;
-    
+
     if (onProgress) {
       onProgress(downloaded, total, percentage);
     }
-    
+
     await delay(30);
   }
-  
+
   return true;
 };
 
@@ -152,8 +152,8 @@ export const mockDownloadUpdate = async (
  */
 export const mockAutoUpdate = async (
   code: string,
-  ukUrl: string,
-  niUrl?: string
+  _ukUrl: string,
+  _niUrl?: string
 ): Promise<{
   success: boolean;
   updated: boolean;
@@ -162,16 +162,16 @@ export const mockAutoUpdate = async (
   message: string;
 }> => {
   await delay(2000);
-  
+
   const oldData = mockTariffs.find(t => t.code === code) || mockTariffs[0];
   const newData = {
     ...oldData,
     rate: `${randomInt(0, 20)}%`,
     northIrelandRate: `${randomInt(0, 18)}%`,
   };
-  
+
   const updated = oldData.rate !== newData.rate;
-  
+
   return {
     success: true,
     updated,

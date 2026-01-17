@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle2, Download, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
 import { checkForUpdates, loadUpdateSettings, saveUpdateSettings, updateLastCheckTime, type UpdateInfo } from '@/lib/updater';
-import { open } from '@tauri-apps/plugin-opener';
+import { open } from '@tauri-apps/api/shell';
 
 interface UpdateDialogProps {
   open: boolean;

@@ -1,11 +1,11 @@
 import type { ExcelProcessType, ExcelProcessResult, ExcelProgress } from '@/types';
-import { delay, simulateProgress } from './utils';
+import { delay } from './utils';
 
 /**
  * 模拟Excel文件处理
  */
 export const mockProcessExcel = async (
-  mainFile: File,
+  _mainFile: File,
   detailFile: File | null,
   processType: ExcelProcessType,
   onProgress?: (progress: ExcelProgress) => void
