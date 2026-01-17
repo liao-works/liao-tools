@@ -26,8 +26,8 @@ pub fn get_default_template_path(template_type: &TemplateType) -> Result<PathBuf
     // 在打包后，模板会被打包到应用的 resources 目录
 
     let template_name = match template_type {
-        TemplateType::Ups => "UPS总结单模板.xlsx",
-        TemplateType::Dpd => "DPD数据预报模板.xlsx",
+        TemplateType::Ups => "UPS_template.xlsx",
+        TemplateType::Dpd => "DPD_template.xlsx",
     };
 
     // 尝试多个可能的位置
