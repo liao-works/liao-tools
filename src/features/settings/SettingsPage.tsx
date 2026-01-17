@@ -2,16 +2,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { Github, Mail, Globe, Check } from 'lucide-react';
-import { useState } from 'react';
+import { Github, Mail, Globe, Check, Download } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
+import { UpdateDialog } from '@/components/UpdateDialog';
+import { loadSettings, saveSettings, type AppSettings } from '@/lib/settings';
 
 export function SettingsPage() {
-  const [autoUpdate, setAutoUpdate] = useState(true);
-  const [notifications, setNotifications] = useState(true);
-  const [saveHistory, setSaveHistory] = useState(true);
+  const [settings, setSettings] = useState<AppSettings>(loadSettings);
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const { currentTheme, themes, changeTheme } = useTheme();
+
+  // 自动保存设置
+  useEffect(() => {
+    saveSettings(settings);
+  }, [settings]);
+
+  const updateSetting = (key: keyof AppSettings, value: boolean) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
+  };
 
   return (
     <div className="space-y-6">
@@ -84,8 +94,8 @@ export function SettingsPage() {
             </div>
             <Switch
               id="auto-update"
-              checked={autoUpdate}
-              onCheckedChange={setAutoUpdate}
+              checked={settings.autoUpdate}
+              onCheckedChange={(checked) => updateSetting('autoUpdate', checked)}
             />
           </div>
 
@@ -98,8 +108,8 @@ export function SettingsPage() {
             </div>
             <Switch
               id="notifications"
-              checked={notifications}
-              onCheckedChange={setNotifications}
+              checked={settings.notifications}
+              onCheckedChange={(checked) => updateSetting('notifications', checked)}
             />
           </div>
 
@@ -112,54 +122,9 @@ export function SettingsPage() {
             </div>
             <Switch
               id="save-history"
-              checked={saveHistory}
-              onCheckedChange={setSaveHistory}
+              checked={settings.saveHistory}
+              onCheckedChange={(checked) => updateSetting('saveHistory', checked)}
             />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 数据管理 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>数据管理</CardTitle>
-          <CardDescription>管理本地缓存和数据文件</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">本地数据缓存</p>
-              <p className="text-xs text-muted-foreground">
-                大约占用 120 MB 磁盘空间
-              </p>
-            </div>
-            <Button variant="outline" size="sm">
-              清理缓存
-            </Button>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">查询历史记录</p>
-              <p className="text-xs text-muted-foreground">
-                包含 245 条查询记录
-              </p>
-            </div>
-            <Button variant="outline" size="sm">
-              清除历史
-            </Button>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">导出配置</p>
-              <p className="text-xs text-muted-foreground">
-                导出当前设置以便备份或迁移
-              </p>
-            </div>
-            <Button variant="outline" size="sm">
-              导出设置
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -194,6 +159,10 @@ export function SettingsPage() {
           </div>
 
           <div className="flex gap-2 pt-4 border-t">
+            <Button variant="outline" size="sm" onClick={() => setUpdateDialogOpen(true)}>
+              <Download className="mr-2 h-4 w-4" />
+              检查更新
+            </Button>
             <Button variant="outline" size="sm">
               <Github className="mr-2 h-4 w-4" />
               GitHub
@@ -210,11 +179,11 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* 保存按钮 */}
-      <div className="flex justify-end gap-2">
-        <Button variant="outline">重置为默认</Button>
-        <Button>保存设置</Button>
-      </div>
+      {/* 更新对话框 */}
+      <UpdateDialog
+        open={updateDialogOpen}
+        onOpenChange={setUpdateDialogOpen}
+      />
     </div>
   );
 }

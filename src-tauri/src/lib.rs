@@ -7,6 +7,8 @@ use commands::alta::database::DatabaseManager;
 use commands::alta::matcher::HSCodeMatcher;
 use commands::excel::*;
 use commands::tax::*;
+use commands::ups_dpd::commands::*;
+use commands::updater::*;
 use log::info;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -86,6 +88,18 @@ pub fn run() {
             process_excel_file,
             get_excel_config,
             save_excel_config,
+            // UPS/DPD commands
+            process_ups_dpd_file,
+            get_template_config,
+            save_template_config,
+            validate_template_file,
+            reset_to_default_template,
+            // Updater commands
+            check_for_updates,
+            load_update_settings,
+            save_update_settings,
+            update_last_check_time,
+            get_current_version,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

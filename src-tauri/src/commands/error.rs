@@ -27,3 +27,9 @@ impl From<String> for CommandError {
         CommandError::new(error, "ERROR")
     }
 }
+
+impl From<rust_xlsxwriter::XlsxError> for CommandError {
+    fn from(error: rust_xlsxwriter::XlsxError) -> Self {
+        CommandError::new(error.to_string(), "XLSX_ERROR")
+    }
+}

@@ -99,9 +99,14 @@ export const getThemeById = (id: string): Theme | undefined => {
 
 export const applyTheme = (theme: Theme) => {
   const root = document.documentElement;
-  
+
+  // 立即应用所有主题颜色变量
   Object.entries(theme.colors).forEach(([key, value]) => {
     const cssVar = key.replace(/([A-Z])/g, '-$1').toLowerCase();
     root.style.setProperty(`--${cssVar}`, value);
   });
+
+  // 强制浏览器重新计算样式
+  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+  root.offsetHeight;
 };

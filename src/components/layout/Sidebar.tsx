@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { FileBarChart, FileSpreadsheet, Settings, Percent, ChevronLeft, ChevronRight, Moon, Sun, Palette } from 'lucide-react';
+import { FileBarChart, FileSpreadsheet, Settings, Percent, ChevronLeft, ChevronRight, Moon, Sun, Palette, Package, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useTheme } from '@/hooks/use-theme';
 import { useDarkMode } from '@/hooks/use-dark-mode';
+import { UpdateDialog } from '@/components/UpdateDialog';
+import logo from '@/assets/logo-64.png';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -25,10 +28,16 @@ const navItems = [
     description: '英国海关税率',
   },
   {
-    title: 'Excel处理',
+    title: 'Excel拆分',
     href: '/excel',
     icon: FileSpreadsheet,
-    description: 'UPS & DPD数据填充/数据拆分',
+    description: '合并单元格拆分',
+  },
+  {
+    title: 'UPS/DPD',
+    href: '/ups-dpd',
+    icon: Package,
+    description: '物流数据模板填充',
   },
 ];
 
@@ -36,6 +45,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const navigate = useNavigate();
   const { currentTheme } = useTheme();
   const { isDark, toggleDarkMode } = useDarkMode();
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
 
   return (
     <aside
@@ -57,8 +67,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Logo区域 */}
       <div className="flex h-16 items-center border-b px-4 shrink-0">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">LT</span>
+          <div className="h-8 w-8 rounded-lg flex items-center justify-center overflow-hidden">
+            <img src={logo} alt="Liao Tools" className="h-full w-full object-contain" />
           </div>
           {!collapsed && (
             <div className="flex flex-col">
@@ -129,17 +139,17 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             title={isDark ? '切换到亮色模式' : '切换到暗色模式'}
             className="group relative shrink-0 h-9 w-9"
           >
-            <Sun 
+            <Sun
               className={`h-4 w-4 transition-all duration-300 absolute ${
-                isDark 
-                  ? 'rotate-0 scale-100 opacity-100' 
+                isDark
+                  ? 'rotate-0 scale-100 opacity-100'
                   : 'rotate-90 scale-0 opacity-0'
               } group-hover:rotate-90`}
             />
-            <Moon 
+            <Moon
               className={`h-4 w-4 transition-all duration-300 absolute ${
-                isDark 
-                  ? '-rotate-90 scale-0 opacity-0' 
+                isDark
+                  ? '-rotate-90 scale-0 opacity-0'
                   : 'rotate-0 scale-100 opacity-100'
               } group-hover:-rotate-12`}
             />
@@ -156,6 +166,17 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <Palette className="h-4 w-4" />
           </Button>
 
+          {/* 检查更新按钮 */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setUpdateDialogOpen(true)}
+            title="检查更新"
+            className="shrink-0 h-9 w-9"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+
           {/* 设置按钮 */}
           <Button
             variant="ghost"
@@ -168,6 +189,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </Button>
         </div>
       </div>
+
+      {/* 更新对话框 */}
+      <UpdateDialog
+        open={updateDialogOpen}
+        onOpenChange={setUpdateDialogOpen}
+      />
     </aside>
   );
 }

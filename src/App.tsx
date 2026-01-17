@@ -3,6 +3,7 @@ import { MainLayout } from './components/layout/MainLayout';
 import { AltaPage } from './features/alta/AltaPage';
 import { TaxPage } from './features/tax/TaxPage';
 import { ExcelPage } from './features/excel/ExcelPage';
+import { UpsUpdPage } from './features/ups-dpd/UpsUpdPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { Toaster } from './components/ui/toaster';
 import { useDarkMode } from './hooks/use-dark-mode';
@@ -19,6 +20,7 @@ function App() {
           <Route path="alta" element={<AltaPage />} />
           <Route path="tax" element={<TaxPage />} />
           <Route path="excel" element={<ExcelPage />} />
+          <Route path="ups-dpd" element={<UpsUpdPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>
