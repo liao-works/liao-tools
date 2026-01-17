@@ -57,6 +57,32 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Get version from tag
+        id: get_version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Update version in config files
+        shell: bash
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          cd src-tauri
+          # Update Cargo.toml
+          sed -i.bak "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+          rm -f Cargo.toml.bak
+          # Update tauri.conf.json
+          node -e "
+            const fs = require('fs');
+            const config = JSON.parse(fs.readFileSync('tauri.conf.json'));
+            config.version = '$VERSION';
+            fs.writeFileSync('tauri.conf.json', JSON.stringify(config, null, 2));
+          "
+          echo "Updated version to $VERSION"
+          echo "--- Cargo.toml ---"
+          head -5 Cargo.toml
+          echo "--- tauri.conf.json ---"
+          head -5 tauri.conf.json
+
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
         env:
