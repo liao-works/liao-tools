@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle2, Download, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
 import { checkForUpdates, loadUpdateSettings, saveUpdateSettings, updateLastCheckTime, type UpdateInfo } from '@/lib/updater';
-import { open } from '@tauri-apps/api/shell';
+import { open as openUrl } from '@tauri-apps/plugin-opener';
 
 interface UpdateDialogProps {
   open: boolean;
@@ -60,7 +60,7 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
   const handleDownload = async () => {
     if (updateInfo?.download_url) {
       try {
-        await open(updateInfo.download_url);
+        await openUrl(updateInfo.download_url);
       } catch (err) {
         console.error('打开下载页面失败:', err);
       }

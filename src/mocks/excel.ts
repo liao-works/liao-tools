@@ -18,7 +18,7 @@ export const mockProcessExcel = async (
     { message: '正在生成输出文件...', percentage: 90 },
     { message: '处理完成！', percentage: 100 },
   ];
-  
+
   for (const step of steps) {
     if (onProgress) {
       onProgress({
@@ -30,7 +30,7 @@ export const mockProcessExcel = async (
     }
     await delay(500);
   }
-  
+
   return {
     success: true,
     outputPath: `/output/${processType}_processed_${Date.now()}.xlsx`,
@@ -44,13 +44,13 @@ export const mockProcessExcel = async (
  */
 export const mockDownloadTemplate = async (processType: ExcelProcessType): Promise<Blob> => {
   await delay(300);
-  
+
   const templateContent = processType === 'UPS'
     ? '订单号,收件人,地址,商品描述,数量\n'
     : '运单号,发件人,目的地,重量,体积\n';
-  
-  return new Blob([templateContent], { 
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+
+  return new Blob([templateContent], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   });
 };
 
@@ -63,27 +63,27 @@ export const mockValidateFile = async (file: File): Promise<{
   warnings: string[];
 }> => {
   await delay(400);
-  
+
   const fileSize = file.size;
   const fileName = file.name;
   const errors: string[] = [];
   const warnings: string[] = [];
-  
+
   // 检查文件大小
   if (fileSize > 10 * 1024 * 1024) {
     errors.push('文件大小超过10MB');
   }
-  
+
   // 检查文件扩展名
   if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
     errors.push('文件格式不正确，请上传Excel文件');
   }
-  
+
   // 模拟一些警告
   if (fileSize < 1024) {
     warnings.push('文件可能为空');
   }
-  
+
   return {
     valid: errors.length === 0,
     errors,
@@ -101,7 +101,7 @@ export const mockGetFileInfo = async (file: File): Promise<{
   columns: string[];
 }> => {
   await delay(300);
-  
+
   return {
     name: file.name,
     size: file.size,
