@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FileOpenDialog } from '@/components/common/FileOpenDialog';
 import { useToast } from '@/hooks/use-toast';
+import { getFileName } from '@/lib/file-opener';
 import { FileText, Play, Settings, X, Package } from 'lucide-react';
 import {
   type TemplateType,
@@ -23,6 +25,8 @@ export function UpsUpdPage() {
   const [detailFile, setDetailFile] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
+  const [showFileDialog, setShowFileDialog] = useState(false);
+  const [outputFilePath, setOutputFilePath] = useState<string>('');
 
   // 模板配置状态
   const [upsConfig, setUpsConfig] = useState<TemplateConfig | null>(null);
@@ -118,9 +122,12 @@ export function UpsUpdPage() {
       setLogs(result.logs);
 
       if (result.success) {
+        setOutputFilePath(result.output_path);
+        setShowFileDialog(true);
+        
         toast({
-          title: '处理成功',
-          description: `文件已保存至: ${result.output_path}`,
+          title: '处理完成',
+          description: `${TemplateTypeLabels[templateType]} 数据处理完成`,
         });
       } else {
         toast({
@@ -455,6 +462,16 @@ export function UpsUpdPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* 文件打开对话框 */}
+      <FileOpenDialog
+        open={showFileDialog}
+        onOpenChange={setShowFileDialog}
+        filePath={outputFilePath}
+        title={`${TemplateTypeLabels[templateType]} 处理完成`}
+        description="数据模板填充处理已完成，是否查看输出文件？"
+        fileName={getFileName(outputFilePath)}
+      />
     </div>
   );
 }

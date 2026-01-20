@@ -6,7 +6,9 @@ import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { ProcessConfigPanel } from './components/ProcessConfigPanel';
 import { ProcessLogPanel } from './components/ProcessLogPanel';
+import { FileOpenDialog } from '@/components/common/FileOpenDialog';
 import { useToast } from '@/hooks/use-toast';
+import { getFileName } from '@/lib/file-opener';
 import type { ProcessType, ProcessRequest, ProcessResponse } from '@/lib/api/excel';
 import { ProcessTypeLabels } from '@/lib/api/excel';
 import { FileText, Play, Settings } from 'lucide-react';
@@ -17,6 +19,8 @@ export function ExcelPage() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
+  const [showFileDialog, setShowFileDialog] = useState(false);
+  const [outputFilePath, setOutputFilePath] = useState<string>('');
   const { toast } = useToast();
 
   const handleSelectFile = async () => {
@@ -71,9 +75,12 @@ export function ExcelPage() {
       setLogs(result.logs);
 
       if (result.success) {
+        setOutputFilePath(result.output_path);
+        setShowFileDialog(true);
+        
         toast({
-          title: '处理成功',
-          description: `文件已保存至: ${result.output_path}`,
+          title: '处理完成',
+          description: 'Excel 文件处理完成',
         });
       } else {
         toast({
@@ -189,6 +196,16 @@ export function ExcelPage() {
           <ProcessConfigPanel />
         </TabsContent>
       </Tabs>
+
+      {/* 文件打开对话框 */}
+      <FileOpenDialog
+        open={showFileDialog}
+        onOpenChange={setShowFileDialog}
+        filePath={outputFilePath}
+        title="Excel 处理完成"
+        description="数据拆分处理已完成，是否查看输出文件？"
+        fileName={getFileName(outputFilePath)}
+      />
     </div>
   );
 }

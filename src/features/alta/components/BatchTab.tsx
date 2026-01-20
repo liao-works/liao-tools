@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Upload, Download, Loader2, ExternalLink } from 'lucide-react';
+import { Upload, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { FileOpenDialog } from '@/components/common/FileOpenDialog';
 import { altaApi } from '@/lib/api/alta';
+import { getFileName } from '@/lib/file-opener';
 import type { AltaBatchResult } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { open, save } from '@tauri-apps/plugin-dialog';
@@ -24,6 +26,9 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
   const [matchLength, setMatchLength] = useState<number | undefined>(6);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<AltaBatchResult | null>(null);
+  const [showResultFileDialog, setShowResultFileDialog] = useState(false);
+  const [showTemplateFileDialog, setShowTemplateFileDialog] = useState(false);
+  const [templateFilePath, setTemplateFilePath] = useState<string>('');
   const { toast } = useToast();
 
   const handleSelectFile = async () => {
@@ -59,6 +64,12 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
     try {
       const data = await altaApi.batchProcess(filePath, matchLength);
       setResult(data);
+      
+      // 如果有输出文件，显示对话框
+      if (data.output_path) {
+        setShowResultFileDialog(true);
+      }
+      
       toast({
         title: '处理完成',
         description: `成功处理 ${data.total} 条记录，其中 ${data.forbidden} 条禁运`,
@@ -107,6 +118,9 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
 
       if (path) {
         await altaApi.downloadTemplate(path);
+        setTemplateFilePath(path);
+        setShowTemplateFileDialog(true);
+        
         toast({
           title: '下载成功',
           description: '模板已保存',
@@ -120,22 +134,6 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
         variant: 'destructive',
       });
     }
-  };
-
-  const copyPathToClipboard = (path: string) => {
-    navigator.clipboard.writeText(path).then(() => {
-      toast({
-        title: '已复制',
-        description: '文件路径已复制到剪贴板',
-      });
-    }).catch((err) => {
-      console.error('复制失败:', err);
-      toast({
-        title: '复制失败',
-        description: '请手动复制路径',
-        variant: 'destructive',
-      });
-    });
   };
 
   return (
@@ -235,30 +233,29 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
                 <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{result.invalid}</p>
               </div>
             </div>
-            {result.output_path && (
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground">输出文件：</p>
-                    <p className="text-sm font-mono truncate">{result.output_path}</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => copyPathToClipboard(result.output_path)}
-                    className="ml-2 shrink-0"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-xs text-center text-muted-foreground">
-                  点击图标复制路径，然后在文件管理器中打开
-                </p>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}
+
+      {/* 模板文件打开对话框 */}
+      <FileOpenDialog
+        open={showTemplateFileDialog}
+        onOpenChange={setShowTemplateFileDialog}
+        filePath={templateFilePath}
+        title="模板下载完成"
+        description="Excel 模板已下载，是否立即打开编辑？"
+        fileName={getFileName(templateFilePath)}
+      />
+
+      {/* 处理结果文件打开对话框 */}
+      <FileOpenDialog
+        open={showResultFileDialog}
+        onOpenChange={setShowResultFileDialog}
+        filePath={result?.output_path || ''}
+        title="Alta 禁运查询完成"
+        description="禁运商品批量查询已完成，是否查看结果文件？"
+        fileName={result?.output_path ? getFileName(result.output_path) : undefined}
+      />
     </div>
   );
 }

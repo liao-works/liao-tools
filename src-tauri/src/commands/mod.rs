@@ -4,3 +4,5 @@ pub mod excel;
 pub mod tax;
 pub mod ups_dpd;
 pub mod updater;
+
+pub mod file_utils;

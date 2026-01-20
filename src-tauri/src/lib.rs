@@ -6,6 +6,7 @@ use commands::alta::*;
 use commands::alta::database::DatabaseManager;
 use commands::alta::matcher::HSCodeMatcher;
 use commands::excel::*;
+use commands::file_utils::open_file_with_default_app;
 use commands::tax::*;
 use commands::ups_dpd::commands::*;
 use commands::updater::*;
@@ -100,6 +101,8 @@ pub fn run() {
             save_update_settings,
             update_last_check_time,
             get_current_version,
+            // File utils commands
+            open_file_with_default_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

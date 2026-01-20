@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Upload, Download, Loader2, ExternalLink, AlertCircle } from 'lucide-react';
+import { Upload, Download, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { FileOpenDialog } from '@/components/common/FileOpenDialog';
 import { useToast } from '@/hooks/use-toast';
 import { taxApi } from '@/lib/api/tax';
+import { getFileName } from '@/lib/file-opener';
 import { open, save } from '@tauri-apps/plugin-dialog';
 
 export function BatchQueryTab() {
@@ -19,6 +21,9 @@ export function BatchQueryTab() {
     errors: string[];
     outputPath: string;
   } | null>(null);
+  const [showResultFileDialog, setShowResultFileDialog] = useState(false);
+  const [showTemplateFileDialog, setShowTemplateFileDialog] = useState(false);
+  const [templateFilePath, setTemplateFilePath] = useState<string>('');
   const { toast } = useToast();
 
   // 检查数据是否存在
@@ -72,6 +77,11 @@ export function BatchQueryTab() {
       
       setResults(result);
       
+      // 显示文件打开对话框
+      if (result.outputPath) {
+        setShowResultFileDialog(true);
+      }
+      
       toast({
         title: '处理完成',
         description: `成功查询 ${result.success} 条，失败 ${result.errors.length} 条`,
@@ -102,6 +112,9 @@ export function BatchQueryTab() {
 
       if (path) {
         await taxApi.downloadTemplate(path);
+        setTemplateFilePath(path);
+        setShowTemplateFileDialog(true);
+        
         toast({
           title: '下载成功',
           description: '模板已保存',
@@ -114,21 +127,6 @@ export function BatchQueryTab() {
         description: String(error),
         variant: 'destructive',
       });
-    }
-  };
-
-  const handleOpenResult = async () => {
-    if (results?.outputPath) {
-      try {
-        await taxApi.openUrl(results.outputPath);
-      } catch (error) {
-        console.error('打开文件失败:', error);
-        toast({
-          title: '打开文件失败',
-          description: String(error),
-          variant: 'destructive',
-        });
-      }
     }
   };
 
@@ -246,19 +244,29 @@ export function BatchQueryTab() {
                 )}
               </div>
             )}
-
-            <div className="space-y-2">
-              <Button className="w-full" onClick={handleOpenResult}>
-                <ExternalLink className="mr-2 h-4 w-4" />
-                打开查询结果
-              </Button>
-              <p className="text-xs text-center text-muted-foreground">
-                结果已保存至: {results.outputPath}
-              </p>
-            </div>
           </CardContent>
         </Card>
       )}
+
+      {/* 模板文件打开对话框 */}
+      <FileOpenDialog
+        open={showTemplateFileDialog}
+        onOpenChange={setShowTemplateFileDialog}
+        filePath={templateFilePath}
+        title="模板下载完成"
+        description="税率查询模板已下载，是否立即打开编辑？"
+        fileName={getFileName(templateFilePath)}
+      />
+
+      {/* 结果文件打开对话框 */}
+      <FileOpenDialog
+        open={showResultFileDialog}
+        onOpenChange={setShowResultFileDialog}
+        filePath={results?.outputPath || ''}
+        title="税率查询完成"
+        description="批量税率查询已完成，是否查看结果文件？"
+        fileName={results?.outputPath ? getFileName(results.outputPath) : undefined}
+      />
     </div>
   );
 }
