@@ -15,6 +15,7 @@ jobs:
         include:
           - platform: "macos-latest"
             args: "--target aarch64-apple-darwin"
+            generate-changelog: true
           - platform: "macos-latest"
             args: "--target x86_64-apple-darwin"
           - platform: "macos-latest"
@@ -27,6 +28,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install dependencies (Linux)
         if: startsWith(matrix.platform, 'ubuntu')
@@ -68,6 +71,15 @@ jobs:
         shell: bash
         run: |
           VERSION="${{ steps.get_version.outputs.VERSION }}"
+
+          # Update package.json
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json'));
+            pkg.version = '$VERSION';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
           cd src-tauri
           # Update Cargo.toml
           sed -i.bak "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
@@ -80,32 +92,46 @@ jobs:
             fs.writeFileSync('tauri.conf.json', JSON.stringify(config, null, 2));
           "
           echo "Updated version to $VERSION"
+          echo "--- package.json ---"
+          head -5 ../package.json
           echo "--- Cargo.toml ---"
           head -5 Cargo.toml
           echo "--- tauri.conf.json ---"
           head -5 tauri.conf.json
 
-      - name: Generate release notes
-        id: release_notes
+      - name: Generate CHANGELOG
+        id: changelog
         shell: bash
         run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 ${{ github.ref_name }}^ 2>/dev/null || echo "")
-          if [ -z "$PREV_TAG" ]; then
-            NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
-              -f tag_name=${{ github.ref_name }} \
-              --jq '.body')
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+
+          # 使用 Node.js 脚本生成 CHANGELOG 并提取 release notes
+          node scripts/generate-changelog.cjs $VERSION
+
+          # 只在第一个平台（macOS ARM64）提交 CHANGELOG 更新
+          if [ "${{ matrix.generate-changelog }}" == "true" ]; then
+            echo "📤 提交 CHANGELOG 更新..."
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add CHANGELOG.md package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
+            git diff --staged --quiet || git commit -m "docs: 更新 CHANGELOG 和版本号 [skip ci]"
+            git push origin HEAD:master
           else
-            NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
-              -f tag_name=${{ github.ref_name }} \
-              -f previous_tag_name=$PREV_TAG \
-              --jq '.body')
+            echo "⏭️  跳过提交（由第一个平台处理）"
           fi
-          echo "$NOTES"
-          echo "NOTES<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+
+          # 保存 notes 到 output（所有平台都需要）
+          # 使用 RUNNER_TEMP 获取跨平台临时目录
+          NOTES_FILE="${RUNNER_TEMP}/release_notes.txt"
+          # 使用随机 delimiter 避免内容冲突
+          DELIMITER="RELEASE_NOTES_$(date +%s)"
+          echo "NOTES<<${DELIMITER}" >> $GITHUB_OUTPUT
+          cat "$NOTES_FILE" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "${DELIMITER}" >> $GITHUB_OUTPUT
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
 
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
@@ -113,8 +139,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "Antigravity Tools ${{ github.ref_name }}"
-          releaseBody: ${{ steps.release_notes.outputs.NOTES }}
+          releaseName: "Liao Tools ${{ github.ref_name }}"
+          releaseBody: ${{ steps.changelog.outputs.NOTES }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

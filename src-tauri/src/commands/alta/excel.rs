@@ -45,8 +45,8 @@ impl ExcelProcessor {
         info!("开始处理Excel: {:?}", input_path);
 
         // 读取输入文件
-        let mut workbook: Xlsx<_> = open_workbook(input_path)
-            .context("Failed to open Excel file")?;
+        let mut workbook: Xlsx<_> =
+            open_workbook(input_path).context("Failed to open Excel file")?;
 
         // 获取第一个工作表
         let sheet_name = workbook
@@ -62,10 +62,7 @@ impl ExcelProcessor {
         // 读取数据
         let mut rows: Vec<Vec<String>> = Vec::new();
         for row in range.rows() {
-            let row_data: Vec<String> = row
-                .iter()
-                .map(|cell| cell.to_string())
-                .collect();
+            let row_data: Vec<String> = row.iter().map(|cell| cell.to_string()).collect();
             rows.push(row_data);
         }
 
@@ -91,17 +88,8 @@ impl ExcelProcessor {
 
         let bold_format = Format::new().set_bold();
 
-        // 写入表头
-        for (col_idx, header) in headers.iter().enumerate() {
-            worksheet.write_string_with_format(0, col_idx as u16, header, &bold_format)?;
-        }
-        // 添加"禁运状态"列
-        worksheet.write_string_with_format(
-            0,
-            headers.len() as u16,
-            "禁运状态",
-            &bold_format,
-        )?;
+        worksheet.write_string_with_format(0, 0, "HS Code", &bold_format)?;
+        worksheet.write_string_with_format(0, 1, "禁运状态", &bold_format)?;
 
         // 统计信息
         let mut stats = ExcelStats {
@@ -114,56 +102,28 @@ impl ExcelProcessor {
 
         // 处理数据行（跳过表头）
         for (row_idx, row_data) in rows.iter().enumerate().skip(1) {
-            // 写入原始数据
-            for (col_idx, cell_value) in row_data.iter().enumerate() {
-                if col_idx == hs_col {
-                    // 获取HS编码并匹配
-                    let hs_code = cell_value.trim();
-                    let matcher = self.matcher.lock().unwrap();
-                    let match_result = matcher.match_code(hs_code, match_length)?;
-                    drop(matcher); // 释放锁
+            // 获取HS编码并匹配
+            let hs_code = row_data[hs_col].trim();
+            let matcher = self.matcher.lock().unwrap();
+            let match_result = matcher.match_code(hs_code, match_length)?;
+            drop(matcher); // 释放锁
 
-                    stats.total += 1;
+            stats.total += 1;
 
-                    if match_result.is_forbidden {
-                        stats.forbidden += 1;
-                        // 红色高亮HS编码单元格
-                        worksheet.write_string_with_format(
-                            row_idx as u32,
-                            col_idx as u16,
-                            cell_value,
-                            &red_format,
-                        )?;
-
-                        // 写入禁运状态
-                        worksheet.write_string_with_format(
-                            row_idx as u32,
-                            headers.len() as u16,
-                            "禁运",
-                            &red_format,
-                        )?;
-
-                        // 注释：rust_xlsxwriter 0.79 暂不支持单元格注释
-                        // 可以考虑在相邻列添加详细信息列作为替代
-                    } else if match_result.match_type == "无效编码"
-                        || match_result.match_type.starts_with("编码长度不足")
-                    {
-                        stats.invalid += 1;
-                        worksheet.write_string(row_idx as u32, col_idx as u16, cell_value)?;
-                        worksheet.write_string(
-                            row_idx as u32,
-                            headers.len() as u16,
-                            &match_result.match_type,
-                        )?;
-                    } else {
-                        stats.safe += 1;
-                        worksheet.write_string(row_idx as u32, col_idx as u16, cell_value)?;
-                        worksheet.write_string(row_idx as u32, headers.len() as u16, "正常")?;
-                    }
-                } else {
-                    // 普通单元格
-                    worksheet.write_string(row_idx as u32, col_idx as u16, cell_value)?;
-                }
+            if match_result.is_forbidden {
+                stats.forbidden += 1;
+                worksheet.write_string_with_format(row_idx as u32, 0, hs_code, &red_format)?;
+                worksheet.write_string_with_format(row_idx as u32, 1, "禁运", &red_format)?;
+            } else if match_result.match_type == "无效编码"
+                || match_result.match_type.starts_with("编码长度不足")
+            {
+                stats.invalid += 1;
+                worksheet.write_string(row_idx as u32, 0, hs_code)?;
+                worksheet.write_string(row_idx as u32, 1, &match_result.match_type)?;
+            } else {
+                stats.safe += 1;
+                worksheet.write_string(row_idx as u32, 0, hs_code)?;
+                worksheet.write_string(row_idx as u32, 1, "正常")?;
             }
         }
 
@@ -200,8 +160,7 @@ impl ExcelProcessor {
         }
 
         // 尝试打开文件
-        let mut workbook: Xlsx<_> = open_workbook(file_path)
-            .context("无法打开Excel文件")?;
+        let mut workbook: Xlsx<_> = open_workbook(file_path).context("无法打开Excel文件")?;
 
         let sheet_name = workbook
             .sheet_names()
@@ -271,18 +230,12 @@ impl ExcelProcessor {
 
         let bold_format = Format::new().set_bold();
 
-        // 写入表头
-        let headers = vec!["序号", "HS Code", "商品名称", "数量", "备注"];
+        let headers = vec!["HS Code"];
         for (idx, header) in headers.iter().enumerate() {
             worksheet.write_string_with_format(0, idx as u16, *header, &bold_format)?;
         }
 
-        // 写入示例数据
-        worksheet.write_number(1, 0, 1.0)?;
-        worksheet.write_string(1, 1, "0101210000")?;
-        worksheet.write_string(1, 2, "示例商品")?;
-        worksheet.write_number(1, 3, 100.0)?;
-        worksheet.write_string(1, 4, "这是示例数据")?;
+        worksheet.write_string(1, 0, "0101210000")?;
 
         workbook.save(output_path)?;
 
@@ -294,11 +247,11 @@ impl ExcelProcessor {
 #[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
-    use super::*;
-    #[allow(unused_imports)]
     use super::database::DatabaseManager;
     #[allow(unused_imports)]
     use super::matcher::HSCodeMatcher;
+    #[allow(unused_imports)]
+    use super::*;
     #[allow(unused_imports)]
     use std::sync::{Arc, Mutex};
     #[allow(unused_imports)]

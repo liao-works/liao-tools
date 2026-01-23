@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
 
 export interface UpdateInfo {
   current_version: string;
@@ -7,12 +8,26 @@ export interface UpdateInfo {
   download_url: string;
   release_notes: string;
   published_at: string;
+  platform_specific_url?: string;
+  file_size?: number;
 }
 
 export interface UpdateSettings {
   auto_check: boolean;
   last_check_time: number;
   check_interval_hours: number;
+}
+
+export interface DownloadProgress {
+  downloaded: number;
+  total: number;
+  percentage: number;
+}
+
+export interface PlatformInfo {
+  platform: string;
+  arch: string;
+  os_family: string;
 }
 
 /**
@@ -51,15 +66,33 @@ export async function getCurrentVersion(): Promise<string> {
 }
 
 /**
- * 保存 GitHub Token
+ * 获取平台信息
  */
-export async function saveGithubToken(token: string): Promise<void> {
-  return await invoke('save_github_token', { token });
+export async function getPlatformInfo(): Promise<PlatformInfo> {
+  return await invoke('get_platform_info');
 }
 
 /**
- * 加载 GitHub Token
+ * 下载更新
  */
-export async function loadGithubToken(): Promise<string> {
-  return await invoke('load_github_token');
+export async function downloadUpdate(url: string, version: string): Promise<string> {
+  return await invoke('download_update', { url, version });
+}
+
+/**
+ * 安装更新
+ */
+export async function installUpdate(filePath: string, silent: boolean = true): Promise<string> {
+  return await invoke('install_update', { filePath, silent });
+}
+
+/**
+ * 监听下载进度
+ */
+export async function listenToDownloadProgress(
+  callback: (progress: DownloadProgress) => void
+): Promise<UnlistenFn> {
+  return await listen<DownloadProgress>('download-progress', (event) => {
+    callback(event.payload);
+  });
 }

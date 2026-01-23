@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -11,14 +11,24 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle2, Download, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
-import { checkForUpdates, loadUpdateSettings, saveUpdateSettings, updateLastCheckTime, type UpdateInfo } from '@/lib/updater';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { Progress } from '@/components/ui/progress';
+import { CheckCircle2, Download, Loader2, AlertCircle, RefreshCw, X } from 'lucide-react';
+import {
+  checkForUpdates,
+  loadUpdateSettings,
+  saveUpdateSettings,
+  updateLastCheckTime,
+  downloadUpdate,
+  installUpdate,
+  listenToDownloadProgress,
+  type UpdateInfo,
+  type DownloadProgress,
+} from '@/lib/updater';
 
 interface UpdateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  autoCheck?: boolean; // 是否是自动检查（影响提示文字）
+  autoCheck?: boolean;
 }
 
 export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDialogProps) {
@@ -26,25 +36,16 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [autoCheckEnabled, setAutoCheckEnabled] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+  const [downloadPath, setDownloadPath] = useState<string | null>(null);
 
-  // 加载自动检查设置
-  useEffect(() => {
-    loadUpdateSettings().then(settings => {
-      setAutoCheckEnabled(settings.auto_check);
-    }).catch(console.error);
-  }, []);
-
-  // 打开对话框时自动检查
-  useEffect(() => {
-    if (open && !updateInfo) {
-      handleCheckUpdate();
-    }
-  }, [open]);
-
-  const handleCheckUpdate = async () => {
+  const handleCheckUpdate = useCallback(async () => {
     setChecking(true);
     setError(null);
     setUpdateInfo(null);
+    setDownloadPath(null);
 
     try {
       const info = await checkForUpdates();
@@ -55,19 +56,65 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
     } finally {
       setChecking(false);
     }
-  };
+  }, []);
 
-  const handleDownload = async () => {
-    if (updateInfo?.download_url) {
-      try {
-        await openUrl(updateInfo.download_url);
-      } catch (err) {
-        console.error('打开下载页面失败:', err);
-      }
+  const handleDownload = useCallback(async () => {
+    if (!updateInfo?.platform_specific_url) {
+      setError('未找到适用于当前平台的安装包');
+      return;
     }
-  };
 
-  const handleAutoCheckChange = async (checked: boolean) => {
+    setDownloading(true);
+    setError(null);
+    setDownloadProgress(null);
+
+    try {
+      let unlistenFn: (() => void) | null = null;
+
+      unlistenFn = await listenToDownloadProgress((progress) => {
+        setDownloadProgress(progress);
+      });
+
+      const filePath = await downloadUpdate(
+        updateInfo.platform_specific_url,
+        updateInfo.latest_version
+      );
+
+      setDownloadPath(filePath);
+      setDownloading(false);
+
+      if (unlistenFn) {
+        unlistenFn();
+      }
+    } catch (err) {
+      setDownloading(false);
+      setError(err instanceof Error ? err.message : '下载失败');
+    }
+  }, [updateInfo]);
+
+  const handleInstall = useCallback(async () => {
+    if (!downloadPath) {
+      setError('请先下载更新');
+      return;
+    }
+
+    setInstalling(true);
+    setError(null);
+
+    try {
+      await installUpdate(downloadPath, true);
+      setInstalling(false);
+
+      setTimeout(() => {
+        onOpenChange(false);
+      }, 2000);
+    } catch (err) {
+      setInstalling(false);
+      setError(err instanceof Error ? err.message : '安装失败');
+    }
+  }, [downloadPath, onOpenChange]);
+
+  const handleAutoCheckChange = useCallback(async (checked: boolean) => {
     setAutoCheckEnabled(checked);
     try {
       const settings = await loadUpdateSettings();
@@ -76,6 +123,19 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
     } catch (err) {
       console.error('保存设置失败:', err);
     }
+  }, []);
+
+  const handleCancelDownload = useCallback(() => {
+    setDownloading(false);
+    setDownloadProgress(null);
+  }, []);
+
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -85,6 +145,18 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
       return dateString;
     }
   };
+
+  useEffect(() => {
+    loadUpdateSettings().then(settings => {
+      setAutoCheckEnabled(settings.auto_check);
+    }).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (open && !updateInfo) {
+      handleCheckUpdate();
+    }
+  }, [open, handleCheckUpdate]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -100,7 +172,6 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* 检查中状态 */}
           {checking && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -108,7 +179,6 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
             </div>
           )}
 
-          {/* 错误提示 */}
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -116,10 +186,51 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
             </Alert>
           )}
 
-          {/* 更新信息 */}
-          {updateInfo && !checking && (
+          {downloading && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">正在下载更新...</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancelDownload}
+                  disabled={installing}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  取消
+                </Button>
+              </div>
+              {downloadProgress && (
+                <>
+                  <Progress value={downloadProgress.percentage} />
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>
+                      {formatBytes(downloadProgress.downloaded)} / {formatBytes(downloadProgress.total)}
+                    </span>
+                    <span>{downloadProgress.percentage.toFixed(1)}%</span>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="ml-3 text-sm text-muted-foreground">
+                  下载中，请稍候...
+                </span>
+              </div>
+            </div>
+          )}
+
+          {installing && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-3 text-muted-foreground">
+                正在启动安装程序...
+              </span>
+            </div>
+          )}
+
+          {updateInfo && !checking && !downloading && !installing && (
             <div className="space-y-4">
-              {/* 版本信息 */}
               <div className="rounded-lg border p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">当前版本</span>
@@ -135,15 +246,22 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
                   <span className="text-sm text-muted-foreground">发布时间</span>
                   <span className="text-sm">{formatDate(updateInfo.published_at)}</span>
                 </div>
+                {updateInfo.file_size && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">文件大小</span>
+                    <span className="text-sm">{formatBytes(updateInfo.file_size)}</span>
+                  </div>
+                )}
               </div>
 
-              {/* 更新状态 */}
               {updateInfo.has_update ? (
                 <Alert>
                   <Download className="h-4 w-4" />
                   <AlertDescription>
                     <div className="font-semibold mb-2">发现新版本！</div>
-                    点击下方按钮前往下载页面
+                    <div className="text-sm">
+                      {downloadPath ? '下载完成，点击下方按钮安装' : '点击下方按钮下载并安装'}
+                    </div>
                   </AlertDescription>
                 </Alert>
               ) : (
@@ -155,7 +273,6 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
                 </Alert>
               )}
 
-              {/* 更新说明 */}
               {updateInfo.has_update && updateInfo.release_notes && (
                 <div className="space-y-2">
                   <Label>更新说明</Label>
@@ -169,12 +286,12 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
             </div>
           )}
 
-          {/* 自动检查设置 */}
           <div className="flex items-center space-x-2 pt-2 border-t">
             <Checkbox
               id="auto-check"
               checked={autoCheckEnabled}
               onCheckedChange={handleAutoCheckChange}
+              disabled={downloading || installing}
             />
             <Label
               htmlFor="auto-check"
@@ -186,16 +303,34 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
         </div>
 
         <DialogFooter className="gap-2">
-          {updateInfo?.has_update && (
-            <Button onClick={handleDownload} className="gap-2">
-              <ExternalLink className="h-4 w-4" />
-              前往下载
-            </Button>
+          {updateInfo?.has_update && !downloading && !installing && (
+            <>
+              {!downloadPath ? (
+                <Button onClick={handleDownload} className="gap-2">
+                  <Download className="h-4 w-4" />
+                  立即更新
+                </Button>
+              ) : (
+                <Button onClick={handleInstall} className="gap-2">
+                  <RefreshCw className="h-4 w-4" />
+                  安装更新
+                </Button>
+              )}
+            </>
           )}
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            关闭
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={downloading || installing}
+          >
+            {downloading ? '下载中...' : installing ? '安装中...' : '关闭'}
           </Button>
-          <Button variant="secondary" onClick={handleCheckUpdate} disabled={checking}>
+          <Button
+            variant="secondary"
+            onClick={handleCheckUpdate}
+            disabled={checking || downloading || installing}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
             重新检查
           </Button>
         </DialogFooter>

@@ -101,6 +101,9 @@ pub fn run() {
             save_update_settings,
             update_last_check_time,
             get_current_version,
+            get_platform_info,
+            download_update,
+            install_update,
             // File utils commands
             open_file_with_default_app,
         ])
