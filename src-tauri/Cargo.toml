@@ -1,6 +1,6 @@
 [package]
 name = "liao-tools"
-version = "0.0.5"
+version = "0.0.6"
 description = "Liao Tools"
 authors = ["cavin"]
 edition = "2021"
@@ -69,4 +69,7 @@ zip = { version = "0.6", default-features = false, features = ["deflate"] }
 
 # XML 解析
 quick-xml = "0.31"
+
+# 临时文件（用于测试）
+tempfile = "3"
 

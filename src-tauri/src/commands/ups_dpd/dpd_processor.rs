@@ -148,7 +148,7 @@ impl DpdProcessor {
     ) -> Result<(), CommandError> {
         self.log("处理总结单工作表".to_string());
 
-        let mut worksheet = workbook.add_worksheet();
+        let worksheet = workbook.add_worksheet();
         worksheet
             .set_name("总结单")
             .map_err(|e| CommandError::new(format!("设置工作表名称失败: {}", e), "ERROR"))?;

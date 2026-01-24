@@ -160,7 +160,7 @@ impl UpsProcessorV2 {
         let first_empty_row = self.find_first_empty_row(sheet)?;
 
         // 3. 字段映射
-        let field_mapping = hashmap![
+        let _field_mapping = hashmap![
             "country" => "Destination",
             "package_count" => "Package",
             "gross_weight" => "G.W",

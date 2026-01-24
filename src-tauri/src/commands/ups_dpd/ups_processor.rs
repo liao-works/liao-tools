@@ -205,7 +205,7 @@ impl UpsProcessor {
         // 按国家分组统计
         let stats = self.group_by_country(data)?;
 
-        let mut worksheet = workbook.add_worksheet();
+        let worksheet = workbook.add_worksheet();
         worksheet
             .set_name("统计")
             .map_err(|e| CommandError::new(format!("设置工作表名称失败: {}", e), "ERROR"))?;
@@ -243,7 +243,7 @@ impl UpsProcessor {
         // 筛选德国数据并按邮编统计
         let stats = self.group_by_german_zipcode(data)?;
 
-        let mut worksheet = workbook.add_worksheet();
+        let worksheet = workbook.add_worksheet();
         worksheet
             .set_name("德国邮编")
             .map_err(|e| CommandError::new(format!("设置工作表名称失败: {}", e), "ERROR"))?;

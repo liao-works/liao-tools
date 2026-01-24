@@ -47,18 +47,31 @@ impl TaxDatabase {
                 north_ireland_rate TEXT,
                 north_ireland_url TEXT,
                 other_rate TEXT,
+                anti_dumping_rate TEXT,
+                countervailing_rate TEXT,
                 last_updated DATETIME
             )",
             [],
         )
         .context("Failed to create tariffs table")?;
-        
+
+        // 向后兼容：为现有数据库添加新列（如果不存在）
+        // 使用 ALTER TABLE 添加列，如果列已存在会忽略错误
+        let _ = self.conn.execute(
+            "ALTER TABLE tariffs ADD COLUMN anti_dumping_rate TEXT",
+            [],
+        );
+        let _ = self.conn.execute(
+            "ALTER TABLE tariffs ADD COLUMN countervailing_rate TEXT",
+            [],
+        );
+
         // 使用 core 的工具批量创建索引
         let indexes = [
             "CREATE INDEX IF NOT EXISTS idx_code ON tariffs(code)",
         ];
         core_db::create_indexes(&self.conn, &indexes)?;
-        
+
         // 创建错误记录表
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS scrape_errors (
@@ -69,21 +82,21 @@ impl TaxDatabase {
             [],
         )
         .context("Failed to create scrape_errors table")?;
-        
+
         Ok(())
     }
     
     /// 精确查询单个税率
     pub fn get_tariff(&self, code: &str) -> Result<Option<TaxTariff>> {
         let mut stmt = self.conn.prepare(
-            "SELECT code, description, rate, url, north_ireland_rate, 
-                    north_ireland_url, other_rate, last_updated 
-             FROM tariffs 
+            "SELECT code, description, rate, url, north_ireland_rate,
+                    north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated
+             FROM tariffs
              WHERE code = ?1",
         )?;
-        
+
         let mut rows = stmt.query(params![code])?;
-        
+
         if let Some(row) = rows.next()? {
             Ok(Some(TaxTariff {
                 code: row.get(0)?,
@@ -93,7 +106,9 @@ impl TaxDatabase {
                 north_ireland_rate: row.get(4)?,
                 north_ireland_url: row.get(5)?,
                 other_rate: row.get(6)?,
-                last_updated: row.get(7)?,
+                anti_dumping_rate: row.get(7)?,
+                countervailing_rate: row.get(8)?,
+                last_updated: row.get(9)?,
                 similarity: None,
             }))
         } else {
@@ -104,11 +119,11 @@ impl TaxDatabase {
     /// 获取所有税率记录
     pub fn get_all_tariffs(&self) -> Result<Vec<TaxTariff>> {
         let mut stmt = self.conn.prepare(
-            "SELECT code, description, rate, url, north_ireland_rate, 
-                    north_ireland_url, other_rate, last_updated 
+            "SELECT code, description, rate, url, north_ireland_rate,
+                    north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated
              FROM tariffs",
         )?;
-        
+
         let rows = stmt.query_map([], |row| {
             Ok(TaxTariff {
                 code: row.get(0)?,
@@ -118,16 +133,18 @@ impl TaxDatabase {
                 north_ireland_rate: row.get(4)?,
                 north_ireland_url: row.get(5)?,
                 other_rate: row.get(6)?,
-                last_updated: row.get(7)?,
+                anti_dumping_rate: row.get(7)?,
+                countervailing_rate: row.get(8)?,
+                last_updated: row.get(9)?,
                 similarity: None,
             })
         })?;
-        
+
         let mut tariffs = Vec::new();
         for tariff in rows {
             tariffs.push(tariff?);
         }
-        
+
         Ok(tariffs)
     }
     
@@ -156,10 +173,10 @@ impl TaxDatabase {
     /// 添加单条记录
     pub fn add_tariff(&self, tariff: &TaxTariff) -> Result<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO tariffs 
-             (code, description, rate, url, north_ireland_rate, 
-              north_ireland_url, other_rate, last_updated)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'))",
+            "INSERT OR REPLACE INTO tariffs
+             (code, description, rate, url, north_ireland_rate,
+              north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))",
             params![
                 tariff.code,
                 tariff.description,
@@ -168,21 +185,23 @@ impl TaxDatabase {
                 tariff.north_ireland_rate,
                 tariff.north_ireland_url,
                 tariff.other_rate,
+                tariff.anti_dumping_rate,
+                tariff.countervailing_rate,
             ],
         )?;
         Ok(())
     }
-    
+
     /// 批量添加记录
     pub fn add_tariffs_batch(&self, tariffs: &[TaxTariff]) -> Result<()> {
         let tx = self.conn.unchecked_transaction()?;
-        
+
         for tariff in tariffs {
             tx.execute(
-                "INSERT OR REPLACE INTO tariffs 
-                 (code, description, rate, url, north_ireland_rate, 
-                  north_ireland_url, other_rate, last_updated)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'))",
+                "INSERT OR REPLACE INTO tariffs
+                 (code, description, rate, url, north_ireland_rate,
+                  north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))",
                 params![
                     tariff.code,
                     tariff.description,
@@ -191,10 +210,12 @@ impl TaxDatabase {
                     tariff.north_ireland_rate,
                     tariff.north_ireland_url,
                     tariff.other_rate,
+                    tariff.anti_dumping_rate,
+                    tariff.countervailing_rate,
                 ],
             )?;
         }
-        
+
         tx.commit()?;
         Ok(())
     }

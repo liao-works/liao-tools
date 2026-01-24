@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
-use std::io::{self, Write, BufWriter};
+use std::io::{Write, BufWriter};
 use crate::commands::error::CommandError;
 use tauri::Emitter;
 
@@ -290,7 +290,7 @@ pub async fn download_update(url: String, version: String, app: tauri::AppHandle
 
 /// 安装更新
 #[tauri::command]
-pub async fn install_update(file_path: String, silent: bool) -> Result<String, CommandError> {
+pub async fn install_update(file_path: String, silent: bool, app: tauri::AppHandle) -> Result<String, CommandError> {
     println!("开始安装更新: {}", file_path);
     println!("静默模式: {}", silent);
 
@@ -346,6 +346,22 @@ pub async fn install_update(file_path: String, silent: bool) -> Result<String, C
             "UNSUPPORTED_OS"
         )),
     };
+
+    // 如果安装成功且是静默模式，发送安装完成事件
+    if result.is_ok() && silent {
+        // 发送安装完成事件
+        app.emit("install-complete", serde_json::json!({
+            "success": true,
+            "message": "安装完成",
+            "needs_restart": true
+        }))
+        .map_err(|e| CommandError::new(
+            format!("发送安装完成事件失败: {}", e),
+            "EMIT_ERROR"
+        ))?;
+
+        return Ok("安装完成".to_string());
+    }
 
     result.map(|_| {
         "安装程序已启动，请按照提示完成安装".to_string()
@@ -455,17 +471,11 @@ fn find_app_bundle(dir: &Path) -> Option<PathBuf> {
 /// 安装 Windows EXE
 fn install_windows_exe(path: &Path, silent: bool) -> Result<(), CommandError> {
     println!("正在启动 Windows 安装程序: {}", path.display());
-    
-    let mut cmd = std::process::Command::new("cmd");
-    cmd.args(["/c", "start"]);
-    
-    if silent {
-        cmd.args(["/wait", "/B"]);
-    }
 
-    cmd.arg(path.as_os_str());
-    
     if silent {
+        // 静默模式：等待安装完成
+        let mut cmd = std::process::Command::new(path);
+
         // NSIS 静默安装参数
         if let Some(filename) = path.file_name() {
             let filename_str = filename.to_string_lossy();
@@ -473,13 +483,32 @@ fn install_windows_exe(path: &Path, silent: bool) -> Result<(), CommandError> {
                 cmd.arg("/S");  // 静默安装
             }
         }
-    }
 
-    cmd.spawn()
-        .map_err(|e| CommandError::new(
-            format!("启动安装程序失败: {}", e),
-            "INSTALL_ERROR"
-        ))?;
+        // 使用 status() 等待安装完成
+        let status = cmd.status()
+            .map_err(|e| CommandError::new(
+                format!("启动安装程序失败: {}", e),
+                "INSTALL_ERROR"
+            ))?;
+
+        if !status.success() {
+            return Err(CommandError::new(
+                "安装程序返回错误",
+                "INSTALL_FAILED"
+            ));
+        }
+
+        println!("静默安装完成");
+    } else {
+        // 交互式安装：不等待
+        std::process::Command::new("cmd")
+            .args(["/c", "start", "", &path.to_string_lossy()])
+            .spawn()
+            .map_err(|e| CommandError::new(
+                format!("启动安装程序失败: {}", e),
+                "INSTALL_ERROR"
+            ))?;
+    }
 
     Ok(())
 }
@@ -487,20 +516,35 @@ fn install_windows_exe(path: &Path, silent: bool) -> Result<(), CommandError> {
 /// 安装 Windows MSI
 fn install_windows_msi(path: &Path, silent: bool) -> Result<(), CommandError> {
     println!("正在启动 MSI 安装程序: {}", path.display());
-    
-    let mut cmd = std::process::Command::new("msiexec");
-    
-    if silent {
-        cmd.args(["/i", &path.to_string_lossy(), "/qn", "/norestart"]);
-    } else {
-        cmd.args(["/i", &path.to_string_lossy()]);
-    }
 
-    cmd.spawn()
-        .map_err(|e| CommandError::new(
-            format!("启动 MSI 安装失败: {}", e),
-            "INSTALL_ERROR"
-        ))?;
+    if silent {
+        // 静默模式：等待安装完成
+        let status = std::process::Command::new("msiexec")
+            .args(["/i", &path.to_string_lossy(), "/qn", "/norestart"])
+            .status()
+            .map_err(|e| CommandError::new(
+                format!("启动 MSI 安装失败: {}", e),
+                "INSTALL_ERROR"
+            ))?;
+
+        if !status.success() {
+            return Err(CommandError::new(
+                "MSI 安装失败",
+                "INSTALL_FAILED"
+            ));
+        }
+
+        println!("MSI 静默安装完成");
+    } else {
+        // 交互式安装：不等待
+        std::process::Command::new("msiexec")
+            .args(["/i", &path.to_string_lossy()])
+            .spawn()
+            .map_err(|e| CommandError::new(
+                format!("启动 MSI 安装失败: {}", e),
+                "INSTALL_ERROR"
+            ))?;
+    }
 
     Ok(())
 }
@@ -746,6 +790,22 @@ pub fn update_last_check_time() -> Result<(), CommandError> {
 #[tauri::command]
 pub fn get_current_version() -> String {
     CURRENT_VERSION.to_string()
+}
+
+/// 重启应用
+#[tauri::command]
+pub fn restart_app(app: tauri::AppHandle) -> Result<(), CommandError> {
+    println!("正在重启应用...");
+    app.restart();
+    Ok(())
+}
+
+/// 退出应用（供稍后手动重启使用）
+#[tauri::command]
+pub fn quit_app(app: tauri::AppHandle) -> Result<(), CommandError> {
+    println!("正在退出应用...");
+    app.exit(0);
+    Ok(())
 }
 
 #[cfg(test)]

@@ -10,6 +10,10 @@ pub struct TaxTariff {
     pub north_ireland_rate: Option<String>,
     pub north_ireland_url: Option<String>,
     pub other_rate: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anti_dumping_rate: Option<String>, // 反倾销税率
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub countervailing_rate: Option<String>, // 反补贴税率
     pub last_updated: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub similarity: Option<f64>, // 仅用于模糊查询

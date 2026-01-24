@@ -31,6 +31,15 @@ export interface PlatformInfo {
 }
 
 /**
+ * 安装完成事件
+ */
+export interface InstallCompleteEvent {
+  success: boolean;
+  message: string;
+  needs_restart: boolean;
+}
+
+/**
  * 检查更新
  */
 export async function checkForUpdates(): Promise<UpdateInfo> {
@@ -95,4 +104,29 @@ export async function listenToDownloadProgress(
   return await listen<DownloadProgress>('download-progress', (event) => {
     callback(event.payload);
   });
+}
+
+/**
+ * 监听安装完成事件
+ */
+export async function listenToInstallComplete(
+  callback: (event: InstallCompleteEvent) => void
+): Promise<UnlistenFn> {
+  return await listen<InstallCompleteEvent>('install-complete', (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * 重启应用
+ */
+export async function restartApp(): Promise<void> {
+  return await invoke('restart_app');
+}
+
+/**
+ * 退出应用
+ */
+export async function quitApp(): Promise<void> {
+  return await invoke('quit_app');
 }

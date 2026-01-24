@@ -21,9 +21,11 @@ import {
   downloadUpdate,
   installUpdate,
   listenToDownloadProgress,
+  listenToInstallComplete,
   type UpdateInfo,
   type DownloadProgress,
 } from '@/lib/updater';
+import { UpdateCompleteDialog } from './UpdateCompleteDialog';
 
 interface UpdateDialogProps {
   open: boolean;
@@ -40,6 +42,10 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
   const [installing, setInstalling] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
   const [downloadPath, setDownloadPath] = useState<string | null>(null);
+
+  // 新增：安装完成相关状态
+  const [installComplete, setInstallComplete] = useState(false);
+  const [newVersion, setNewVersion] = useState<string>('');
 
   const handleCheckUpdate = useCallback(async () => {
     setChecking(true);
@@ -103,16 +109,13 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
 
     try {
       await installUpdate(downloadPath, true);
-      setInstalling(false);
-
-      setTimeout(() => {
-        onOpenChange(false);
-      }, 2000);
+      // 不自动关闭，等待安装完成事件
+      // 安装完成后会触发 install-complete 事件
     } catch (err) {
       setInstalling(false);
       setError(err instanceof Error ? err.message : '安装失败');
     }
-  }, [downloadPath, onOpenChange]);
+  }, [downloadPath]);
 
   const handleAutoCheckChange = useCallback(async (checked: boolean) => {
     setAutoCheckEnabled(checked);
@@ -152,6 +155,30 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
     }).catch(console.error);
   }, []);
 
+  // 监听安装完成事件
+  useEffect(() => {
+    let unlistenFn: (() => void) | undefined;
+
+    const setupListener = async () => {
+      unlistenFn = await listenToInstallComplete((event) => {
+        const { success, needs_restart } = event;
+        if (success && needs_restart) {
+          setInstallComplete(true);
+          setInstalling(false);
+          setNewVersion(updateInfo?.latest_version || '');
+        }
+      });
+    };
+
+    setupListener();
+
+    return () => {
+      if (unlistenFn) {
+        unlistenFn();
+      }
+    };
+  }, [updateInfo]);
+
   useEffect(() => {
     if (open && !updateInfo) {
       handleCheckUpdate();
@@ -159,7 +186,8 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
   }, [open, handleCheckUpdate]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -336,5 +364,13 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* 安装完成对话框 */}
+    <UpdateCompleteDialog
+      open={installComplete}
+      onOpenChange={setInstallComplete}
+      version={newVersion}
+    />
+    </>
   );
 }

@@ -41,6 +41,8 @@ export interface TaxTariff {
   northIrelandUrl?: string; // 向后兼容
   description?: string;
   other_rate?: string;
+  anti_dumping_rate?: string; // 反倾销税率
+  countervailing_rate?: string; // 反补贴税率
   last_updated?: string;
   similarity?: number;
 }

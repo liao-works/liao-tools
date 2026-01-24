@@ -297,6 +297,8 @@ export function SingleQueryTab() {
                   <TableHead>商品编码</TableHead>
                   <TableHead>英国税率</TableHead>
                   <TableHead>北爱尔兰税率</TableHead>
+                  <TableHead>反倾销税率</TableHead>
+                  <TableHead>反补贴税率</TableHead>
                   {fuzzyMode && <TableHead>相似度</TableHead>}
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
@@ -335,6 +337,42 @@ export function SingleQueryTab() {
                               )
                             }
                             title="复制北爱尔兰税率"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium">
+                          {result.anti_dumping_rate || '-'}
+                        </span>
+                        {result.anti_dumping_rate && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => copyToClipboard(result.anti_dumping_rate || '')}
+                            title="复制反倾销税率"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium">
+                          {result.countervailing_rate || '-'}
+                        </span>
+                        {result.countervailing_rate && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => copyToClipboard(result.countervailing_rate || '')}
+                            title="复制反补贴税率"
                           >
                             <Copy className="h-3 w-3" />
                           </Button>

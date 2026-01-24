@@ -242,10 +242,11 @@ pub fn filter_dataframe(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use calamine::Data;
 
     #[test]
     fn test_datatype_conversion() {
-        let dt = DataType::String("test".to_string());
+        let dt = Data::String("test".to_string());
         assert_eq!(datatype_to_string(&dt), "test");
 
         let cv = datatype_to_cellvalue(&dt);

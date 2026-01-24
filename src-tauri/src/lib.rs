@@ -104,6 +104,8 @@ pub fn run() {
             get_platform_info,
             download_update,
             install_update,
+            restart_app,
+            quit_app,
             // File utils commands
             open_file_with_default_app,
         ])

@@ -25,6 +25,8 @@ pub struct ParsedTariff {
     pub description: Option<String>,
     pub rate: Option<String>,
     pub other_rate: Option<String>,
+    pub anti_dumping_rate: Option<String>, // 反倾销税率
+    pub countervailing_rate: Option<String>, // 反补贴税率
 }
 
 pub struct TaxScraper {
@@ -105,6 +107,8 @@ impl TaxScraper {
             description: None,
             rate: None,
             other_rate: None,
+            anti_dumping_rate: None,
+            countervailing_rate: None,
         };
 
         // 提取商品描述
