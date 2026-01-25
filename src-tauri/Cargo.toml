@@ -53,6 +53,12 @@ tokio = { version = "1", features = ["full"] }
 # 日期时间
 chrono = { version = "0.4", features = ["serde"] }
 
+# Base64 编码
+base64 = "0.22"
+
+# UUID (用于生成临时文件名)
+uuid = { version = "1.0", features = ["v4"] }
+
 # 字符串相似度
 strsim = "0.11"
 
@@ -72,4 +78,8 @@ quick-xml = "0.31"
 
 # 临时文件（用于测试）
 tempfile = "3"
+
+# Windows 注册表访问
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
 

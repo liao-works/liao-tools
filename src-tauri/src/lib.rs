@@ -7,9 +7,13 @@ use commands::alta::database::DatabaseManager;
 use commands::alta::matcher::HSCodeMatcher;
 use commands::excel::*;
 use commands::file_utils::open_file_with_default_app;
+use commands::icon_extractor::extract_icon;
+use commands::installed_apps::get_installed_apps;
+use commands::system_tools::*;
 use commands::tax::*;
 use commands::ups_dpd::commands::*;
 use commands::updater::*;
+use commands::user_tools::*;
 use log::info;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -24,8 +28,10 @@ pub struct AppState {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // 初始化日志
-    env_logger::init();
+    // 初始化日志，设置日志级别
+    env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Info)
+        .init();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -108,6 +114,23 @@ pub fn run() {
             quit_app,
             // File utils commands
             open_file_with_default_app,
+            // System tools commands
+            get_system_tools,
+            launch_system_tool,
+            check_tool_available,
+            // User tools commands
+            get_all_tools,
+            add_user_tool,
+            update_user_tool,
+            delete_user_tool,
+            reorder_tools,
+            launch_custom_tool,
+            get_recent_programs,
+            record_program_launch,
+            // Icon extractor commands
+            extract_icon,
+            // Installed apps commands
+            get_installed_apps,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

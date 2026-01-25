@@ -22,9 +22,8 @@ pub async fn open_file_with_default_app(file_path: String) -> Result<(), String>
 
         const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-        let quoted_path = format!("\"{}\"", file_path);
         let result = Command::new("cmd")
-            .args(["/c", "start", "", &quoted_path])
+            .args(["/c", "start", "", &file_path])
             .creation_flags(CREATE_NO_WINDOW)
             .spawn();
 

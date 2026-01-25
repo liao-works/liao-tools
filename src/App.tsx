@@ -4,6 +4,7 @@ import { AltaPage } from './features/alta/AltaPage';
 import { TaxPage } from './features/tax/TaxPage';
 import { ExcelPage } from './features/excel/ExcelPage';
 import { UpsUpdPage } from './features/ups-dpd/UpsUpdPage';
+import { SystemToolsPage } from './features/system-tools/SystemToolsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { Toaster } from './components/ui/toaster';
 import { useDarkMode } from './hooks/use-dark-mode';
@@ -18,11 +19,12 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<MainLayout />}>
-          <Route index element={<Navigate to="/alta" replace />} />
+          <Route index element={<Navigate to="/system-tools" replace />} />
           <Route path="alta" element={<AltaPage />} />
           <Route path="tax" element={<TaxPage />} />
           <Route path="excel" element={<ExcelPage />} />
           <Route path="ups-dpd" element={<UpsUpdPage />} />
+          <Route path="system-tools" element={<SystemToolsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>

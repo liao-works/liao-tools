@@ -1,3 +1,99 @@
+// 系统工具类型
+export interface SystemTool {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: ToolCategory;
+  platform: string[];
+  enabled: boolean;
+  command: string;
+  args?: string[];
+  hotkey?: string;
+}
+
+export type ToolCategory = 'system' | 'utility' | 'development' | 'media' | 'custom';
+
+export interface LaunchToolResult {
+  success: boolean;
+  tool_id: string;
+  message: string;
+  error?: string;
+}
+
+// 用户自定义工具类型
+export interface UserTool {
+  id?: number;
+  name: string;
+  description: string;
+  icon?: string;
+  executablePath: string;
+  arguments?: string;
+  workingDirectory?: string;
+  category: string;
+  order: number;
+  hotkey?: string;
+  enabled: boolean;
+  platform: string;
+  createdAt: string;
+  updatedAt: string;
+  lastLaunchedAt?: string;
+  launchCount: number;
+}
+
+// 最近使用的程序
+export interface RecentProgram {
+  path: string;
+  name: string;
+  lastUsed: string;
+  usageCount: number;
+}
+
+// 显示工具（系统工具或自定义工具）
+export interface DisplayTool {
+  type: 'system' | 'custom';
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: ToolCategory;
+  platform: string[];
+  enabled: boolean;
+  command?: string;
+  executablePath?: string;
+  args?: string[];
+  arguments?: string;
+  hotkey?: string;
+  order?: number;
+  globalHotkey?: boolean;
+}
+
+// 创建用户工具请求
+export interface CreateUserToolRequest {
+  name: string;
+  description: string;
+  icon?: string;
+  executablePath: string;
+  arguments?: string;
+  workingDirectory?: string;
+  category: string;
+  hotkey?: string;
+}
+
+// 更新用户工具请求
+export interface UpdateUserToolRequest {
+  id: number;
+  name: string;
+  description: string;
+  icon?: string;
+  executablePath: string;
+  arguments?: string;
+  workingDirectory?: string;
+  category: string;
+  hotkey?: string;
+  enabled: boolean;
+}
+
 // Alta模块类型
 export interface AltaQueryResult {
   code: string;

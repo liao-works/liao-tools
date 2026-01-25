@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::fmt;
 
 /// 统一的错误响应格式
 #[derive(Debug, Serialize)]
@@ -13,6 +14,12 @@ impl CommandError {
             message: message.into(),
             code: code.into(),
         }
+    }
+}
+
+impl fmt::Display for CommandError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", self.code, self.message)
     }
 }
 
@@ -31,5 +38,11 @@ impl From<String> for CommandError {
 impl From<rust_xlsxwriter::XlsxError> for CommandError {
     fn from(error: rust_xlsxwriter::XlsxError) -> Self {
         CommandError::new(error.to_string(), "XLSX_ERROR")
+    }
+}
+
+impl From<std::io::Error> for CommandError {
+    fn from(error: std::io::Error) -> Self {
+        CommandError::new(error.to_string(), "IO_ERROR")
     }
 }
