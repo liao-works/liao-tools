@@ -95,15 +95,19 @@ export interface UpdateUserToolRequest {
 }
 
 // Alta模块类型
+export interface AltaMatchedItem {
+  code: string;
+  description: string;
+  level: number;
+  raw_text?: string | null;
+  has_exceptions?: boolean | null;
+}
+
 export interface AltaQueryResult {
   code: string;
   status: 'forbidden' | 'safe';
   description: string;
-  matched_items?: {
-    code: string;
-    description: string;
-    level: number;
-  }[];
+  matched_items?: AltaMatchedItem[];
 }
 
 export interface AltaBatchResult {

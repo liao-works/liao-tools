@@ -1,6 +1,6 @@
 [package]
 name = "liao-tools"
-version = "0.0.7"
+version = "0.0.8"
 description = "Liao Tools"
 authors = ["cavin"]
 edition = "2021"
@@ -78,6 +78,12 @@ quick-xml = "0.31"
 
 # 临时文件（用于测试）
 tempfile = "3"
+
+# 正则表达式
+regex = "1.10"
+
+# 延迟静态初始化
+lazy_static = "1.4"
 
 # Windows 注册表访问
 [target.'cfg(windows)'.dependencies]

@@ -34,6 +34,8 @@ impl HSCodeMatcher {
                 matched_codes: vec![],
                 descriptions: vec![],
                 match_type: "无效编码".to_string(),
+                raw_texts: vec![],
+                has_exceptions: vec![],
             });
         }
 
@@ -45,6 +47,8 @@ impl HSCodeMatcher {
                     matched_codes: vec![],
                     descriptions: vec![],
                     match_type: format!("编码长度不足{}位", length),
+                    raw_texts: vec![],
+                    has_exceptions: vec![],
                 });
             }
         }
@@ -63,6 +67,8 @@ impl HSCodeMatcher {
 
             let matched_codes: Vec<String> = results.iter().map(|item| item.hs_code.clone()).collect();
             let descriptions: Vec<String> = results.iter().map(|item| item.description.clone()).collect();
+            let raw_texts: Vec<Option<String>> = results.iter().map(|item| item.raw_text.clone()).collect();
+            let has_exceptions: Vec<bool> = results.iter().map(|item| item.has_exceptions.unwrap_or(false)).collect();
 
             debug!("匹配到 {} 条记录，匹配类型: {}", results.len(), match_type);
 
@@ -71,6 +77,8 @@ impl HSCodeMatcher {
                 matched_codes,
                 descriptions,
                 match_type: match_type.to_string(),
+                raw_texts,
+                has_exceptions,
             })
         } else {
             Ok(MatchResult {
@@ -78,6 +86,8 @@ impl HSCodeMatcher {
                 matched_codes: vec![],
                 descriptions: vec![],
                 match_type: "未匹配".to_string(),
+                raw_texts: vec![],
+                has_exceptions: vec![],
             })
         }
     }
@@ -122,7 +132,9 @@ impl HSCodeMatcher {
                 .matched_codes
                 .iter()
                 .zip(match_result.descriptions.iter())
-                .map(|(code, desc)| {
+                .zip(match_result.raw_texts.iter())
+                .zip(match_result.has_exceptions.iter())
+                .map(|(((code, desc), raw_text), has_exceptions)| {
                     let level = if match_result.match_type.contains("4位") {
                         4
                     } else if match_result.match_type.contains("6位") {
@@ -137,6 +149,8 @@ impl HSCodeMatcher {
                         code: code.clone(),
                         description: desc.clone(),
                         level,
+                        raw_text: raw_text.clone(),
+                        has_exceptions: Some(*has_exceptions),
                     }
                 })
                 .collect();
@@ -219,6 +233,8 @@ mod tests {
             additional_info: "Info".to_string(),
             source_url: "https://example.com".to_string(),
             created_at: None,
+            raw_text: None,
+            has_exceptions: None,
         }];
         db_manager.update_forbidden_items(items).unwrap();
 

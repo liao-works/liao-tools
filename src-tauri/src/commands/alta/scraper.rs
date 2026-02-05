@@ -1,9 +1,13 @@
 use crate::core::html::HtmlParser;
 use crate::core::http;
-use crate::models::alta::ForbiddenItem;
+use crate::models::alta::{ForbiddenItem, HsCodeEntry};
 use anyhow::{Context, Result};
 use log::{debug, info, warn};
 use reqwest::Client;
+use regex::Regex;
+
+// 导入 lazy_static 宏
+use lazy_static::lazy_static;
 
 /// Alta.ru 禁运数据爬虫
 pub struct AltaScraper {
@@ -68,6 +72,96 @@ impl AltaScraper {
         Ok(items)
     }
 
+    /// 智能解析 HS 编码条目
+    fn parse_hs_code_entry(
+        &self,
+        raw_text: &str,
+        _description: &str,
+        _document: &str
+    ) -> Vec<HsCodeEntry> {
+        lazy_static! {
+            static ref CODE_RE: Regex = Regex::new(r"\d{4,10}").unwrap();
+        }
+
+        let mut entries = Vec::new();
+
+        // 1. 判断是否有例外
+        let has_exceptions = raw_text.contains("за исключением") ||
+                            raw_text.contains("кроме");
+
+        if has_exceptions {
+            // 2.1 有例外：分离主编码和例外编码
+            if let Some(pos) = raw_text.find("за исключением") {
+                let main_part = &raw_text[..pos];
+                let exception_part = &raw_text[pos..];
+
+                // 提取主编码
+                let main_codes: Vec<String> = CODE_RE
+                    .find_iter(main_part)
+                    .map(|m| m.as_str().to_string())
+                    .collect();
+
+                // 提取例外编码
+                let exception_codes: Vec<String> = CODE_RE
+                    .find_iter(exception_part)
+                    .map(|m| m.as_str().to_string())
+                    .collect();
+
+                // 为主编码创建条目
+                for code in main_codes {
+                    entries.push(HsCodeEntry {
+                        code: code.clone(),
+                        code_4: Self::prefix(&code, 4),
+                        code_6: Self::prefix(&code, 6),
+                        code_8: Self::prefix(&code, 8),
+                        is_exception: false,
+                        parent_raw: raw_text.to_string(),
+                    });
+                }
+
+                // 为例外编码创建条目（标记为例外）
+                for code in exception_codes {
+                    entries.push(HsCodeEntry {
+                        code: code.clone(),
+                        code_4: Self::prefix(&code, 4),
+                        code_6: Self::prefix(&code, 6),
+                        code_8: Self::prefix(&code, 8),
+                        is_exception: true,
+                        parent_raw: raw_text.to_string(),
+                    });
+                }
+            }
+        } else {
+            // 2.2 无例外：所有编码都是主编码
+            let codes: Vec<String> = CODE_RE
+                .find_iter(raw_text)
+                .map(|m| m.as_str().to_string())
+                .collect();
+
+            for code in codes {
+                entries.push(HsCodeEntry {
+                    code: code.clone(),
+                    code_4: Self::prefix(&code, 4),
+                    code_6: Self::prefix(&code, 6),
+                    code_8: Self::prefix(&code, 8),
+                    is_exception: false,
+                    parent_raw: raw_text.to_string(),
+                });
+            }
+        }
+
+        entries
+    }
+
+    /// 获取编码前缀
+    fn prefix(code: &str, len: usize) -> String {
+        if code.len() >= len {
+            code[..len].to_string()
+        } else {
+            code.to_string()
+        }
+    }
+
     /// 解析表格结构的数据
     fn parse_table(&self, table: &scraper::ElementRef) -> Result<Vec<ForbiddenItem>> {
         let mut items = Vec::new();
@@ -84,7 +178,7 @@ impl AltaScraper {
                 // 确保至少有3列数据
                 if cols.len() >= 3 {
                     // 第1列：HS编码
-                    let hs_code = cols[0]
+                    let raw_hs_text = cols[0]
                         .text()
                         .collect::<Vec<_>>()
                         .join("")
@@ -107,41 +201,30 @@ impl AltaScraper {
                         .trim()
                         .to_string();
 
-                    // 使用 core 的工具清理HS编码
-                    let hs_code_clean = HtmlParser::extract_digits(&hs_code);
+                    // 使用新的智能解析器
+                    let entries = self.parse_hs_code_entry(&raw_hs_text, &description, &document);
 
-                    if !hs_code_clean.is_empty() {
-                        let hs_code_4 = if hs_code_clean.len() >= 4 {
-                            hs_code_clean[0..4].to_string()
-                        } else {
-                            hs_code_clean.clone()
-                        };
+                    // 过滤掉例外编码（只存储被禁运的编码）
+                    let forbidden_entries: Vec<_> = entries.into_iter()
+                        .filter(|e| !e.is_exception)
+                        .collect();
 
-                        let hs_code_6 = if hs_code_clean.len() >= 6 {
-                            hs_code_clean[0..6].to_string()
-                        } else {
-                            hs_code_clean.clone()
-                        };
+                    // 为每个主编码创建 ForbiddenItem
+                    for entry in forbidden_entries {
+                        let has_exception = raw_hs_text.contains("за исключением");
 
-                        let hs_code_8 = if hs_code_clean.len() >= 8 {
-                            hs_code_clean[0..8].to_string()
-                        } else {
-                            hs_code_clean.clone()
-                        };
+                        items.push(ForbiddenItem::new_v2(
+                            entry,
+                            raw_hs_text.clone(),
+                            has_exception,
+                            description.clone(),
+                            document.clone(),
+                            self.base_url.clone(),
+                        ));
+                    }
 
-                        items.push(ForbiddenItem {
-                            id: None,
-                            hs_code: hs_code_clean,
-                            hs_code_4,
-                            hs_code_6,
-                            hs_code_8,
-                            description,
-                            additional_info: document,
-                            source_url: self.base_url.clone(),
-                            created_at: None,
-                        });
-                    } else {
-                        debug!("跳过无效的HS编码: {}", hs_code);
+                    if items.is_empty() {
+                        debug!("跳过无效的HS编码: {}", raw_hs_text);
                     }
                 }
             }
