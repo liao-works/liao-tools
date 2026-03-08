@@ -55,7 +55,7 @@ export function MainLayout() {
       {/* 主内容区 */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* 页面内容 */}
-        <main className="flex-1 overflow-y-auto p-8">
+        <main className="flex-1 min-h-0 overflow-y-auto p-8">
           <Outlet />
         </main>
       </div>

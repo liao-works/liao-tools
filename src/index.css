@@ -216,6 +216,18 @@ small {
   overscroll-behavior: none;
 }
 
+html.todo-widget-window,
+body.todo-widget-window,
+#root.todo-widget-window {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+body.todo-widget-window,
+#root.todo-widget-window {
+  overflow: hidden;
+}
+
 /* 移除默认的 tap 高亮 */
 * {
   -webkit-tap-highlight-color: transparent;

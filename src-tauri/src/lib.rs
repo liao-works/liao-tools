@@ -1,6 +1,7 @@
 mod commands;
 mod core;
 mod models;
+mod sticky_notes;
 
 use commands::alta::*;
 use commands::alta::database::DatabaseManager;
@@ -36,6 +37,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             info!("初始化应用...");
 
@@ -70,6 +73,11 @@ pub fn run() {
 
             // 设置状态
             app.manage(state);
+            app.manage(sticky_notes::NoteWindowManager::new());
+
+            if let Err(error) = sticky_notes::register_global_shortcuts(app.handle()) {
+                log::warn!("注册 Todo 全局快捷键失败: {}", error);
+            }
 
             info!("应用初始化完成");
             Ok(())
@@ -131,6 +139,20 @@ pub fn run() {
             extract_icon,
             // Installed apps commands
             get_installed_apps,
+            // Todo commands
+            sticky_notes::load_sticky_notes,
+            sticky_notes::save_sticky_notes,
+            sticky_notes::save_todo_widget_layout,
+            sticky_notes::detach_note_window,
+            sticky_notes::attach_note_window,
+            sticky_notes::update_note_window_state,
+            sticky_notes::set_desktop_mode,
+            sticky_notes::start_window_dragging,
+            sticky_notes::toggle_pin_all_notes,
+            sticky_notes::show_hide_all_notes,
+            sticky_notes::toggle_todo_widget_visibility,
+            sticky_notes::show_todo_widget_and_focus_input,
+            sticky_notes::toggle_todo_widget_pin,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

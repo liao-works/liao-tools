@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { FileBarChart, FileSpreadsheet, Settings, Percent, ChevronLeft, ChevronRight, Moon, Sun, Palette, Package, Download, Check, Wrench } from 'lucide-react';
+import { FileBarChart, FileSpreadsheet, Settings, Percent, ChevronLeft, ChevronRight, Moon, Sun, Palette, Package, Download, Check, Wrench, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -16,6 +16,12 @@ interface SidebarProps {
 }
 
 const navItems = [
+  {
+    title: 'Todo',
+    href: '/todo',
+    icon: CheckCircle2,
+    description: '任务清单与桌面小部件',
+  },
   {
     title: '系统工具',
     href: '/system-tools',
