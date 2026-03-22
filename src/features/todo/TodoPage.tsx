@@ -5,6 +5,7 @@ import {
   Circle,
   ExternalLink,
   Filter,
+  Pencil,
   Plus,
   Settings,
   Trash2,
@@ -230,7 +231,6 @@ export function TodoPage() {
             type="text"
             value={newTaskTitle}
             onChange={(event) => setNewTaskTitle(event.target.value)}
-            onKeyDown={handleNavigationKeyDown}
             placeholder="添加新任务..."
             className="flex-1 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
           />
@@ -357,7 +357,47 @@ interface TaskItemProps {
 }
 
 function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
-  const { toggleTask, deleteTask } = useTodoStore();
+  const { toggleTask, deleteTask, updateTask } = useTodoStore();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(task.title);
+  const editInputRef = useRef<HTMLInputElement | null>(null);
+  const skipBlurSaveRef = useRef(false);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    editInputRef.current?.focus();
+    editInputRef.current?.select();
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (isEditing) return;
+    setEditTitle(task.title);
+  }, [isEditing, task.title]);
+
+  const startEditing = () => {
+    setEditTitle(task.title);
+    setIsEditing(true);
+    onActivate();
+  };
+
+  const cancelEditing = () => {
+    setEditTitle(task.title);
+    setIsEditing(false);
+  };
+
+  const saveEditing = async () => {
+    const nextTitle = editTitle.trim();
+    if (!nextTitle) {
+      cancelEditing();
+      return;
+    }
+
+    if (nextTitle !== task.title) {
+      await updateTask(task.id, { title: nextTitle });
+    }
+
+    setIsEditing(false);
+  };
 
   return (
     <div
@@ -379,7 +419,7 @@ function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
         className="w-1.5 self-stretch rounded-full"
         style={{ backgroundColor: isActive ? 'hsl(var(--primary))' : 'transparent' }}
       />
-      <button onClick={() => void toggleTask(task.id)} className="flex-shrink-0">
+      <button onClick={() => void toggleTask(task.id)} className="flex-shrink-0" disabled={isEditing}>
         {task.status === 'completed' ? (
           <CheckCircle2 className="h-5 w-5" style={{ color: isActive ? 'hsl(var(--primary))' : '#22c55e' }} />
         ) : (
@@ -393,14 +433,45 @@ function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
       </button>
 
       <div className="min-w-0 flex-1">
-        <p
-          className={`text-sm ${
-            task.status === 'completed' ? 'text-muted-foreground line-through' : 'text-foreground'
-          }`}
-          style={{ fontWeight: isActive ? 700 : 500 }}
-        >
-          {task.title}
-        </p>
+        {isEditing ? (
+          <input
+            ref={editInputRef}
+            value={editTitle}
+            onChange={(event) => setEditTitle(event.target.value)}
+            onBlur={() => {
+              if (skipBlurSaveRef.current) {
+                skipBlurSaveRef.current = false;
+                return;
+              }
+              void saveEditing();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                void saveEditing();
+                return;
+              }
+
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                skipBlurSaveRef.current = true;
+                cancelEditing();
+              }
+            }}
+            className="w-full rounded-md border border-primary/40 bg-muted px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none"
+          />
+        ) : (
+          <p
+            onDoubleClick={startEditing}
+            className={`cursor-text text-sm ${
+              task.status === 'completed' ? 'text-muted-foreground line-through' : 'text-foreground'
+            }`}
+            style={{ fontWeight: isActive ? 700 : 500 }}
+            title="双击编辑"
+          >
+            {task.title}
+          </p>
+        )}
         <div className="mt-1 flex items-center gap-2">
           {isActive && (
             <span className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-primary-foreground">
@@ -419,12 +490,24 @@ function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
         </div>
       </div>
 
-      <button
-        onClick={() => void deleteTask(task.id)}
-        className="rounded p-1 text-muted-foreground opacity-0 transition-all group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
+      {!isEditing && (
+        <>
+          <button
+            onClick={startEditing}
+            className="rounded p-1 text-muted-foreground opacity-0 transition-all group-hover:opacity-100 hover:bg-muted hover:text-foreground"
+            title="编辑任务"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => void deleteTask(task.id)}
+            className="rounded p-1 text-muted-foreground opacity-0 transition-all group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
+            title="删除任务"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </>
+      )}
     </div>
   );
 }

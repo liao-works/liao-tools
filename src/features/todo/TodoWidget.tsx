@@ -9,6 +9,7 @@ import {
   Minus,
   Monitor,
   MonitorOff,
+  Pencil,
   Pin,
   PinOff,
   Plus,
@@ -27,7 +28,11 @@ export function TodoWidget() {
   const [isDesktopMode, setIsDesktopMode] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('pending');
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTaskTitle, setEditingTaskTitle] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const editingInputRef = useRef<HTMLInputElement | null>(null);
+  const skipEditBlurSaveRef = useRef(false);
   const persistTimerRef = useRef<number | null>(null);
   const taskRefs = useRef(new Map<string, HTMLDivElement>());
 
@@ -228,6 +233,51 @@ export function TodoWidget() {
     const updatedTasks = tasks.filter((task) => task.id !== id);
     setTasks(updatedTasks);
     await saveData(updatedTasks);
+  };
+
+  const startEditingTask = (task: TodoTask) => {
+    setEditingTaskId(task.id);
+    setEditingTaskTitle(task.title);
+    setActiveTaskId(task.id);
+  };
+
+  const cancelEditingTask = () => {
+    setEditingTaskId(null);
+    setEditingTaskTitle('');
+  };
+
+  const saveEditingTask = async () => {
+    if (!editingTaskId) return;
+
+    const nextTitle = editingTaskTitle.trim();
+    if (!nextTitle) {
+      cancelEditingTask();
+      return;
+    }
+
+    const targetTask = tasks.find((task) => task.id === editingTaskId);
+    if (!targetTask) {
+      cancelEditingTask();
+      return;
+    }
+
+    if (targetTask.title === nextTitle) {
+      cancelEditingTask();
+      return;
+    }
+
+    const updatedTasks = tasks.map((task) =>
+      task.id === editingTaskId
+        ? {
+            ...task,
+            title: nextTitle,
+          }
+        : task
+    );
+
+    setTasks(updatedTasks);
+    await saveData(updatedTasks);
+    cancelEditingTask();
   };
 
   const readCurrentWidgetLayout = async () => {
@@ -463,6 +513,12 @@ export function TodoWidget() {
   }, [activeTaskId]);
 
   useEffect(() => {
+    if (!editingTaskId) return;
+    editingInputRef.current?.focus();
+    editingInputRef.current?.select();
+  }, [editingTaskId]);
+
+  useEffect(() => {
     const handleWindowKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const isTextInput =
@@ -676,7 +732,11 @@ export function TodoWidget() {
                     opacity: task.status === 'completed' ? 0.5 : 1,
                   }}
                 >
-                  <button onClick={() => void toggleTask(task.id)} className="flex-shrink-0">
+                  <button
+                    onClick={() => void toggleTask(task.id)}
+                    className="flex-shrink-0"
+                    disabled={editingTaskId === task.id}
+                  >
                     {task.status === 'completed' ? (
                       <CheckCircle2 className="h-4 w-4" style={{ color: '#22c55e' }} />
                     ) : (
@@ -687,14 +747,50 @@ export function TodoWidget() {
                     )}
                   </button>
 
-                  <span
-                    className={`flex-1 truncate text-sm ${task.status === 'completed' ? 'line-through' : ''}`}
-                    style={{
-                      color: task.status === 'completed' ? themeColors.textSecondary : themeColors.text,
-                    }}
-                  >
-                    {task.title}
-                  </span>
+                  {editingTaskId === task.id ? (
+                    <input
+                      ref={editingInputRef}
+                      value={editingTaskTitle}
+                      onChange={(event) => setEditingTaskTitle(event.target.value)}
+                      onBlur={() => {
+                        if (skipEditBlurSaveRef.current) {
+                          skipEditBlurSaveRef.current = false;
+                          return;
+                        }
+                        void saveEditingTask();
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          void saveEditingTask();
+                          return;
+                        }
+
+                        if (event.key === 'Escape') {
+                          event.preventDefault();
+                          skipEditBlurSaveRef.current = true;
+                          cancelEditingTask();
+                        }
+                      }}
+                      className="flex-1 rounded px-1.5 py-0.5 text-sm focus:outline-none focus:ring-1"
+                      style={{
+                        backgroundColor: `${themeColors.text}12`,
+                        color: themeColors.text,
+                        outlineColor: themeColors.accent,
+                      }}
+                    />
+                  ) : (
+                    <span
+                      onDoubleClick={() => startEditingTask(task)}
+                      className={`flex-1 truncate text-sm ${task.status === 'completed' ? 'line-through' : ''}`}
+                      style={{
+                        color: task.status === 'completed' ? themeColors.textSecondary : themeColors.text,
+                      }}
+                      title="双击编辑"
+                    >
+                      {task.title}
+                    </span>
+                  )}
 
                   <span
                     className="rounded px-1 py-0.5 text-xs opacity-0 transition-opacity group-hover:opacity-100"
@@ -706,13 +802,26 @@ export function TodoWidget() {
                     {PRIORITY_LABELS[task.priority]}
                   </span>
 
-                  <button
-                    onClick={() => void deleteTask(task.id)}
-                    className="rounded p-1 opacity-0 transition-all group-hover:opacity-100"
-                    style={{ color: themeColors.textSecondary }}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
+                  {editingTaskId !== task.id && (
+                    <>
+                      <button
+                        onClick={() => startEditingTask(task)}
+                        className="rounded p-1 opacity-0 transition-all group-hover:opacity-100"
+                        style={{ color: themeColors.textSecondary }}
+                        title="编辑任务"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => void deleteTask(task.id)}
+                        className="rounded p-1 opacity-0 transition-all group-hover:opacity-100"
+                        style={{ color: themeColors.textSecondary }}
+                        title="删除任务"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </>
+                  )}
                 </div>
               ))}
             </section>
