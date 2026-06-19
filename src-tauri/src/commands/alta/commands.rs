@@ -1,6 +1,8 @@
 use crate::commands::error::CommandError;
 use super::excel::ExcelProcessor;
 use super::scraper::AltaScraper;
+use crate::commands::update_history::database::HistoryDatabase;
+use crate::commands::update_history::diff::diff_forbidden_items;
 use crate::models::alta::{AltaQueryResult, DatabaseInfo, ExcelStats, UpdateResult};
 use crate::AppState;
 use log::{error, info};
@@ -58,6 +60,7 @@ pub async fn query_hs_code(
 #[tauri::command]
 pub async fn update_alta_database(
     state: State<'_, AppState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<UpdateResult, CommandError> {
     info!("开始更新Alta数据库");
 
@@ -83,12 +86,26 @@ pub async fn update_alta_database(
         CommandError::new("系统错误", "LOCK_ERROR")
     })?;
 
+    // 旁路：在 DELETE+INSERT 之前快照旧数据，用于 diff
+    let old_items = db.get_all_forbidden_items().unwrap_or_default();
+    let new_items = items.clone();
+
     let count = db.update_forbidden_items(items).map_err(|e| {
         error!("更新数据库失败: {}", e);
         CommandError::from(e)
     })?;
+    drop(db); // 释放 alta db 锁，避免与 HistoryDatabase 冲突
 
     info!("数据库更新成功，共 {} 条记录", count);
+
+    // 写入变更历史（旁路，失败不阻断）
+    if let Ok(history_db) = HistoryDatabase::new(&app_handle) {
+        let session_id = uuid::Uuid::new_v4().to_string();
+        let records = diff_forbidden_items(&old_items, &new_items, &session_id);
+        if let Err(e) = history_db.insert_changes(&records) {
+            log::warn!("写入变更历史失败(alta): {}", e);
+        }
+    }
 
     Ok(UpdateResult {
         success: true,

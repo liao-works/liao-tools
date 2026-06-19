@@ -289,6 +289,33 @@ impl DatabaseManager {
         Ok(count)
     }
 
+    /// 读取全部禁运商品（用于更新前 diff）
+    /// 注意：仅读取 diff 对比所需字段（description/additional_info/source_url），
+    /// raw_text/has_exceptions 置 None 以避免依赖 v2 列存在与否。
+    pub fn get_all_forbidden_items(&self) -> Result<Vec<ForbiddenItem>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, hs_code, hs_code_4, hs_code_6, hs_code_8,
+                    description, additional_info, source_url, created_at
+             FROM forbidden_items",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(ForbiddenItem {
+                id: row.get(0).ok(),
+                hs_code: row.get(1)?,
+                hs_code_4: row.get(2)?,
+                hs_code_6: row.get(3)?,
+                hs_code_8: row.get(4)?,
+                description: row.get(5)?,
+                additional_info: row.get(6)?,
+                source_url: row.get(7)?,
+                created_at: row.get(8).ok(),
+                raw_text: None,
+                has_exceptions: None,
+            })
+        })?;
+        rows.collect::<rusqlite::Result<Vec<_>>>().map_err(Into::into)
+    }
+
     /// 获取数据库信息
     pub fn get_database_info(&self, db_path: &Path) -> Result<DatabaseInfo> {
         let total_items = self.get_total_count()?;
