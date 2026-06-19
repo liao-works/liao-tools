@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { taxApi } from '@/lib/api/tax';
 import type { TaxVersionInfo } from '@/types';
+import { UpdateHistoryDialog } from '@/components/update-history/UpdateHistoryDialog';
 
 export function UpdateTab() {
   const [versionInfo, setVersionInfo] = useState<TaxVersionInfo | null>(null);
@@ -214,6 +215,7 @@ export function UpdateTab() {
                 </>
               )}
             </Button>
+            <UpdateHistoryDialog module="tax" />
           </div>
 
           {downloading && (

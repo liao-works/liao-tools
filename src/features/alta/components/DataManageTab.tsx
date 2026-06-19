@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { altaApi } from '@/lib/api/alta';
 import type { AltaDbStats } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { UpdateHistoryDialog } from '@/components/update-history/UpdateHistoryDialog';
 
 export function DataManageTab() {
   const [updating, setUpdating] = useState(false);
@@ -126,9 +127,9 @@ export function DataManageTab() {
                 </div>
               </div>
 
-              <Button 
-                onClick={handleUpdate} 
-                disabled={updating} 
+              <Button
+                onClick={handleUpdate}
+                disabled={updating}
                 className="w-full"
                 variant={dbStats.total_items === 0 ? 'default' : 'outline'}
               >
@@ -144,6 +145,8 @@ export function DataManageTab() {
                   </>
                 )}
               </Button>
+
+              <UpdateHistoryDialog module="alta" />
             </>
           ) : (
             <div className="text-center py-4 text-muted-foreground">
