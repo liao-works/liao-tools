@@ -182,3 +182,30 @@ export interface ExcelProgress {
   percentage: number;
   message: string;
 }
+
+// 更新历史类型
+/** 更新历史中一次更新的摘要 */
+export interface UpdateSessionSummary {
+  session_id: string;
+  module: 'tax' | 'alta';
+  update_type: 'full' | 'single';
+  version_to: string | null;
+  timestamp: string;
+  change_count: number;
+}
+
+/** 单条变更明细 */
+export interface UpdateChangeDetail {
+  id: number;
+  session_id: string;
+  module: 'tax' | 'alta';
+  update_type: 'full' | 'single';
+  version_from: string | null;
+  version_to: string | null;
+  timestamp: string;
+  code: string;
+  field: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  change_type: 'added' | 'removed' | 'modified';
+}
