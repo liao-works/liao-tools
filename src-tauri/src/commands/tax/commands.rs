@@ -3,7 +3,9 @@ use crate::commands::tax::downloader::TaxDataDownloader;
 use crate::commands::tax::excel::TaxExcelProcessor;
 use crate::commands::tax::query::TaxQuery;
 use crate::commands::tax::scraper::TaxScraper;
+use crate::commands::update_history::database::HistoryDatabase;
 use crate::models::tax::{BatchResult, TaxTariff, TaxVersionInfo, UpdateResult};
+use crate::models::update_history::ChangeRecord;
 use tauri::Emitter;
 use tauri_plugin_opener::OpenerExt;
 use log::{info, warn};
@@ -369,12 +371,55 @@ pub async fn tax_update_single_row(
         .map_err(|e| e.to_string())?;
         
         info!("数据库更新成功");
-        
+
         let _ = window.emit("update-log", serde_json::json!({
             "code": code,
             "message": "数据库更新成功",
             "level": "success"
         }));
+
+        // 旁路：写入变更历史（失败不阻断主流程）
+        if let Ok(history_db) = HistoryDatabase::new(&app_handle) {
+            let session_id = uuid::Uuid::new_v4().to_string();
+            let mk = |field: &str, old: Option<String>, new: Option<String>| ChangeRecord {
+                session_id: session_id.clone(),
+                module: "tax".into(),
+                update_type: "single".into(),
+                version_from: None,
+                version_to: None,
+                code: code.clone(),
+                field: Some(field.into()),
+                old_value: old,
+                new_value: new,
+                change_type: "modified".into(),
+            };
+            let mut records = Vec::new();
+            // 按各字段实际是否变化（Option::Some）判断，而非 uk_updated（后者含 description 变化）
+            if let Some(new_rate) = &new_uk_rate {
+                records.push(mk(
+                    "rate",
+                    Some(old_tariff.rate.clone()),
+                    Some(new_rate.clone()),
+                ));
+            }
+            if let Some(new_ni) = &new_ni_rate {
+                records.push(mk(
+                    "north_ireland_rate",
+                    old_tariff.north_ireland_rate.clone(),
+                    Some(new_ni.clone()),
+                ));
+            }
+            if let Some(new_desc) = &new_description {
+                records.push(mk(
+                    "description",
+                    old_tariff.description.clone(),
+                    Some(new_desc.clone()),
+                ));
+            }
+            if let Err(e) = history_db.insert_changes(&records) {
+                log::warn!("写入变更历史失败(tax 单行): {}", e);
+            }
+        }
     }
     
     // 8. 构建返回结果
