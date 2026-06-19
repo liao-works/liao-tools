@@ -12,6 +12,7 @@ use commands::icon_extractor::extract_icon;
 use commands::installed_apps::get_installed_apps;
 use commands::system_tools::*;
 use commands::tax::*;
+use commands::update_history::commands::*;
 use commands::ups_dpd::commands::*;
 use commands::updater::*;
 use commands::user_tools::*;
@@ -99,6 +100,10 @@ pub fn run() {
             tax_download_update,
             tax_open_url,
             tax_update_single_row,
+            // Update history commands
+            get_update_sessions,
+            get_update_details,
+            clear_update_history,
             // Excel commands
             process_excel_file,
             get_excel_config,
