@@ -44,9 +44,16 @@ export function UpdateTab() {
       if (data.has_update) {
         addLog(`发现新版本: ${data.remote.version}`);
         addLog(`新增记录: ${data.remote.records - data.local.records} 条`);
+        // 更新前预览（来自服务端 data_changes）
+        if (data.data_changes?.summary) {
+          const s = data.data_changes.summary;
+          addLog(`本次预计变动: 新增 ${s.added} / 删除 ${s.removed} / 修改 ${s.modified}`);
+        }
         toast({
           title: '发现新版本',
-          description: `版本 ${data.remote.version} 可用`,
+          description: data.data_changes?.summary
+            ? `新增 ${data.data_changes.summary.added} / 删除 ${data.data_changes.summary.removed} / 修改 ${data.data_changes.summary.modified}`
+            : `版本 ${data.remote.version} 可用`,
         });
       } else {
         addLog('当前已是最新版本');

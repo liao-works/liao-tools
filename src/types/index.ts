@@ -147,6 +147,21 @@ export interface TaxTariff {
   similarity?: number;
 }
 
+/** 服务端数据变动摘要（更新前预览） */
+export interface DataChanges {
+  version: string | null;
+  previous_version: string | null;
+  summary: { added: number; removed: number; modified: number };
+  changes: Array<{
+    code: string;
+    change_type: 'added' | 'removed' | 'modified';
+    description: string;
+    field: string | null;
+    old_value: string | null;
+    new_value: string | null;
+  }>;
+}
+
 export interface TaxVersionInfo {
   local: {
     version: string;
@@ -164,6 +179,7 @@ export interface TaxVersionInfo {
     date: string;
     message: string;
   }[];
+  data_changes?: DataChanges | null;
 }
 
 // Excel模块类型
