@@ -40,16 +40,16 @@ pub fn diff_tariffs(
         }
     };
 
-    // added
-    for (code, _n) in &new_map {
+    // added：新有旧无（new_value 存新商品描述）
+    for (code, n) in &new_map {
         if !old_map.contains_key(code) {
-            out.push(mk(code, None, None, None, "added"));
+            out.push(mk(code, None, None, n.description.clone(), "added"));
         }
     }
     // removed + modified
     for (code, o) in &old_map {
         match new_map.get(code) {
-            None => out.push(mk(code, None, None, None, "removed")),
+            None => out.push(mk(code, None, o.description.clone(), None, "removed")),
             Some(n) => {
                 for (fname, fget) in &fields {
                     let ov = fget(o);
@@ -127,7 +127,7 @@ mod tests {
     fn tariff(code: &str, rate: &str, ni: Option<&str>) -> TaxTariff {
         TaxTariff {
             code: code.into(),
-            description: None,
+            description: Some(format!("商品{}", code)),  // 测试用描述
             rate: rate.into(),
             url: String::new(),
             north_ireland_rate: ni.map(Into::into),
@@ -145,11 +145,20 @@ mod tests {
         let old = vec![tariff("01", "5%", Some("3%")), tariff("02", "0%", None)];
         let new = vec![tariff("01", "6%", Some("3%")), tariff("03", "0%", None)];
         let recs = diff_tariffs(&old, &new, "s1", Some("data-1"), Some("data-2"));
-        // 01: rate 5%→6% (modified); 02: removed; 03: added
+
+        // 01: rate 5%→6% (modified)
         assert!(recs.iter().any(|r| r.code == "01" && r.field.as_deref() == Some("rate")
             && r.old_value.as_deref() == Some("5%") && r.new_value.as_deref() == Some("6%")));
-        assert!(recs.iter().any(|r| r.code == "02" && r.change_type == "removed"));
-        assert!(recs.iter().any(|r| r.code == "03" && r.change_type == "added"));
+        // 02: removed，old_value=旧描述
+        let removed = recs.iter().find(|r| r.code == "02" && r.change_type == "removed").unwrap();
+        assert_eq!(removed.old_value.as_deref(), Some("商品02"));
+        assert_eq!(removed.new_value, None);
+        assert_eq!(removed.field, None);
+        // 03: added，new_value=新描述
+        let added = recs.iter().find(|r| r.code == "03" && r.change_type == "added").unwrap();
+        assert_eq!(added.new_value.as_deref(), Some("商品03"));
+        assert_eq!(added.old_value, None);
+        assert_eq!(added.field, None);
     }
 
     #[test]
