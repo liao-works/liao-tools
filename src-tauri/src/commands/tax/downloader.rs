@@ -1,4 +1,6 @@
 use crate::commands::tax::database::TaxDatabase;
+use crate::commands::update_history::database::HistoryDatabase;
+use crate::commands::update_history::diff::diff_tariffs;
 use crate::models::tax::{RemoteMetadata, TaxVersionInfo, VersionDetail};
 use anyhow::{Context, Result};
 use std::path::PathBuf;
@@ -47,38 +49,89 @@ impl TaxDataDownloader {
     {
         // 下载数据库文件
         let temp_db_path = Self::download_database(&mut progress_callback).await?;
-        
+
+        // 提前获取远程元数据（用于 diff 的 version_to 与写 metadata 文件，避免重复 fetch）
+        let remote_metadata = Self::fetch_remote_metadata().await?;
+
         // 获取目标路径
         let app_data_dir = app_handle
             .path()
             .app_data_dir()
             .context("Failed to get app data directory")?;
-        
+
         std::fs::create_dir_all(&app_data_dir)
             .context("Failed to create app data directory")?;
-        
+
         let target_db_path = app_data_dir.join("tariffs.db");
-        
+
         // 备份旧数据库（如果存在）
         if target_db_path.exists() {
             let backup_path = app_data_dir.join("tariffs.db.backup");
             std::fs::copy(&target_db_path, &backup_path)
                 .context("Failed to backup old database")?;
         }
-        
+
+        // 旁路：对比新旧库写入变更历史（必须在 rename 之前，否则旧库被覆盖）
+        // 失败仅告警，不阻断主流程
+        let local_version = Self::get_local_version(app_handle)
+            .await
+            .unwrap_or_else(|_| VersionDetail {
+                version: "unknown".into(),
+                records: 0,
+                date: "unknown".into(),
+            });
+        if let Err(e) = Self::record_full_update_diff(
+            app_handle,
+            &target_db_path,
+            &temp_db_path,
+            &local_version.version,
+            &remote_metadata.version,
+        ) {
+            log::warn!("写入 tax 全量变更历史失败: {}", e);
+        }
+
         // 移动新数据库到目标位置
         std::fs::rename(&temp_db_path, &target_db_path)
             .context("Failed to install new database")?;
-        
-        // 下载元数据
-        let metadata = Self::fetch_remote_metadata().await?;
+
+        // 写入元数据文件（复用已获取的 remote_metadata，不再二次 fetch）
         let metadata_path = app_data_dir.join("tariffs.db.metadata.json");
-        let metadata_json = serde_json::to_string_pretty(&metadata)
+        let metadata_json = serde_json::to_string_pretty(&remote_metadata)
             .context("Failed to serialize metadata")?;
         std::fs::write(&metadata_path, metadata_json)
             .context("Failed to write metadata file")?;
-        
+
         Ok(true)
+    }
+
+    /// 对比旧库与下载的新库，写入 tax 全量变更历史
+    fn record_full_update_diff(
+        app_handle: &tauri::AppHandle,
+        old_db_path: &std::path::Path,
+        new_db_path: &std::path::Path,
+        version_from: &str,
+        version_to: &str,
+    ) -> Result<()> {
+        // 旧库可能不存在（首次下载），此时全部为 added
+        let old_tariffs = if old_db_path.exists() {
+            TaxDatabase::read_all_from_path(old_db_path).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        let new_tariffs = TaxDatabase::read_all_from_path(new_db_path)?;
+
+        let session_id = uuid::Uuid::new_v4().to_string();
+        let records = diff_tariffs(
+            &old_tariffs,
+            &new_tariffs,
+            &session_id,
+            Some(version_from),
+            Some(version_to),
+        );
+
+        let history_db = HistoryDatabase::new(app_handle)?;
+        history_db.insert_changes(&records)?;
+        Ok(())
     }
     
     /// 获取本地版本信息

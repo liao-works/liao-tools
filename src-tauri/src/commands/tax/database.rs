@@ -147,7 +147,38 @@ impl TaxDatabase {
 
         Ok(tariffs)
     }
-    
+
+    /// 从指定路径的数据库读取全部关税（只读，用于全量更新 diff 新库）
+    pub fn read_all_from_path(db_path: &std::path::Path) -> Result<Vec<TaxTariff>> {
+        let conn = crate::core::database::create_connection(db_path)
+            .context("Failed to open new tariffs db for diff")?;
+        let mut stmt = conn.prepare(
+            "SELECT code, description, rate, url, north_ireland_rate,
+                    north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated
+             FROM tariffs",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(TaxTariff {
+                code: row.get(0)?,
+                description: row.get(1)?,
+                rate: row.get(2)?,
+                url: row.get(3)?,
+                north_ireland_rate: row.get(4)?,
+                north_ireland_url: row.get(5)?,
+                other_rate: row.get(6)?,
+                anti_dumping_rate: row.get(7)?,
+                countervailing_rate: row.get(8)?,
+                last_updated: row.get(9)?,
+                similarity: None,
+            })
+        })?;
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r?);
+        }
+        Ok(out)
+    }
+
     /// 获取记录总数
     pub fn get_record_count(&self) -> Result<i64> {
         let count: i64 = self
