@@ -247,9 +247,9 @@ impl ExcelProcessor {
 #[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
-    use super::database::DatabaseManager;
+    use crate::commands::alta::database::DatabaseManager;
     #[allow(unused_imports)]
-    use super::matcher::HSCodeMatcher;
+    use crate::commands::alta::matcher::HSCodeMatcher;
     #[allow(unused_imports)]
     use super::*;
     #[allow(unused_imports)]

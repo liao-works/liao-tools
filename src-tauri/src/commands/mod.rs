@@ -5,6 +5,7 @@ pub mod icon_extractor;
 pub mod installed_apps;
 pub mod tax;
 pub mod ups_dpd;
+pub mod update_history;
 pub mod updater;
 
 pub mod file_utils;

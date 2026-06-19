@@ -201,7 +201,7 @@ impl HSCodeMatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::database::DatabaseManager;
+    use crate::commands::alta::database::DatabaseManager;
     use crate::models::alta::ForbiddenItem;
     use std::sync::{Arc, Mutex};
     use tempfile::NamedTempFile;
