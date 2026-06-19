@@ -1,0 +1,40 @@
+name: 测试数据源可达性 (A API / B CSV)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: A - trade-tariff 页面 + API（当前/候选源）
+        run: |
+          echo "=== A1: trade-tariff 页面（当前被封的源）==="
+          curl -sL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o /dev/null -w "commodity 页面: %{http_code}\n" "https://www.trade-tariff.service.gov.uk/commodities/0101210000"
+          curl -sL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o /dev/null -w "chapter 页面: %{http_code}\n" "https://www.trade-tariff.service.gov.uk/chapters/29"
+
+          echo "=== A2: trade-tariff API（/api/v2，候选替代源）==="
+          curl -sL -o /dev/null -w "commodity API（有效）: %{http_code}\n" "https://www.trade-tariff.service.gov.uk/api/v2/commodities/0101210000"
+          curl -sL -o /dev/null -w "commodity API（废止 9403208000）: %{http_code}\n" "https://www.trade-tariff.service.gov.uk/api/v2/commodities/9403208000"
+
+      - name: B - trade.gov.uk CSV 批量数据
+        run: |
+          echo "=== B1: trade.gov.uk 可达性 ==="
+          curl -sL -o /dev/null -w "CSV metadata: %{http_code}\n" "https://data.api.trade.gov.uk/v1/datasets/uk-tariff-2021-01-01/versions/v4.0.167/metadata?format=csvw"
+          curl -sL -o /dev/null -w "data.gov.uk dataset: %{http_code}\n" "https://www.data.gov.uk/dataset/3bee9a8a-e69c-400e-add5-3345a87a8e25/tariffs-to-trade-with-the-uk-from-1-january-2021"
+
+          echo "=== B2: CSV metadata 格式（表/列）==="
+          curl -sL "https://data.api.trade.gov.uk/v1/datasets/uk-tariff-2021-01-01/versions/v4.0.167/metadata?format=csvw" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          tables = d.get('tables', {})
+          if isinstance(tables, dict):
+              for tn, tv in tables.items():
+                  cols = [c.get('name', '') for c in tv.get('tableSchema', {}).get('columns', [])]
+                  print(f'表 {tn} ({len(cols)} 列): {cols[:10]}')
+          elif isinstance(tables, list):
+              for t in tables[:6]:
+                  cols = [c.get('name', '') for c in t.get('tableSchema', {}).get('columns', [])]
+                  print(f'表 ({len(cols)} 列): {cols[:10]}')
+          "
