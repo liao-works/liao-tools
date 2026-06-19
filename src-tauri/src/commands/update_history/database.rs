@@ -84,21 +84,27 @@ impl HistoryDatabase {
     /// 查询历史列表（按 module 过滤，可选；按时间倒序）
     pub fn list_sessions(&self, module: Option<&str>, limit: i64) -> Result<Vec<SessionSummary>> {
         let sql = if module.is_some() {
-            "SELECT session_id, module, update_type, version_to,
-                    (SELECT timestamp FROM change_log c2 WHERE c2.session_id = c1.session_id LIMIT 1) AS ts,
+            "SELECT session_id,
+                    MAX(module) AS module,
+                    MAX(update_type) AS update_type,
+                    MAX(version_to) AS version_to,
+                    MAX(timestamp) AS timestamp,
                     COUNT(*) AS cnt
-             FROM change_log c1
+             FROM change_log
              WHERE module = ?1
              GROUP BY session_id
-             ORDER BY ts DESC
+             ORDER BY MAX(timestamp) DESC
              LIMIT ?2"
         } else {
-            "SELECT session_id, module, update_type, version_to,
-                    (SELECT timestamp FROM change_log c2 WHERE c2.session_id = c1.session_id LIMIT 1) AS ts,
+            "SELECT session_id,
+                    MAX(module) AS module,
+                    MAX(update_type) AS update_type,
+                    MAX(version_to) AS version_to,
+                    MAX(timestamp) AS timestamp,
                     COUNT(*) AS cnt
-             FROM change_log c1
+             FROM change_log
              GROUP BY session_id
-             ORDER BY ts DESC
+             ORDER BY MAX(timestamp) DESC
              LIMIT ?1"
         };
 
@@ -231,5 +237,24 @@ mod tests {
         let (_f, db) = empty_db();
         db.insert_changes(&[]).unwrap();
         assert!(db.list_sessions(None, 100).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_list_sessions_order_and_limit() {
+        let (_f, db) = empty_db();
+        db.insert_changes(&[rec("s1", "tax", "c1", None, None, None, "added")]).unwrap();
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        db.insert_changes(&[rec("s2", "tax", "c2", None, None, None, "added")]).unwrap();
+
+        // 时间倒序：最近的 s2 在前
+        let all = db.list_sessions(None, 100).unwrap();
+        assert_eq!(all.len(), 2);
+        assert_eq!(all[0].session_id, "s2");
+        assert_eq!(all[1].session_id, "s1");
+
+        // limit 截断
+        let limited = db.list_sessions(None, 1).unwrap();
+        assert_eq!(limited.len(), 1);
+        assert_eq!(limited[0].session_id, "s2");
     }
 }
