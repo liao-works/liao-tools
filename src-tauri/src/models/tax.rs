@@ -34,6 +34,39 @@ pub struct ChangelogItem {
     pub message: String,
 }
 
+/// 单条数据变动（服务端 data_changes.changes 元素，用于更新前预览）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChangelogEntry {
+    pub code: String,
+    pub change_type: String, // 'added' | 'removed' | 'modified'
+    #[serde(default)]
+    pub description: String,
+    pub field: Option<String>,
+    pub old_value: Option<String>,
+    pub new_value: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ChangelogSummary {
+    #[serde(default)]
+    pub added: i64,
+    #[serde(default)]
+    pub removed: i64,
+    #[serde(default)]
+    pub modified: i64,
+}
+
+/// 服务端发布的版本数据变动明细（更新前预览用）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataChanges {
+    pub version: Option<String>,
+    pub previous_version: Option<String>,
+    #[serde(default)]
+    pub summary: ChangelogSummary,
+    #[serde(default)]
+    pub changes: Vec<ChangelogEntry>,
+}
+
 /// 版本信息
 #[derive(Debug, Clone, Serialize)]
 pub struct TaxVersionInfo {
@@ -41,6 +74,8 @@ pub struct TaxVersionInfo {
     pub remote: VersionDetail,
     pub has_update: bool,
     pub changelog: Vec<ChangelogItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_changes: Option<DataChanges>,
 }
 
 /// 批量处理结果
@@ -63,6 +98,8 @@ pub struct RemoteMetadata {
     pub download_urls: DownloadUrls,
     #[serde(default)]
     pub changelog: Option<Vec<ChangelogItem>>,
+    #[serde(default)]
+    pub data_changes: Option<DataChanges>,
 }
 
 /// 下载URL

@@ -36,6 +36,7 @@ impl TaxDataDownloader {
             remote: remote_version,
             has_update,
             changelog: remote_metadata.changelog.unwrap_or_default(),
+            data_changes: remote_metadata.data_changes,
         })
     }
     
