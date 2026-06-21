@@ -1,0 +1,201 @@
+<!doctype html>
+<!--
+  Liao Tools · 界面重设计总览启动器 (index.html)
+  串联 7 个模块原型页。视觉系统：Claude (Anthropic) 暖色 · 工具化适配
+  点击任意卡片进入对应模块的高保真原型。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Liao Tools · 界面重设计</title>
+<style>
+  /* ============ tokens — 与所有 *-page.html 逐字一致 ============ */
+  :root{
+    --bg:#f5f4ed; --surface:#faf9f5; --surface-warm:#e8e6dc;
+    --fg:#141413; --fg-2:#3d3d3a; --muted:#5e5d59; --meta:#87867f;
+    --border:#f0eee6; --border-soft:#e8e6dc;
+    --accent:#c96442; --accent-on:#faf9f5;
+    --accent-soft:color-mix(in oklch,var(--accent) 12%,transparent);
+    --fg-soft:color-mix(in oklch,var(--fg) 5%,transparent);
+    --success:#2f7d4f; --warn:#b58635; --danger:#b53333; --info:#2f6db5;
+    --font-display:'Anthropic Serif',Georgia,'Times New Roman',serif;
+    --font-body:'Anthropic Sans',-apple-system,'Segoe UI',system-ui,'PingFang SC','Microsoft YaHei',sans-serif;
+    --font-mono:'Anthropic Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --radius:8px; --radius-md:12px; --radius-lg:16px;
+    --shadow-soft:0 1px 2px color-mix(in oklch,var(--fg) 4%,transparent);
+    --shadow-lift:0 6px 20px color-mix(in oklch,var(--fg) 9%,transparent);
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  a{color:inherit;text-decoration:none}
+  h1,h2,h3{text-wrap:balance;margin:0}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+
+  /* ============ topbar ============ */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 0}
+  .brand{display:flex;align-items:center;gap:11px}
+  .brand-mark{width:32px;height:32px;border-radius:9px;background:var(--accent);display:grid;place-items:center;color:var(--accent-on);font-family:var(--font-display);font-size:18px;font-weight:600}
+  .brand-name{font-family:var(--font-display);font-size:17px;font-weight:600;letter-spacing:-.01em;line-height:1.1}
+  .brand-sub{font-size:11.5px;color:var(--meta)}
+  .top-meta{font-family:var(--font-mono);font-size:11.5px;color:var(--meta);display:flex;align-items:center;gap:7px}
+  .top-meta .dot{width:7px;height:7px;border-radius:50%;background:var(--success)}
+
+  /* ============ hero ============ */
+  .hero{padding:18px 0 30px}
+  .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--meta);margin-bottom:12px}
+  .hero h1{font-family:var(--font-display);font-size:clamp(34px,5vw,46px);font-weight:500;line-height:1.08;letter-spacing:-.018em;max-width:18ch}
+  .hero .sub{margin-top:14px;color:var(--muted);font-size:15px;max-width:62ch;line-height:1.6}
+  .hero .sub b{color:var(--fg-2);font-weight:500}
+  .hero-hint{margin-top:18px;display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--meta);font-family:var(--font-mono)}
+  .hero-hint svg{width:14px;height:14px;stroke:var(--meta);fill:none;stroke-width:1.7}
+
+  /* ============ 分组 ============ */
+  .group{margin-top:30px}
+  .group-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+  .group-head .gt{font-family:var(--font-display);font-size:19px;font-weight:500;letter-spacing:-.01em}
+  .group-head .gc{font-family:var(--font-mono);font-size:11px;color:var(--meta);letter-spacing:.04em}
+  .group-head .gline{flex:1;height:1px;background:var(--border)}
+
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  @media (max-width:680px){.grid{grid-template-columns:1fr}}
+
+  /* ============ 启动卡片 ============ */
+  .launch{display:flex;flex-direction:column;gap:10px;padding:20px 22px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-soft);transition:transform .2s cubic-bezier(.2,0,0,1),box-shadow .2s ease,border-color .2s ease;position:relative;overflow:hidden}
+  .launch:hover{transform:translateY(-3px);box-shadow:var(--shadow-lift);border-color:var(--border-soft)}
+  .launch:active{transform:translateY(-1px)}
+  .launch .lic{width:38px;height:38px;border-radius:10px;background:var(--surface-warm);display:grid;place-items:center;color:var(--fg-2)}
+  .launch .lic svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.6}
+  .launch .lt{font-size:15px;font-weight:600;letter-spacing:-.005em;display:flex;align-items:center;gap:9px}
+  .launch .ld{font-size:13px;color:var(--muted);line-height:1.55}
+  .launch .lf{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
+  .launch .ltag{font-family:var(--font-mono);font-size:11px;color:var(--meta)}
+  .launch .lgo{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;color:var(--muted);transition:color .2s}
+  .launch .lgo svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;transition:transform .2s}
+  .launch:hover .lgo{color:var(--accent)}
+  .launch:hover .lgo svg{transform:translateX(3px)}
+
+  /* ============ motion ============ */
+  @keyframes riseIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .reveal{opacity:0;animation:riseIn .42s cubic-bezier(.2,0,0,1) both}
+  .reveal.r2{animation-delay:70ms}
+  .reveal.r3{animation-delay:140ms}
+  .reveal.r4{animation-delay:210ms}
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important}
+    .reveal{opacity:1 !important;transform:none !important}
+    .launch:hover{transform:none}
+  }
+
+  /* ============ foot ============ */
+  .foot{margin-top:46px;padding:22px 0 40px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;color:var(--meta);font-size:12.5px}
+  .foot .fl{display:flex;align-items:center;gap:8px}
+  .foot .fl svg{width:14px;height:14px;stroke:var(--meta);fill:none;stroke-width:1.6}
+  .foot code{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);background:var(--surface);padding:2px 7px;border-radius:5px;border:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar reveal" data-od-id="topbar">
+    <div class="brand">
+      <div class="brand-mark">L</div>
+      <div>
+        <div class="brand-name">Liao Tools</div>
+        <div class="brand-sub">跨境物流工具集 · 界面重设计</div>
+      </div>
+    </div>
+    <div class="top-meta"><span class="dot"></span>7 个模块已重设计</div>
+  </header>
+
+  <section class="hero reveal" data-od-id="hero">
+    <div class="eyebrow">界面重设计 · 高保真原型</div>
+    <h1>每个页面都重新考量过易用性。</h1>
+    <p class="sub">基于 Claude 暖色设计系统的工具化适配：信息架构重组为 <b>查询 / 处理 / 效率 / 系统</b> 四组，统一状态色体系、数据为王的可视化、命令面板与键盘优先交互。点击任意卡片进入对应模块。</p>
+    <div class="hero-hint">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+      选择下方模块进入 · 各页支持 ⌘K 命令面板
+    </div>
+  </section>
+
+  <!-- 查询 -->
+  <section class="group reveal r2" data-od-id="group-query">
+    <div class="group-head"><span class="gt">查询</span><span class="gc">2 个模块 · 高频</span><span class="gline"></span></div>
+    <div class="grid">
+      <a class="launch" href="tax-page.html">
+        <div class="lic"><svg viewBox="0 0 24 24"><path d="M19 5l-1.5 9.5a4 4 0 0 1-3.94 3.37L7 18.5M5 5h14M7 5v3a4 4 0 0 0 8 0V5"/></svg></div>
+        <div class="lt">税率查询</div>
+        <div class="ld">英国海关税率，10 位商品编码的单查 / 批量 / 数据更新，含反倾销与相似度。</div>
+        <div class="lf"><span class="ltag">单查 · 批查 · 更新</span><span class="lgo">进入<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+      </a>
+      <a class="launch" href="alta-page.html">
+        <div class="lic"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 3 4-6"/></svg></div>
+        <div class="lt">Alta 禁运查询</div>
+        <div class="ld">HS 编码禁运判定，精确 / 模糊匹配，Excel 批量检测与禁运库远程更新。</div>
+        <div class="lf"><span class="ltag">禁运红 · 可运绿</span><span class="lgo">进入<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+      </a>
+    </div>
+  </section>
+
+  <!-- 处理 -->
+  <section class="group reveal r2" data-od-id="group-process">
+    <div class="group-head"><span class="gt">处理</span><span class="gc">2 个模块 · 高频</span><span class="gline"></span></div>
+    <div class="grid">
+      <a class="launch" href="excel-page.html">
+        <div class="lic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16M15 4v16"/></svg></div>
+        <div class="lt">Excel 拆分</div>
+        <div class="ld">合并单元格拆分处理，主数据 + 明细表，配置 / 进度 / 实时日志三件套。</div>
+        <div class="lf"><span class="ltag">配置 · 进度 · 日志</span><span class="lgo">进入<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+      </a>
+      <a class="launch" href="ups-dpd-page.html">
+        <div class="lic"><svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/></svg></div>
+        <div class="lt">UPS / DPD</div>
+        <div class="ld">UPS 总结单与 DPD 数据预报模板填充，字段映射、处理进度与结果输出。</div>
+        <div class="lf"><span class="ltag">UPS · DPD 两类型</span><span class="lgo">进入<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+      </a>
+    </div>
+  </section>
+
+  <!-- 效率 -->
+  <section class="group reveal r3" data-od-id="group-efficiency">
+    <div class="group-head"><span class="gt">效率</span><span class="gc">2 个模块</span><span class="gline"></span></div>
+    <div class="grid">
+      <a class="launch" href="todo-page.html">
+        <div class="lic"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <div class="lt">待办清单</div>
+        <div class="ld">任务管理，优先级、筛选、桌面小部件与提醒，物流工作流相关示例。</div>
+        <div class="lf"><span class="ltag">添加 · 完成 · 筛选</span><span class="lgo">进入<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+      </a>
+      <a class="launch" href="system-tools-page.html">
+        <div class="lic"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-6 6a1.5 1.5 0 0 0 2 2l6-6a4 4 0 0 0 5.4-5.4l-2.3 2.3-2-2 2.3-2.3z"/></svg></div>
+        <div class="lt">系统工具</div>
+        <div class="ld">快速启动器，分类筛选、工具卡片网格、添加 / 编辑 / 启动系统工具。</div>
+        <div class="lf"><span class="ltag">启动器 · 分类管理</span><span class="lgo">进入<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+      </a>
+    </div>
+  </section>
+
+  <!-- 系统 -->
+  <section class="group reveal r4" data-od-id="group-system">
+    <div class="group-head"><span class="gt">系统</span><span class="gc">1 个模块</span><span class="gline"></span></div>
+    <div class="grid">
+      <a class="launch" href="settings-page.html">
+        <div class="lic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></div>
+        <div class="lt">设置</div>
+        <div class="ld">外观主题与配色、各模块数据版本管理、常规偏好与应用信息。</div>
+        <div class="lf"><span class="ltag">外观 · 数据 · 关于</span><span class="lgo">进入<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+      </a>
+    </div>
+  </section>
+
+  <footer class="foot" data-od-id="footer">
+    <div class="fl">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      视觉系统：Claude (Anthropic) 暖色 · 工具化适配
+    </div>
+    <div>共 <code>7</code> 屏 · 每屏独立文件 · <code>⌘K</code> 命令面板</div>
+  </footer>
+
+</div>
+</body>
+</html>
