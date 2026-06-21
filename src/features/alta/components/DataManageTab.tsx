@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Loader2 } from 'lucide-react';
+import { RefreshCw, Loader2, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { altaApi } from '@/lib/api/alta';
 import type { AltaDbStats } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { UpdateHistoryDialog } from '@/components/update-history/UpdateHistoryDialog';
+import { openUpdateHistory } from '@/hooks/use-update-history';
 
 export function DataManageTab() {
   const [updating, setUpdating] = useState(false);
@@ -146,7 +146,15 @@ export function DataManageTab() {
                 )}
               </Button>
 
-              <UpdateHistoryDialog module="alta" />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openUpdateHistory({ module: 'alta' })}
+                className="w-full"
+              >
+                <History className="mr-2 h-4 w-4" />
+                更新历史
+              </Button>
             </>
           ) : (
             <div className="text-center py-4 text-muted-foreground">

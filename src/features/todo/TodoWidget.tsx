@@ -563,7 +563,12 @@ export function TodoWidget() {
           if (newTaskTitle.trim()) {
             event.preventDefault();
             void handleAddTask();
+            return;
           }
+
+          if (!activeTaskId) return;
+          event.preventDefault();
+          void toggleTask(activeTaskId);
           return;
         }
         if (target !== inputRef.current) return;

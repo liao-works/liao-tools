@@ -24,3 +24,9 @@ dist-ssr
 *.sw?
 
 target/
+
+# Playwright MCP debug snapshots
+.playwright-mcp/
+
+# Local temp/debug artifacts (e.g. failed API response dumps)
+_latest_meta.json

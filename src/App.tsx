@@ -11,6 +11,7 @@ import { SettingsPage } from './features/settings/SettingsPage';
 import { TodoPage } from './features/todo/TodoPage';
 import { TodoWidget } from './features/todo/TodoWidget';
 import { Toaster } from './components/ui/toaster';
+import { UpdateHistoryHost } from './components/update-history/UpdateHistoryHost';
 import { useDarkMode } from './hooks/use-dark-mode';
 import { useTheme } from './hooks/use-theme';
 
@@ -62,6 +63,7 @@ function App() {
         </Route>
       </Routes>
       <Toaster />
+      <UpdateHistoryHost />
     </BrowserRouter>
   );
 }

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Download, Loader2, CheckCircle } from 'lucide-react';
+import { RefreshCw, Download, Loader2, CheckCircle, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { taxApi } from '@/lib/api/tax';
 import type { TaxVersionInfo } from '@/types';
-import { UpdateHistoryDialog } from '@/components/update-history/UpdateHistoryDialog';
+import { openUpdateHistory } from '@/hooks/use-update-history';
 
 export function UpdateTab() {
   const [versionInfo, setVersionInfo] = useState<TaxVersionInfo | null>(null);
@@ -222,7 +222,14 @@ export function UpdateTab() {
                 </>
               )}
             </Button>
-            <UpdateHistoryDialog module="tax" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openUpdateHistory({ module: 'tax' })}
+            >
+              <History className="mr-2 h-4 w-4" />
+              更新历史
+            </Button>
           </div>
 
           {downloading && (
