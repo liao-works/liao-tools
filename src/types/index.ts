@@ -225,3 +225,50 @@ export interface UpdateChangeDetail {
   new_value: string | null;
   change_type: 'added' | 'removed' | 'modified';
 }
+
+// Amazon 收益计算器类型（revcalpublic）
+/** 商品信息（对应页面 Étape 1 结果行的尺寸与价格等字段） */
+export interface RevCalProduct {
+  asin: string;
+  title: string;
+  brand: string | null;
+  image_url: string | null;
+  product_link: string | null;
+  length: number | null;
+  width: number | null;
+  height: number | null;
+  dimension_unit: string | null;
+  weight: number | null;
+  weight_unit: string | null;
+  price: number | null;
+  currency: string | null;
+  fee_category: string | null;
+  sales_rank: number | null;
+  sales_rank_context: string | null;
+  reviews_count: number | null;
+  rating: string | null;
+  offer_count: number | null;
+}
+
+/** 单个查询码的结果 */
+export interface RevCalQueryResult {
+  code: string;
+  products: RevCalProduct[];
+  error: string | null;
+}
+
+/** 批量查询汇总 */
+export interface RevCalBatchResult {
+  total: number;
+  success: number;
+  failed: number;
+  results: RevCalQueryResult[];
+}
+
+/** 批量查询进度事件 */
+export interface RevCalBatchProgress {
+  current: number;
+  total: number;
+  code: string;
+  status: string;
+}

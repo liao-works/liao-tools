@@ -6,6 +6,7 @@ import { AltaPage } from './features/alta/AltaPage';
 import { TaxPage } from './features/tax/TaxPage';
 import { ExcelPage } from './features/excel/ExcelPage';
 import { UpsUpdPage } from './features/ups-dpd/UpsUpdPage';
+import { RevCalPage } from './features/revcal/RevCalPage';
 import { SystemToolsPage } from './features/system-tools/SystemToolsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { TodoPage } from './features/todo/TodoPage';
@@ -58,6 +59,7 @@ function App() {
           <Route path="tax" element={<TaxPage />} />
           <Route path="excel" element={<ExcelPage />} />
           <Route path="ups-dpd" element={<UpsUpdPage />} />
+          <Route path="revcal" element={<RevCalPage />} />
           <Route path="system-tools" element={<SystemToolsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>

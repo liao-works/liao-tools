@@ -10,6 +10,7 @@ use commands::excel::*;
 use commands::file_utils::open_file_with_default_app;
 use commands::icon_extractor::extract_icon;
 use commands::installed_apps::get_installed_apps;
+use commands::revcal::commands::*;
 use commands::system_tools::*;
 use commands::tax::*;
 use commands::update_history::commands::*;
@@ -104,6 +105,11 @@ pub fn run() {
             get_update_sessions,
             get_update_details,
             clear_update_history,
+            // RevCal commands
+            revcal_search,
+            revcal_batch_search,
+            revcal_read_excel_codes,
+            revcal_export_excel,
             // Excel commands
             process_excel_file,
             get_excel_config,

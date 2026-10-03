@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { FileBarChart, FileSpreadsheet, Settings, Percent, ChevronLeft, ChevronRight, Moon, Sun, Palette, Package, Download, Check, Wrench, CheckCircle2 } from 'lucide-react';
+import { FileBarChart, FileSpreadsheet, Settings, Percent, ChevronLeft, ChevronRight, Moon, Sun, Palette, Package, Download, Check, Wrench, CheckCircle2, Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -51,6 +51,12 @@ const navItems = [
     href: '/ups-dpd',
     icon: Package,
     description: '物流数据模板填充',
+  },
+  {
+    title: '收益计算器',
+    href: '/revcal',
+    icon: Calculator,
+    description: 'Amazon 商品尺寸价格查询',
   },
 ];
 
