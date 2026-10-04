@@ -134,15 +134,15 @@ export function BatchQueryTab() {
     <div className="space-y-4">
       {/* 数据检查提示 */}
       {hasData === false && (
-        <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
+        <Card className="border-warning bg-warning-subtle">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mt-0.5" />
+              <AlertCircle className="h-5 w-5 text-warning-fg mt-0.5" />
               <div className="flex-1">
-                <h3 className="font-semibold text-yellow-800 dark:text-yellow-200">
+                <h3 className="font-semibold text-warning-subtle-fg">
                   数据库为空
                 </h3>
-                <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                <p className="text-sm text-warning-fg mt-1">
                   请先在「数据更新」标签页下载税率数据后再进行批量查询
                 </p>
               </div>
@@ -221,7 +221,7 @@ export function BatchQueryTab() {
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">成功</p>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                <p className="text-2xl font-bold text-success-fg">
                   {results.success}
                 </p>
               </div>

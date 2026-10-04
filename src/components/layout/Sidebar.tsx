@@ -138,7 +138,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50">
                 <div
                   className="h-3 w-3 rounded-full shadow-sm shrink-0"
-                  style={{ backgroundColor: 'hsl(var(--primary))' }}
+                  style={{ backgroundColor: 'var(--primary)' }}
                 />
                 <span className="text-sm font-medium truncate">{currentTheme.name}</span>
               </div>

@@ -195,7 +195,7 @@ export function ToolEditDialog({ tool, open, onSave, onCancel }: ToolEditDialogP
           {/* 工具名称 */}
           <div>
             <Label htmlFor="name">
-              工具名称 <span className="text-red-500">*</span>
+              工具名称 <span className="text-danger-fg">*</span>
             </Label>
             <Input
               id="name"
@@ -219,7 +219,7 @@ export function ToolEditDialog({ tool, open, onSave, onCancel }: ToolEditDialogP
           {/* 程序路径 */}
           <div>
             <Label htmlFor="path">
-              程序路径 <span className="text-red-500">*</span>
+              程序路径 <span className="text-danger-fg">*</span>
             </Label>
             <div className="space-y-2">
               <div className="flex gap-2">

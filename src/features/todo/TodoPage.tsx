@@ -408,25 +408,25 @@ function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
         task.status === 'completed' ? 'opacity-60' : ''
       }`}
       style={{
-        backgroundColor: isActive ? 'hsl(var(--primary) / 0.08)' : 'hsl(var(--card))',
-        borderColor: isActive ? 'hsl(var(--primary) / 0.9)' : 'hsl(var(--border))',
+        backgroundColor: isActive ? 'var(--primary-subtle)' : 'var(--card)',
+        borderColor: isActive ? 'var(--primary)' : 'var(--border)',
         boxShadow: isActive
-          ? '0 0 0 3px hsl(var(--primary) / 0.22), 0 14px 32px -18px hsl(var(--foreground) / 0.5)'
+          ? '0 0 0 3px var(--primary-subtle), var(--shadow-lg)'
           : 'none',
       }}
     >
       <div
         className="w-1.5 self-stretch rounded-full"
-        style={{ backgroundColor: isActive ? 'hsl(var(--primary))' : 'transparent' }}
+        style={{ backgroundColor: isActive ? 'var(--primary)' : 'transparent' }}
       />
       <button onClick={() => void toggleTask(task.id)} className="flex-shrink-0" disabled={isEditing}>
         {task.status === 'completed' ? (
-          <CheckCircle2 className="h-5 w-5" style={{ color: isActive ? 'hsl(var(--primary))' : '#22c55e' }} />
+          <CheckCircle2 className="h-5 w-5" style={{ color: isActive ? 'var(--primary)' : '#22c55e' }} />
         ) : (
           <Circle
             className="h-5 w-5 text-muted-foreground transition-colors hover:text-primary"
             style={{
-              color: isActive ? 'hsl(var(--primary))' : PRIORITY_COLORS[task.priority],
+              color: isActive ? 'var(--primary)' : PRIORITY_COLORS[task.priority],
             }}
           />
         )}

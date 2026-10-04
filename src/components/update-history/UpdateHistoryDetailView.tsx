@@ -8,9 +8,9 @@ import { filterUnchanged } from '@/lib/update-history-utils';
 const MODULE_LABEL: Record<string, string> = { tax: '关税', alta: '禁运' };
 
 const CHANGE_BADGE: Record<string, { variant: 'default' | 'destructive' | 'outline'; className: string }> = {
-  added: { variant: 'default', className: 'bg-green-500 hover:bg-green-600 text-white border-green-500' },
+  added: { variant: 'default', className: 'bg-success hover:opacity-90 text-success-foreground border-success' },
   removed: { variant: 'destructive', className: '' },
-  modified: { variant: 'outline', className: 'border-blue-400 text-blue-600 dark:text-blue-400' },
+  modified: { variant: 'outline', className: 'border-info-fg/40 text-info-fg' },
 };
 
 const CHANGE_LABEL: Record<string, string> = {

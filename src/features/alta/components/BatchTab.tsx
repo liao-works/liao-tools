@@ -226,11 +226,11 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">正常</p>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{result.safe}</p>
+                <p className="text-2xl font-bold text-success-fg">{result.safe}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">无效</p>
-                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{result.invalid}</p>
+                <p className="text-2xl font-bold text-warning-fg">{result.invalid}</p>
               </div>
             </div>
           </CardContent>

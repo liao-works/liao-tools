@@ -204,7 +204,7 @@ export function QueryTab({ onSwitchToManage }: QueryTabProps) {
                   className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
                     result.status === 'forbidden'
                       ? 'bg-destructive/20 text-destructive'
-                      : 'bg-green-500/20 text-green-700 dark:text-green-400'
+                      : 'bg-success-subtle text-success-subtle-fg'
                   }`}
                 >
                   {result.status === 'forbidden' ? '🚫 禁运' : '✅ 正常'}
@@ -245,19 +245,19 @@ export function QueryTab({ onSwitchToManage }: QueryTabProps) {
                             <TableCell>
                               {hasEx ? (
                                 <div className="flex items-start gap-1">
-                                  <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                                  <AlertCircle className="h-4 w-4 text-warning-fg mt-0.5 flex-shrink-0" />
                                   <div className="flex flex-wrap gap-1">
                                     {exceptions.length > 0 ? (
                                       exceptions.map((exc, idx) => (
                                         <span
                                           key={idx}
-                                          className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs font-medium"
+                                          className="inline-flex items-center px-2 py-0.5 rounded-md bg-warning-subtle text-warning-fg text-xs font-medium"
                                         >
                                           {exc}
                                         </span>
                                       ))
                                     ) : (
-                                      <span className="text-xs text-amber-600 dark:text-amber-400">
+                                      <span className="text-xs text-warning-fg">
                                         含例外
                                       </span>
                                     )}

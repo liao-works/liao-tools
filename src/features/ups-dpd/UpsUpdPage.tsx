@@ -248,7 +248,7 @@ export function UpsUpdPage() {
                             setDetailFile(null);
                             setLogs([]);
                           }}
-                          className="w-4 h-4 text-primary border-gray-300 focus:ring-2 focus:ring-primary cursor-pointer"
+                          className="w-4 h-4 text-primary border-input focus:ring-2 focus:ring-primary cursor-pointer"
                         />
                         <Label
                           htmlFor={value}

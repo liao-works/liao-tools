@@ -220,15 +220,15 @@ export function SingleQueryTab() {
     <div className="space-y-4">
       {/* 数据检查提示 */}
       {hasData === false && (
-        <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
+        <Card className="border-warning bg-warning-subtle">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mt-0.5" />
+              <AlertCircle className="h-5 w-5 text-warning-fg mt-0.5" />
               <div className="flex-1">
-                <h3 className="font-semibold text-yellow-800 dark:text-yellow-200">
+                <h3 className="font-semibold text-warning-subtle-fg">
                   数据库为空
                 </h3>
-                <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                <p className="text-sm text-warning-fg mt-1">
                   请先在「数据更新」标签页下载税率数据后再进行查询
                 </p>
               </div>
@@ -403,7 +403,7 @@ export function SingleQueryTab() {
                             onClick={() => openUrl(result.north_ireland_url!)}
                             title="打开北爱尔兰税率网址"
                           >
-                            <ExternalLink className="h-3 w-3 text-blue-500" />
+                            <ExternalLink className="h-3 w-3 text-info-fg" />
                           </Button>
                         )}
                         <Button
@@ -489,9 +489,9 @@ export function SingleQueryTab() {
                 key={index}
                 className={`flex gap-2 ${
                   log.level === 'error'
-                    ? 'text-red-600'
+                    ? 'text-danger-fg'
                     : log.level === 'success'
-                    ? 'text-green-600'
+                    ? 'text-success-fg'
                     : 'text-muted-foreground'
                 }`}
               >

@@ -131,7 +131,7 @@ export function UpdateTab() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-blue-500" />
+                <div className="h-3 w-3 rounded-full bg-info" />
                 本地版本
               </CardTitle>
               <CardDescription>当前使用的数据版本</CardDescription>
@@ -157,7 +157,7 @@ export function UpdateTab() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <div
-                  className={`h-3 w-3 rounded-full ${versionInfo.has_update ? 'bg-green-500' : 'bg-gray-400'}`}
+                  className={`h-3 w-3 rounded-full ${versionInfo.has_update ? 'bg-success' : 'bg-muted-foreground/60'}`}
                 />
                 远程版本
               </CardTitle>
@@ -259,7 +259,7 @@ export function UpdateTab() {
             <div className="space-y-3">
               {versionInfo.changelog.map((log, index) => (
                 <div key={index} className="flex gap-3">
-                  <CheckCircle className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+                  <CheckCircle className="h-5 w-5 text-success-fg shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <p className="text-sm font-medium">{log.message}</p>
                     <p className="text-xs text-muted-foreground">{log.date}</p>

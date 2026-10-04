@@ -16,10 +16,10 @@ export function SystemToolCard({ tool, onLaunch, disabled }: SystemToolCardProps
   const IconComponent = getIconComponent(tool.icon) as LucideIcon;
 
   const categoryColors: Record<string, string> = {
-    system: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-    utility: 'bg-green-500/10 text-green-500 border-green-500/20',
-    development: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
-    media: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+    system: 'bg-chart-1/10 text-chart-1 border-chart-1/20',
+    utility: 'bg-chart-2/10 text-chart-2 border-chart-2/20',
+    development: 'bg-chart-5/10 text-chart-5 border-chart-5/20',
+    media: 'bg-chart-3/10 text-chart-3 border-chart-3/20',
   };
 
   const categoryLabels: Record<string, string> = {
