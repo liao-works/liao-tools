@@ -1,0 +1,286 @@
+/* ============================================================
+   设计 Token —— Tier 1 原始层 + Tier 2 语义层
+   规范: docs/superpowers/specs/2026-10-04-design-tokens-design.md
+   模式: .dark class | 强调色: data-accent 属性(缺省 blue)
+   ============================================================ */
+
+/* ---------------- 亮色(默认,accent 缺省 = blue) ---------------- */
+:root {
+  /* Tier 1 · 中性阶 */
+  --gray-1: #F6F7F9;
+  --gray-2: #EDEFF3;
+  --gray-3: #E2E6EB;
+  --gray-4: #D3D8DF;
+  --gray-5: #C0C7D0;
+  --gray-6: #A6AEBA;
+  --gray-7: #8B93A1;
+  --gray-8: #6E7683;
+  --gray-9: #5A6270;
+  --gray-10: #454D59;
+  --gray-11: #2C333D;
+  --gray-12: #191E26;
+
+  /* Tier 2 · 表面阶梯 */
+  --background: var(--gray-1);
+  --surface: #FFFFFF;
+  --card: #FFFFFF;
+  --popover: #FFFFFF;
+  --muted: #EDF0F3;
+  --accent: #ECEEF2;
+  --hover: rgb(13 20 31 / 4%);
+  --active: rgb(13 20 31 / 8%);
+  --secondary: var(--gray-3);
+
+  /* Tier 2 · 文字阶梯 */
+  --foreground: var(--gray-11);
+  --foreground-emphasis: var(--gray-12);
+  --muted-foreground: var(--gray-8);
+  --foreground-faint: var(--gray-6);
+  --card-foreground: var(--foreground);
+  --popover-foreground: var(--foreground);
+  --secondary-foreground: var(--foreground);
+  --accent-foreground: var(--foreground);
+
+  /* Tier 2 · 边框与滚动条 */
+  --border: rgb(13 20 31 / 9%);
+  --border-strong: rgb(13 20 31 / 16%);
+  --input: rgb(13 20 31 / 14%);
+  --scrollbar-thumb: rgb(13 20 31 / 18%);
+  --scrollbar-thumb-hover: rgb(13 20 31 / 32%);
+
+  /* Tier 2 · 状态色五件套 */
+  --success: #29903B;
+  --success-foreground: #FFFFFF;
+  --success-fg: #218358;
+  --success-subtle: rgb(46 144 59 / 11%);
+  --success-subtle-fg: #1D7A44;
+  --warning: #DD9209;
+  --warning-foreground: #241A04;
+  --warning-fg: #965F12;
+  --warning-subtle: rgb(221 146 9 / 13%);
+  --warning-subtle-fg: #8A570F;
+  --danger: #D13438;
+  --danger-foreground: #FFFFFF;
+  --danger-fg: #C03535;
+  --danger-subtle: rgb(209 52 56 / 10%);
+  --danger-subtle-fg: #B02E32;
+  --info: #2563EB;
+  --info-foreground: #FFFFFF;
+  --info-fg: #1B64C9;
+  --info-subtle: rgb(37 99 235 / 10%);
+  --info-subtle-fg: #175AB0;
+  --destructive: var(--danger);
+  --destructive-foreground: var(--danger-foreground);
+
+  /* Tier 1 · 图表分类色板 */
+  --chart-1: #2E7CF6;
+  --chart-2: #2E9E5B;
+  --chart-3: #DD9209;
+  --chart-4: #D13438;
+  --chart-5: #7C6CE4;
+  --chart-6: #2FA8BC;
+  --chart-7: #C9649A;
+  --chart-8: #6E7683;
+
+  /* Tier 2 · 强调色(缺省 blue,亮色) */
+  --primary: hsl(217 91% 50%);
+  --primary-foreground: #FFFFFF;
+  --primary-hover: hsl(217 91% 55%);
+  --primary-active: hsl(217 91% 46%);
+  --primary-fg: hsl(217 91% 25%);
+  --primary-subtle: hsl(217 91% 50% / 10%);
+  --primary-subtle-fg: hsl(217 91% 25%);
+  --ring: var(--primary);
+}
+
+/* ---------------- 暗色 ---------------- */
+.dark {
+  /* Tier 1 · 中性阶 */
+  --gray-1: #101216;
+  --gray-2: #15181E;
+  --gray-3: #1A1F26;
+  --gray-4: #21262E;
+  --gray-5: #292F38;
+  --gray-6: #333A44;
+  --gray-7: #454E5B;
+  --gray-8: #5C6675;
+  --gray-9: #8B93A1;
+  --gray-10: #A6AEBB;
+  --gray-11: #C9CFD8;
+  --gray-12: #E8EBF0;
+
+  /* Tier 2 · 表面阶梯 */
+  --background: var(--gray-1);
+  --surface: var(--gray-2);
+  --card: #1C212A;
+  --popover: #232933;
+  --muted: var(--gray-3);
+  --accent: #262C36;
+  --hover: rgb(255 255 255 / 4%);
+  --active: rgb(255 255 255 / 8%);
+  --secondary: var(--gray-5);
+
+  /* Tier 2 · 文字阶梯 */
+  --foreground: var(--gray-11);
+  --foreground-emphasis: var(--gray-12);
+  --muted-foreground: var(--gray-9);
+  --foreground-faint: var(--gray-8);
+  --card-foreground: var(--foreground);
+  --popover-foreground: var(--foreground);
+  --secondary-foreground: var(--foreground);
+  --accent-foreground: var(--foreground);
+
+  /* Tier 2 · 边框与滚动条 */
+  --border: rgb(255 255 255 / 7%);
+  --border-strong: rgb(255 255 255 / 13%);
+  --input: rgb(255 255 255 / 12%);
+  --scrollbar-thumb: rgb(255 255 255 / 14%);
+  --scrollbar-thumb-hover: rgb(255 255 255 / 28%);
+
+  /* Tier 2 · 状态色五件套 */
+  --success: #30A46C;
+  --success-foreground: #FFFFFF;
+  --success-fg: #4CC38A;
+  --success-subtle: rgb(76 195 138 / 13%);
+  --success-subtle-fg: #6BD69C;
+  --warning: #E9A23B;
+  --warning-foreground: #241A04;
+  --warning-fg: #F1B35C;
+  --warning-subtle: rgb(241 179 92 / 13%);
+  --warning-subtle-fg: #F5C57E;
+  --danger: #E0484D;
+  --danger-foreground: #FFFFFF;
+  --danger-fg: #F0767A;
+  --danger-subtle: rgb(240 118 122 / 13%);
+  --danger-subtle-fg: #F49B9E;
+  --info: #3B82F6;
+  --info-foreground: #FFFFFF;
+  --info-fg: #6FA9F8;
+  --info-subtle: rgb(111 169 248 / 13%);
+  --info-subtle-fg: #93C2FA;
+  --destructive: var(--danger);
+  --destructive-foreground: var(--danger-foreground);
+
+  /* Tier 1 · 图表分类色板 */
+  --chart-1: #5B93F7;
+  --chart-2: #3FC27D;
+  --chart-3: #F0B35C;
+  --chart-4: #F0767A;
+  --chart-5: #9C8CF0;
+  --chart-6: #4FC3D6;
+  --chart-7: #E08BB0;
+  --chart-8: #8B93A1;
+
+  /* Tier 2 · 强调色(缺省 blue,暗色) */
+  --primary: hsl(217 91% 62%);
+  --primary-foreground: #FFFFFF;
+  --primary-hover: hsl(217 91% 67%);
+  --primary-active: hsl(217 91% 58%);
+  --primary-fg: hsl(217 91% 80%);
+  --primary-subtle: hsl(217 91% 62% / 12%);
+  --primary-subtle-fg: hsl(217 91% 80%);
+  --ring: var(--primary);
+}
+
+/* ---------------- 强调色维度 · 亮色 ---------------- */
+[data-accent='sky'] {
+  --primary: hsl(199 89% 45%);
+  --primary-hover: hsl(199 89% 50%);
+  --primary-active: hsl(199 89% 41%);
+  --primary-fg: hsl(199 89% 20%);
+  --primary-subtle: hsl(199 89% 45% / 10%);
+  --primary-subtle-fg: hsl(199 89% 20%);
+  --ring: var(--primary);
+}
+[data-accent='purple'] {
+  --primary: hsl(271 81% 52%);
+  --primary-hover: hsl(271 81% 57%);
+  --primary-active: hsl(271 81% 48%);
+  --primary-fg: hsl(271 81% 27%);
+  --primary-subtle: hsl(271 81% 52% / 10%);
+  --primary-subtle-fg: hsl(271 81% 27%);
+  --ring: var(--primary);
+}
+[data-accent='green'] {
+  --primary: hsl(142 76% 36%);
+  --primary-hover: hsl(142 76% 41%);
+  --primary-active: hsl(142 76% 32%);
+  --primary-fg: hsl(142 76% 11%);
+  --primary-subtle: hsl(142 76% 36% / 10%);
+  --primary-subtle-fg: hsl(142 76% 11%);
+  --ring: var(--primary);
+}
+[data-accent='rose'] {
+  --primary: hsl(340 82% 50%);
+  --primary-hover: hsl(340 82% 55%);
+  --primary-active: hsl(340 82% 46%);
+  --primary-fg: hsl(340 82% 25%);
+  --primary-subtle: hsl(340 82% 50% / 10%);
+  --primary-subtle-fg: hsl(340 82% 25%);
+  --ring: var(--primary);
+}
+[data-accent='slate'] {
+  --primary: hsl(215 16% 45%);
+  --primary-hover: hsl(215 16% 50%);
+  --primary-active: hsl(215 16% 41%);
+  --primary-fg: hsl(215 16% 20%);
+  --primary-subtle: hsl(215 16% 45% / 10%);
+  --primary-subtle-fg: hsl(215 16% 20%);
+  --ring: var(--primary);
+}
+
+/* ---------------- 强调色维度 · 暗色 ---------------- */
+.dark[data-accent='blue'] {
+  --primary: hsl(217 91% 62%);
+  --primary-hover: hsl(217 91% 67%);
+  --primary-active: hsl(217 91% 58%);
+  --primary-fg: hsl(217 91% 80%);
+  --primary-subtle: hsl(217 91% 62% / 12%);
+  --primary-subtle-fg: hsl(217 91% 80%);
+  --ring: var(--primary);
+}
+.dark[data-accent='sky'] {
+  --primary: hsl(199 89% 55%);
+  --primary-hover: hsl(199 89% 60%);
+  --primary-active: hsl(199 89% 51%);
+  --primary-fg: hsl(199 89% 73%);
+  --primary-subtle: hsl(199 89% 55% / 12%);
+  --primary-subtle-fg: hsl(199 89% 73%);
+  --ring: var(--primary);
+}
+.dark[data-accent='purple'] {
+  --primary: hsl(271 81% 62%);
+  --primary-hover: hsl(271 81% 67%);
+  --primary-active: hsl(271 81% 58%);
+  --primary-fg: hsl(271 81% 80%);
+  --primary-subtle: hsl(271 81% 62% / 12%);
+  --primary-subtle-fg: hsl(271 81% 80%);
+  --ring: var(--primary);
+}
+.dark[data-accent='green'] {
+  --primary: hsl(142 60% 45%);
+  --primary-hover: hsl(142 60% 50%);
+  --primary-active: hsl(142 60% 41%);
+  --primary-fg: hsl(142 60% 63%);
+  --primary-subtle: hsl(142 60% 45% / 12%);
+  --primary-subtle-fg: hsl(142 60% 63%);
+  --ring: var(--primary);
+}
+.dark[data-accent='rose'] {
+  --primary: hsl(340 82% 60%);
+  --primary-hover: hsl(340 82% 65%);
+  --primary-active: hsl(340 82% 56%);
+  --primary-fg: hsl(340 82% 78%);
+  --primary-subtle: hsl(340 82% 60% / 12%);
+  --primary-subtle-fg: hsl(340 82% 78%);
+  --ring: var(--primary);
+}
+.dark[data-accent='slate'] {
+  --primary: hsl(215 18% 58%);
+  --primary-hover: hsl(215 18% 63%);
+  --primary-active: hsl(215 18% 54%);
+  --primary-fg: hsl(215 18% 76%);
+  --primary-subtle: hsl(215 18% 58% / 12%);
+  --primary-subtle-fg: hsl(215 18% 76%);
+  --ring: var(--primary);
+}

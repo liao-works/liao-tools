@@ -1,90 +1,89 @@
 @import "tailwindcss";
+@import "./styles/tokens.css";
 
 /* ============================================
-   🎨 COLOR TOKENS
-   ============================================ */
-
-:root {
-  --background: 0 0% 100%;
-  --foreground: 220 15% 15%;
-  --card: 0 0% 100%;
-  --card-foreground: 220 15% 15%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 220 15% 15%;
-  --primary: 217 91% 55%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 160 84% 39%;
-  --secondary-foreground: 0 0% 100%;
-  --muted: 220 15% 96%;
-  --muted-foreground: 220 10% 45%;
-  --accent: 220 15% 94%;
-  --accent-foreground: 220 15% 15%;
-  --destructive: 0 84% 55%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 220 13% 90%;
-  --input: 220 13% 90%;
-  --ring: 217 91% 55%;
-  --radius: 0.5rem;
-}
-
-.dark {
-  --background: 220 20% 6%;
-  --foreground: 220 10% 94%;
-  --card: 220 18% 9%;
-  --card-foreground: 220 10% 94%;
-  --popover: 220 18% 9%;
-  --popover-foreground: 220 10% 94%;
-  --primary: 217 91% 60%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 160 84% 42%;
-  --secondary-foreground: 0 0% 100%;
-  --muted: 220 15% 14%;
-  --muted-foreground: 220 10% 58%;
-  --accent: 220 15% 16%;
-  --accent-foreground: 220 10% 94%;
-  --destructive: 0 84% 58%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 220 15% 18%;
-  --input: 220 15% 18%;
-  --ring: 217 91% 60%;
-}
-
-/* ============================================
-   🎨 TAILWIND THEME MAPPING
+   TAILWIND THEME MAPPING
+   颜色 token 均为完整色值,inline 映射保证 .dark / data-accent 切换生效
    ============================================ */
 
 @theme inline {
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
+  /* 表面 */
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-popover: var(--popover);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-secondary: var(--secondary);
+  --color-hover: var(--hover);
+  --color-active: var(--active);
 
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  /* 文字 */
+  --color-foreground: var(--foreground);
+  --color-foreground-emphasis: var(--foreground-emphasis);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-foreground-faint: var(--foreground-faint);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent-foreground: var(--accent-foreground);
 
-  /* Accordion animations */
+  /* 边框与滚动条 */
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+
+  /* 强调色 */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-subtle: var(--primary-subtle);
+  --color-primary-subtle-fg: var(--primary-subtle-fg);
+  --color-ring: var(--ring);
+
+  /* 状态色 */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-fg: var(--success-fg);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-subtle-fg: var(--success-subtle-fg);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-subtle-fg: var(--warning-subtle-fg);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-danger-subtle-fg: var(--danger-subtle-fg);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-fg: var(--info-fg);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-subtle-fg: var(--info-subtle-fg);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  /* 图表 */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
+
+  /* Accordion(Radix 高度动画;Task 3 将 0.2s 换为 var(--duration-base)) */
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
 }
 
 /* ============================================
-   🎬 ACCORDION ANIMATIONS
+   ANIMATIONS
    ============================================ */
 
 @keyframes accordion-down {
@@ -102,224 +101,5 @@
   }
   to {
     height: 0;
-  }
-}
-
-/* ============================================
-   🔤 TYPOGRAPHY SCALE
-   基于 1.25 模块化比例 (Major Third)
-   ============================================ */
-
-* {
-  border-color: hsl(var(--border));
-}
-
-/* 全局样式 */
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #FAFBFC;
-  color: hsl(var(--foreground));
-}
-
-/* Dark mode override for body strictly */
-.dark body {
-  background-color: #1d232a;
-  /* matches base-300 commonly used */
-}
-
-/* ============================================
-   📰 HEADINGS - 有力量感的标题系统
-   ============================================ */
-
-h1, h2, h3, h4, h5, h6 {
-  font-weight: 600;
-  color: hsl(var(--foreground));
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
-
-h1 {
-  font-size: 1.875rem;       /* 30px */
-  line-height: 1.2;
-  letter-spacing: -0.025em;
-  font-weight: 700;
-}
-
-h2 {
-  font-size: 1.5rem;         /* 24px */
-  line-height: 1.25;
-  letter-spacing: -0.02em;
-}
-
-h3 {
-  font-size: 1.25rem;        /* 20px */
-  line-height: 1.3;
-  letter-spacing: -0.015em;
-}
-
-h4 {
-  font-size: 1.0625rem;      /* 17px */
-  line-height: 1.35;
-  letter-spacing: -0.01em;
-}
-
-h5 {
-  font-size: 0.9375rem;      /* 15px */
-  line-height: 1.4;
-  font-weight: 500;
-}
-
-h6 {
-  font-size: 0.8125rem;      /* 13px */
-  line-height: 1.4;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: hsl(var(--muted-foreground));
-}
-
-/* ============================================
-   📝 BODY TEXT
-   ============================================ */
-
-p {
-  font-size: 0.9375rem;      /* 15px */
-  line-height: 1.65;
-  color: hsl(var(--foreground) / 0.9);
-  margin-bottom: 0.875em;
-}
-
-/* 描述文字 - 次级信息 */
-.description,
-[class*="Description"] {
-  font-size: 0.875rem;       /* 14px */
-  line-height: 1.55;
-  color: hsl(var(--muted-foreground));
-  font-weight: 400;
-}
-
-small {
-  font-size: 0.8125rem;      /* 13px */
-  line-height: 1.5;
-  color: hsl(var(--muted-foreground));
-}
-#root {
-  width: 100%;
-  height: 100%;
-  overflow-y: auto;
-  overscroll-behavior: none;
-}
-
-html.todo-widget-window,
-body.todo-widget-window,
-#root.todo-widget-window {
-  background: transparent !important;
-  background-color: transparent !important;
-}
-
-body.todo-widget-window,
-#root.todo-widget-window {
-  overflow: hidden;
-}
-
-/* 移除默认的 tap 高亮 */
-* {
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* 只移除链接的默认下划线，不强制颜色 */
-a {
-  text-decoration: none;
-}
-
-/* 滚动条优化 - 彻底隐藏但保留功能 */
-::-webkit-scrollbar {
-  width: 0px;
-  background: transparent;
-}
-
-::-webkit-scrollbar-track {
-  background-color: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 99px;
-  border: 3px solid transparent;
-  background-clip: content-box;
-  transition: background-color 0.2s;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(0, 0, 0, 0.3);
-}
-
-/* View Transitions API 主题切换动画 */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
-}
-
-::view-transition-old(root) {
-  z-index: 1;
-}
-
-::view-transition-new(root) {
-  z-index: 9999;
-}
-
-.dark::view-transition-old(root) {
-  z-index: 9999;
-}
-
-.dark::view-transition-new(root) {
-  z-index: 1;
-}
-
-/* 暗色模式下 select 下拉菜单样式 */
-.dark select,
-.dark select option,
-.dark select optgroup {
-  background-color: #1e293b;
-  color: #e2e8f0;
-}
-
-.dark select option:checked {
-  background-color: #3b82f6;
-  color: white;
-}
-
-/* ============================================
-   📱 RESPONSIVE TYPOGRAPHY
-   ============================================ */
-
-@media (max-width: 640px) {
-  html {
-    font-size: 14px;
-  }
-
-  h1 {
-    font-size: 1.625rem;     /* 26px */
-  }
-
-  h2 {
-    font-size: 1.375rem;     /* 22px */
-  }
-
-  h3 {
-    font-size: 1.125rem;     /* 18px */
-  }
-}
-
-/* 大屏幕优化 */
-@media (min-width: 1280px) {
-  html {
-    font-size: 16px;
   }
 }
