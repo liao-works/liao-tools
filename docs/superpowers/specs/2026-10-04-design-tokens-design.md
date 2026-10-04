@@ -329,8 +329,9 @@ export interface Theme {
 | `text-red-500/300/50`、`bg-red-50` | `danger` 族 |
 | `text-blue-500/400/600`、`bg-blue-500` | `info` 族或 `primary` 族(按语义判断) |
 | `text-purple-500`、`text-orange-500` 等 | `--chart-*` 或就近状态色 |
-| todo 的 `#22c55e`、`#ffffff` 优先级圆点 | `--chart-2` / 对应 token |
-| SettingsModal 的 `#000000` | token |
+| todo 内联 `hsl(var(--primary) / 0.08)` 等旧三元组内联样式 | `var(--primary-subtle)` 等新 token |
+
+**豁免域(用户可配置的域数据,不 token 化)**:`src/features/todo/types.ts` 的 `WIDGET_THEMES`(widget 皮肤)与 `PRIORITY_COLORS`(优先级色,页面与 widget 共享)、`src/features/todo/TodoWidget.tsx`(独立透明窗口,自管皮肤)、`src/features/todo/components/SettingsModal.tsx` 的颜色选择器占位符 `#000000`。widget 是独立主题系统,强行注入 app token 会破坏其皮肤功能。
 | `body { background-color: #FAFBFC }`、`.dark body { #1d232a }` | 删除,由 `--background` 接管 |
 | `.dark select { #1e293b / #3b82f6 }` | token 化 |
 | 滚动条 `rgba(0,0,0,…)` | `--scrollbar-thumb(-hover)` |
@@ -339,7 +340,7 @@ export interface Theme {
 ## 11. 验证标准
 
 1. `pnpm build`(tsc + vite)通过;
-2. 门禁归零:`grep -rEn '#[0-9a-fA-F]{6}' src --include='*.tsx'` 与 `grep -rE '(text|bg|border|ring)-(green|amber|yellow|red|blue|purple|orange|slate|gray)-[0-9]' src --include='*.tsx'` 均无结果(排除 `styles/tokens.css` 与 `lib/motion.ts` 本身);
+2. 门禁归零:`grep -rEn '#[0-9a-fA-F]{6}' src --include='*.tsx'` 与 `grep -rE '(text|bg|border|ring)-(green|amber|yellow|red|blue|purple|orange|slate|gray)-[0-9]' src --include='*.tsx'` 均无结果;豁免:`src/styles/tokens.css`、`src/features/todo/`(widget 皮肤域,见 §10);
 3. 视觉验证:`pnpm tauri dev`,暗色+blue / 暗色+purple / 亮色+blue / 亮色+green 四组合截图,重点检查 sidebar、revcal 表格页、todo 页(含 widget 窗口)、设置页(主题选择器);
 4. 功能验证:主题选择器 6 项切换生效;旧持久化主题 id 迁移后正确;明暗切换(system/light/dark)与 accent 组合正确;
 5. 回归:shadcn 组件(button/dialog/select/toast)外观无破相,仅随 token 值发生预期内的变化。
