@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "lint:tokens": "grep -rEn '(text|bg|border|ring|from|to|via|divide|outline|decoration|fill|stroke)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}' src --include='*.tsx' --include='*.ts' | grep -v 'features/todo/' | grep -v 'lib/themes.ts' | grep -v 'ACCENT_PREVIEW'; grep -rEn '#[0-9a-fA-F]{6}\\b' src --include='*.tsx' --include='*.ts' | grep -v 'features/todo/' | grep -v 'lib/themes.ts' | grep -v 'ACCENT_PREVIEW'; grep -rEn 'hsl\\(var\\(' src --include='*.tsx' --include='*.ts' --include='*.css' | grep -v 'styles/tokens.css'; exit 0",
     "preview": "vite preview",
     "tauri": "tauri"
   },

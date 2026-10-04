@@ -35,7 +35,10 @@ export const migrateTheme = (stored: unknown): Theme => {
   return themes[0];
 };
 
-/** 主题选择器预览色(静态常量,不随全局 accent 变化,用于区分六个选项) */
+/**
+ * 主题选择器预览色:固定预览色板——绝不能绑定全局 accent(后者随选中项变化),
+ * 每个值锚定到该 accent 在浅色模式下的 primary 色相家族,用于区分六个选项
+ */
 export const ACCENT_PREVIEW: Record<AccentId, string> = {
   blue: '#2E7CF6',
   sky: '#1799C4',

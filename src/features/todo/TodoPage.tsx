@@ -421,7 +421,7 @@ function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
       />
       <button onClick={() => void toggleTask(task.id)} className="flex-shrink-0" disabled={isEditing}>
         {task.status === 'completed' ? (
-          <CheckCircle2 className="h-5 w-5" style={{ color: isActive ? 'var(--primary)' : '#22c55e' }} />
+          <CheckCircle2 className="h-5 w-5" style={{ color: isActive ? 'var(--primary)' : 'var(--success-fg)' }} />
         ) : (
           <Circle
             className="h-5 w-5 text-muted-foreground transition-colors hover:text-primary"

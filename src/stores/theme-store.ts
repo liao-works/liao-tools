@@ -25,15 +25,16 @@ export const useThemeStore = create<ThemeStore>()(
     }),
     {
       name: 'liao-tools-theme-storage',
-      version: 1,
+      version: 2,
+      // 只持久化 currentTheme:themes 是代码内常量,整包存储会让
+      // themes.ts 的任何更新都被用户本地的旧数组静默遮蔽
+      partialize: (state) => ({ currentTheme: state.currentTheme }),
       migrate: (persisted) => {
-        const persistedState = persisted as { currentTheme?: unknown; themes?: unknown };
+        const persistedState = persisted as { currentTheme?: unknown };
+        // v0(colors 结构 + themes 数组)与 v1(整包状态)一律规约为仅
+        // currentTheme,彻底丢弃残留的 themes;id 未知时回退默认主题
         return {
-          ...persistedState,
           currentTheme: migrateTheme(persistedState?.currentTheme),
-          // 旧持久化里的 themes 是旧结构(含 colors 字段),一并重置为新数组,
-          // 避免合并后选择器读到残留字段
-          themes,
         };
       },
       onRehydrateStorage: () => (state) => {
