@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useTheme } from '@/hooks/use-theme';
 import { useDarkMode } from '@/hooks/use-dark-mode';
+import { ACCENT_PREVIEW } from '@/lib/themes';
 import { UpdateDialog } from '@/components/UpdateDialog';
 import logo from '@/assets/logo-64.png';
 
@@ -206,11 +207,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     <div className="flex gap-1">
                       <div
                         className="h-4 w-4 rounded-sm shadow-sm"
-                        style={{ backgroundColor: `hsl(${theme.colors.primary})` }}
-                      />
-                      <div
-                        className="h-4 w-4 rounded-sm shadow-sm"
-                        style={{ backgroundColor: `hsl(${theme.colors.secondary})` }}
+                        style={{ backgroundColor: ACCENT_PREVIEW[theme.accent] }}
                       />
                     </div>
                     <span className="text-sm flex-1 text-left">{theme.name}</span>

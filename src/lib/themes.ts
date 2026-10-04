@@ -1,112 +1,46 @@
+export type AccentId = 'blue' | 'sky' | 'purple' | 'green' | 'rose' | 'slate';
+
 export interface Theme {
-  id: string;
+  id: string;          // 沿用旧 id,保证持久化兼容
   name: string;
   description: string;
-  colors: {
-    primary: string;
-    primaryForeground: string;
-    accent: string;
-    accentForeground: string;
-    secondary: string;
-    secondaryForeground: string;
-  };
+  accent: AccentId;
 }
 
 export const themes: Theme[] = [
-  {
-    id: 'default-dark',
-    name: '默认暗色',
-    description: '经典的蓝色主题',
-    colors: {
-      primary: '217 91% 60%',
-      primaryForeground: '0 0% 98%',
-      accent: '0 0% 18%',
-      accentForeground: '0 0% 98%',
-      secondary: '142 76% 36%',
-      secondaryForeground: '0 0% 98%',
-    },
-  },
-  {
-    id: 'blue-ocean',
-    name: '蓝色海洋',
-    description: '清新的海洋蓝',
-    colors: {
-      primary: '199 89% 48%',
-      primaryForeground: '0 0% 100%',
-      accent: '0 0% 18%',
-      accentForeground: '0 0% 98%',
-      secondary: '187 71% 45%',
-      secondaryForeground: '0 0% 100%',
-    },
-  },
-  {
-    id: 'purple-night',
-    name: '紫色夜晚',
-    description: '神秘的紫罗兰',
-    colors: {
-      primary: '271 81% 56%',
-      primaryForeground: '0 0% 100%',
-      accent: '0 0% 18%',
-      accentForeground: '0 0% 98%',
-      secondary: '280 89% 60%',
-      secondaryForeground: '0 0% 100%',
-    },
-  },
-  {
-    id: 'green-forest',
-    name: '绿色森林',
-    description: '自然的翠绿色',
-    colors: {
-      primary: '142 76% 36%',
-      primaryForeground: '0 0% 100%',
-      accent: '0 0% 18%',
-      accentForeground: '0 0% 98%',
-      secondary: '151 55% 42%',
-      secondaryForeground: '0 0% 100%',
-    },
-  },
-  {
-    id: 'rose-gold',
-    name: '玫瑰金',
-    description: '优雅的玫瑰金',
-    colors: {
-      primary: '340 82% 52%',
-      primaryForeground: '0 0% 100%',
-      accent: '0 0% 18%',
-      accentForeground: '0 0% 98%',
-      secondary: '25 95% 53%',
-      secondaryForeground: '0 0% 100%',
-    },
-  },
-  {
-    id: 'slate',
-    name: '石板灰',
-    description: '专业的灰色调',
-    colors: {
-      primary: '215 16% 47%',
-      primaryForeground: '0 0% 100%',
-      accent: '0 0% 18%',
-      accentForeground: '0 0% 98%',
-      secondary: '217 19% 35%',
-      secondaryForeground: '0 0% 100%',
-    },
-  },
+  { id: 'default-dark', name: '默认蓝', description: '经典的蓝色主题', accent: 'blue' },
+  { id: 'blue-ocean', name: '蓝色海洋', description: '清新的海洋蓝', accent: 'sky' },
+  { id: 'purple-night', name: '紫色夜晚', description: '神秘的紫罗兰', accent: 'purple' },
+  { id: 'green-forest', name: '绿色森林', description: '自然的翠绿色', accent: 'green' },
+  { id: 'rose-gold', name: '玫瑰金', description: '优雅的玫瑰金', accent: 'rose' },
+  { id: 'slate', name: '石板灰', description: '专业的灰色调', accent: 'slate' },
 ];
 
-export const getThemeById = (id: string): Theme | undefined => {
-  return themes.find(theme => theme.id === id);
+export const getThemeById = (id: string): Theme | undefined =>
+  themes.find(theme => theme.id === id);
+
+/** 应用主题:切换 <html> 的 data-accent 属性(颜色由 CSS token 机制接管) */
+export const applyTheme = (theme: Theme) => {
+  document.documentElement.dataset.accent = theme.accent;
 };
 
-export const applyTheme = (theme: Theme) => {
-  const root = document.documentElement;
+/**
+ * 持久化迁移:旧版 Theme 含 colors 字段(HSL 三元组),按 id 映射为新结构。
+ * 未知 id 回退 'default-dark'。
+ */
+export const migrateTheme = (stored: unknown): Theme => {
+  if (stored && typeof stored === 'object' && 'id' in stored) {
+    return getThemeById((stored as { id: string }).id) ?? themes[0];
+  }
+  return themes[0];
+};
 
-  // 立即应用所有主题颜色变量
-  Object.entries(theme.colors).forEach(([key, value]) => {
-    const cssVar = key.replace(/([A-Z])/g, '-$1').toLowerCase();
-    root.style.setProperty(`--${cssVar}`, value);
-  });
-
-  // 强制浏览器重新计算样式
-  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-  root.offsetHeight;
+/** 主题选择器预览色(静态常量,不随全局 accent 变化,用于区分六个选项) */
+export const ACCENT_PREVIEW: Record<AccentId, string> = {
+  blue: '#2E7CF6',
+  sky: '#1799C4',
+  purple: '#8B5CF6',
+  green: '#22A052',
+  rose: '#D9407E',
+  slate: '#5A6B84',
 };

@@ -9,6 +9,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { useTheme } from '@/hooks/use-theme';
 import { useDarkMode, type DarkModeType } from '@/hooks/use-dark-mode';
 import { cn } from '@/lib/utils';
+import { ACCENT_PREVIEW } from '@/lib/themes';
 import { UpdateDialog } from '@/components/UpdateDialog';
 import { loadSettings, saveSettings, type AppSettings } from '@/lib/settings';
 import logo from '@/assets/logo-64.png';
@@ -97,11 +98,7 @@ export function SettingsPage() {
                   <div className="flex gap-1.5 w-full">
                     <div
                       className="h-8 w-8 rounded-md shadow-sm"
-                      style={{ backgroundColor: `hsl(${theme.colors.primary})` }}
-                    />
-                    <div
-                      className="h-8 w-8 rounded-md shadow-sm"
-                      style={{ backgroundColor: `hsl(${theme.colors.secondary})` }}
+                      style={{ backgroundColor: ACCENT_PREVIEW[theme.accent] }}
                     />
                     <div className="flex-1" />
                     {currentTheme.id === theme.id && (
