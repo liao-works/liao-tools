@@ -78,9 +78,9 @@
   --color-chart-7: var(--chart-7);
   --color-chart-8: var(--chart-8);
 
-  /* Accordion(Radix 高度动画;Task 3 将 0.2s 换为 var(--duration-base)) */
-  --animate-accordion-down: accordion-down 0.2s ease-out;
-  --animate-accordion-up: accordion-up 0.2s ease-out;
+  /* Accordion(Radix 高度动画;时长走 duration token) */
+  --animate-accordion-down: accordion-down var(--duration-base) ease-out;
+  --animate-accordion-up: accordion-up var(--duration-base) ease-out;
 
   /* 排版 */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Roboto',
@@ -134,4 +134,25 @@
   to {
     height: 0;
   }
+}
+
+@theme {
+  /* 圆角 */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* 间距基数(Tailwind 4 所有 p/gap/w-* 工具类的倍数基准) */
+  --spacing: 0.25rem;
+}
+
+@theme inline {
+  /* 阴影 → 模式感知 elevation */
+  --shadow-xs: var(--elevation-xs);
+  --shadow-sm: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+  --shadow-lg: var(--elevation-lg);
 }

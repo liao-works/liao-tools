@@ -284,3 +284,52 @@
   --primary-subtle-fg: hsl(215 18% 76%);
   --ring: var(--primary);
 }
+
+/* ============================================================
+   Tier 2 · 阴影(elevation,由 @theme inline 映射为 shadow-* 工具类)
+   ============================================================ */
+
+:root {
+  --elevation-xs: 0 1px 2px rgb(16 24 40 / 5%);
+  --elevation-sm: 0 1px 3px rgb(16 24 40 / 8%), 0 1px 2px rgb(16 24 40 / 5%);
+  --elevation-md: 0 4px 16px rgb(16 24 40 / 10%), 0 2px 4px rgb(16 24 40 / 5%);
+  --elevation-lg: 0 16px 40px rgb(16 24 40 / 16%);
+}
+
+.dark {
+  --elevation-xs: 0 1px 2px rgb(0 0 0 / 35%);
+  --elevation-sm: 0 1px 3px rgb(0 0 0 / 40%);
+  --elevation-md: 0 4px 16px rgb(0 0 0 / 50%);
+  --elevation-lg: 0 16px 40px rgb(0 0 0 / 60%);
+}
+
+/* ============================================================
+   Tier 3 · 层级与聚焦环
+   ============================================================ */
+
+:root {
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+  --ring-width: 2px;
+  --ring-offset-width: 2px;
+}
+
+/* ============================================================
+   Tier 3 · 布局与控件
+   ============================================================ */
+
+:root {
+  --layout-sidebar-width: 240px;
+  --layout-sidebar-width-collapsed: 56px;
+  --layout-page-padding: 32px;
+  --control-h-sm: 28px;
+  --control-h-md: 32px;
+  --control-h-lg: 36px;
+  --icon-sm: 14px;
+  --icon-md: 16px;
+  --icon-lg: 20px;
+}
