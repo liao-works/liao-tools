@@ -1,168 +1,171 @@
 /* ============================================================
    元素默认值与全局基础样式
    字号/颜色一律引用 token,禁止写死值
+   全部规则包在 base 层:Tailwind utilities 层在后,工具类优先
    ============================================================ */
 
-/* 全局盒模型辅助:统一边框色 */
-* {
-  border-color: var(--border);
-}
+@layer base {
+  /* 全局盒模型辅助:统一边框色 */
+  * {
+    border-color: var(--border);
+  }
 
-/* 移除默认的 tap 高亮 */
-* {
-  -webkit-tap-highlight-color: transparent;
-}
+  /* 移除默认的 tap 高亮 */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
 
-body {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: var(--text-base);
-  line-height: 1.6;
-  font-weight: 400;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: var(--background);
-  color: var(--foreground);
-  text-rendering: optimizeLegibility;
-  font-synthesis: none;
-  -webkit-text-size-adjust: 100%;
-}
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.6;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: var(--background);
+    color: var(--foreground);
+    text-rendering: optimizeLegibility;
+    font-synthesis: none;
+    -webkit-text-size-adjust: 100%;
+  }
 
-#root {
-  width: 100%;
-  height: 100%;
-  overflow-y: auto;
-  overscroll-behavior: none;
-}
+  #root {
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: none;
+  }
 
-/* todo widget 独立透明窗口 */
-html.todo-widget-window,
-body.todo-widget-window,
-#root.todo-widget-window {
-  background: transparent !important;
-  background-color: transparent !important;
-}
+  /* todo widget 独立透明窗口 */
+  html.todo-widget-window,
+  body.todo-widget-window,
+  #root.todo-widget-window {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
 
-body.todo-widget-window,
-#root.todo-widget-window {
-  overflow: hidden;
-}
+  body.todo-widget-window,
+  #root.todo-widget-window {
+    overflow: hidden;
+  }
 
-/* 只移除链接的默认下划线,不强制颜色 */
-a {
-  text-decoration: none;
-}
+  /* 只移除链接的默认下划线,不强制颜色 */
+  a {
+    text-decoration: none;
+  }
 
-/* ============================================
-   标题体系(工具流密度:h1=页面标题 20px)
-   ============================================ */
+  /* ============================================
+     标题体系(工具流密度:h1=页面标题 20px)
+     ============================================ */
 
-h1, h2, h3, h4, h5, h6 {
-  font-weight: 600;
-  color: var(--foreground-emphasis);
-  text-wrap: balance;
-}
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    color: var(--foreground-emphasis);
+    text-wrap: balance;
+  }
 
-h1 {
-  font-size: var(--text-xl);        /* 20px 页面标题 */
-  line-height: 1.3;
-  letter-spacing: -0.01em;
-}
+  h1 {
+    font-size: var(--text-xl);        /* 20px 页面标题 */
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
 
-h2 {
-  font-size: var(--text-lg);        /* 16px 小节标题 */
-  line-height: 1.4;
-}
+  h2 {
+    font-size: var(--text-lg);        /* 16px 小节标题 */
+    line-height: 1.4;
+  }
 
-h3 {
-  font-size: var(--text-base);      /* 14px 卡片标题 */
-  line-height: 1.5;
-}
+  h3 {
+    font-size: var(--text-base);      /* 14px 卡片标题 */
+    line-height: 1.5;
+  }
 
-h4 {
-  font-size: var(--text-base);
-  line-height: 1.5;
-  font-weight: 500;
-}
+  h4 {
+    font-size: var(--text-base);
+    line-height: 1.5;
+    font-weight: 500;
+  }
 
-h5 {
-  font-size: var(--text-sm);
-  line-height: 1.5;
-  font-weight: 500;
-}
+  h5 {
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    font-weight: 500;
+  }
 
-h6 {
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted-foreground);
-}
+  h6 {
+    font-size: var(--text-xs);
+    line-height: 1.5;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted-foreground);
+  }
 
-/* 描述文字 - 次级信息 */
-.description,
-[class*="Description"] {
-  font-size: var(--text-sm);
-  line-height: 1.55;
-  color: var(--muted-foreground);
-  font-weight: 400;
-}
+  /* 描述文字 - 次级信息 */
+  .description,
+  [class*="Description"] {
+    font-size: var(--text-sm);
+    line-height: 1.55;
+    color: var(--muted-foreground);
+    font-weight: 400;
+  }
 
-small {
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  color: var(--muted-foreground);
-}
+  small {
+    font-size: var(--text-xs);
+    line-height: 1.5;
+    color: var(--muted-foreground);
+  }
 
-/* 滚动条(隐藏但保留功能) */
-::-webkit-scrollbar {
-  width: 0px;
-  background: transparent;
-}
+  /* 滚动条(隐藏但保留功能) */
+  ::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+  }
 
-::-webkit-scrollbar-track {
-  background-color: transparent;
-}
+  ::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
 
-::-webkit-scrollbar-thumb {
-  background-color: var(--scrollbar-thumb);
-  border-radius: 99px;
-  border: 3px solid transparent;
-  background-clip: content-box;
-  transition: background-color var(--duration-fast);
-}
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border-radius: 99px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+    transition: background-color var(--duration-fast);
+  }
 
-::-webkit-scrollbar-thumb:hover {
-  background-color: var(--scrollbar-thumb-hover);
-}
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
 
-/* View Transitions API 主题切换动画 */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
-}
+  /* View Transitions API 主题切换动画 */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
 
-::view-transition-old(root) {
-  z-index: 1;
-}
+  ::view-transition-old(root) {
+    z-index: 1;
+  }
 
-::view-transition-new(root) {
-  z-index: 9999;
-}
+  ::view-transition-new(root) {
+    z-index: 9999;
+  }
 
-.dark::view-transition-old(root) {
-  z-index: 9999;
-}
+  .dark::view-transition-old(root) {
+    z-index: 9999;
+  }
 
-.dark::view-transition-new(root) {
-  z-index: 1;
-}
+  .dark::view-transition-new(root) {
+    z-index: 1;
+  }
 
-/* 大屏幕优化 */
-@media (min-width: 1280px) {
-  html {
-    font-size: 16px;
+  /* 大屏幕优化 */
+  @media (min-width: 1280px) {
+    html {
+      font-size: 16px;
+    }
   }
 }
