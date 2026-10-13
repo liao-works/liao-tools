@@ -24,6 +24,7 @@ jobs:
           cargo test --locked --lib commands::tax::downloader -- --nocapture
           cargo test --locked --lib commands::tax::preview -- --nocapture
           cargo test --locked --lib commands::tax::signed -- --nocapture
+          cargo test --locked --lib commands::tax::ni_review -- --nocapture
       - uses: pnpm/action-setup@v4
         with:
           version: 9

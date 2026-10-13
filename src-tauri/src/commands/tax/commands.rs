@@ -5,6 +5,7 @@ use crate::commands::tax::query::TaxQuery;
 use crate::commands::tax::scraper::TaxScraper;
 use crate::commands::tax::preview::{self, PreviewSummary, PreviewRate};
 use crate::commands::tax::signed::{self, SignedReviewResult};
+use crate::commands::tax::ni_review::{self, NiReviewReport};
 use crate::models::tax::{BatchResult, TaxTariff, TaxVersionInfo, UpdateResult};
 use tauri::Emitter;
 use tauri_plugin_opener::OpenerExt;
@@ -136,6 +137,13 @@ pub async fn tax_verify_signed_review(archive_path: String)
 #[tauri::command]
 pub fn tax_has_signed_review_trust_key() -> bool {
     signed::trusted_key_available()
+}
+
+/// Read-only review of a generated NI Other evidence report. Not duty data.
+#[tauri::command]
+pub async fn tax_read_ni_review(path: String) -> Result<NiReviewReport, String> {
+    tauri::async_runtime::spawn_blocking(move || ni_review::load_ni_review(&path))
+        .await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())
 }
 
 /// 检查更新

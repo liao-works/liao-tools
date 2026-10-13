@@ -104,6 +104,7 @@ pub fn run() {
             tax_import_preview,
             tax_preview_lookup,
             tax_verify_signed_review,
+            tax_read_ni_review,
             tax_has_signed_review_trust_key,
             tax_open_url,
             tax_update_single_row,

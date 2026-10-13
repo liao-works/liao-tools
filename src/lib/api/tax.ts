@@ -36,7 +36,34 @@ export interface TaxSignedReviewResult {
   sha256: string;
 }
 
+export interface NiReviewItem {
+  code: string;
+  verdict: string;
+  comparison: string;
+  legacy?: string | null;
+  candidate?: string | null;
+  source_url?: string | null;
+}
+
+export interface NiReviewReport {
+  kind: 'xi-other-evidence-gate-v1';
+  as_of: string;
+  samples: number;
+  chapters: number;
+  required_chapters: number;
+  audit_sha256: string;
+  evidence_complete: boolean;
+  status: 'review_required' | 'insufficient_evidence';
+  manual_review_count: number;
+  manual_review_items: NiReviewItem[];
+  production_eligible: false;
+  other_semantics_verified: false;
+}
+
 export const taxApi = {
+  async readNiReview(path: string): Promise<NiReviewReport> {
+    return invoke<NiReviewReport>('tax_read_ni_review', { path });
+  },
   async hasSignedReviewTrustKey(): Promise<boolean> {
     return invoke<boolean>('tax_has_signed_review_trust_key');
   },
