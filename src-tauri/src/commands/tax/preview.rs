@@ -1,7 +1,7 @@
 //! Experimental shadow preview importer.
 //! The archive is deliberately unsigned and CANNOT be installed as the live
 //! tariff database. All paths reside under app_data/tax-preview/snapshots.
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{ensure, Context, Result};
 use rusqlite::{params, Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -122,6 +122,11 @@ fn validate_manifest(manifest: &PreviewManifest) -> Result<()> {
 
 /// A deliberately *manual* import. Never touches production tariffs.db.
 pub fn import_archive(app: &tauri::AppHandle, archive_path: &str) -> Result<PreviewSummary> {
+    let root = preview_root(app)?;
+    import_archive_to_root(&root, archive_path)
+}
+
+fn import_archive_to_root(root: &Path, archive_path: &str) -> Result<PreviewSummary> {
     let path = Path::new(archive_path);
     ensure!(path.is_file(), "Preview ZIP does not exist");
     ensure!(fs::metadata(path)?.len() <= MAX_ARCHIVE, "Preview ZIP too large");
@@ -138,8 +143,7 @@ pub fn import_archive(app: &tauri::AppHandle, archive_path: &str) -> Result<Prev
     let manifest: PreviewManifest = serde_json::from_slice(&manifest_bytes)
         .context("Invalid preview manifest")?;
     validate_manifest(&manifest)?;
-    let root = preview_root(app)?;
-    fs::create_dir_all(&root)?;
+    fs::create_dir_all(root)?;
     let mut temporary = tempfile::Builder::new()
         .prefix("preview-").suffix(".db").tempfile_in(&root)?;
     let (digest, received) = {
@@ -191,9 +195,13 @@ pub fn import_archive(app: &tauri::AppHandle, archive_path: &str) -> Result<Prev
 }
 
 pub fn lookup(app: &tauri::AppHandle, digest: &str, code: &str) -> Result<Option<PreviewRate>> {
+    lookup_from_root(&preview_root(app)?, digest, code)
+}
+
+fn lookup_from_root(root: &Path, digest: &str, code: &str) -> Result<Option<PreviewRate>> {
     ensure!(valid_digest(digest), "Invalid preview snapshot ID");
     ensure!(valid_code(code), "Commodity code must be exactly 10 digits");
-    let base = preview_root(app)?.join(digest.to_ascii_lowercase());
+    let base = root.join(digest.to_ascii_lowercase());
     let path = base.join("target-duty.db");
     ensure!(path.is_file(), "Preview snapshot has not been imported");
     // Local preview content is untrusted and cannot be used for duty declarations.
@@ -235,6 +243,83 @@ mod tests {
         assert!(validate_manifest(&prod).is_err());
         assert!(!valid_code("0101210000;"));
         assert!(!valid_digest("../x"));
+    }
+
+
+    fn make_fixture(archive_path: &Path, changed_hash: bool, status: &str) {
+        let folder = tempfile::tempdir().unwrap();
+        let dbpath = folder.path().join("source.db");
+        let conn = Connection::open(&dbpath).unwrap();
+        conn.execute_batch("CREATE TABLE tariffs(
+            code TEXT PRIMARY KEY, description TEXT, rate TEXT,
+            north_ireland_rate TEXT, uk_rate_status TEXT, ni_rate_status TEXT);").unwrap();
+        for i in 0..120 {
+            conn.execute(
+                "INSERT INTO tariffs VALUES(?1,'Test duty','8%',NULL,?2,'pending')",
+                params![format!("{:010}", i), status]).unwrap();
+        }
+        drop(conn);
+        let body = fs::read(&dbpath).unwrap();
+        let digest = format!("{:x}", Sha256::digest(&body));
+        let manifest = serde_json::json!({
+            "schema_version": 2, "channel": "shadow-preview",
+            "release_id": "target-duty-test-001", "as_of": "2026-10-13",
+            "signed": false, "production_eligible": false,
+            "artifact": {
+                "name": "target-duty.db", "size": body.len(),
+                "sha256": if changed_hash { "a".repeat(64) } else { digest }
+            },
+            "quality": {
+                "record_count": 120, "gb_verified": 120,
+                "gb_conditional": 0, "ni_unverified": 120
+            }
+        });
+        let archive = File::create(archive_path).unwrap();
+        let mut writer = zip::ZipWriter::new(archive);
+        let options = zip::write::FileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        writer.start_file("manifest.json", options).unwrap();
+        writer.write_all(manifest.to_string().as_bytes()).unwrap();
+        writer.start_file("target-duty.db", options).unwrap();
+        writer.write_all(&body).unwrap();
+        writer.finish().unwrap();
+    }
+
+    #[test]
+    fn accepts_shadow_preview_without_touching_production() {
+        let folder = tempfile::tempdir().unwrap();
+        let root = folder.path().join("preview").join("snapshots");
+        let archive = folder.path().join("preview.zip");
+        make_fixture(&archive, false, "verified");
+        let prod = folder.path().join("tariffs.db");
+        fs::write(&prod, b"unchanged-production-file").unwrap();
+        let info = import_archive_to_root(&root, archive.to_str().unwrap()).unwrap();
+        assert_eq!(info.record_count, 120);
+        assert!(!info.production_eligible);
+        let row = lookup_from_root(&root, &info.digest, "0000000000").unwrap().unwrap();
+        assert_eq!(row.gb_rate, "8%");
+        assert_eq!(row.ni_status, "pending");
+        assert_eq!(fs::read(prod).unwrap(), b"unchanged-production-file");
+    }
+
+    #[test]
+    fn corrupted_preview_is_rejected_before_placing_snapshot() {
+        let folder = tempfile::tempdir().unwrap();
+        let root = folder.path().join("snapshots");
+        let archive = folder.path().join("tampered.zip");
+        make_fixture(&archive, true, "verified");
+        assert!(import_archive_to_root(&root, archive.to_str().unwrap()).is_err());
+        let children = fs::read_dir(root).unwrap().count();
+        assert_eq!(children, 0);
+    }
+
+    #[test]
+    fn fabricated_verification_status_does_not_pass_validation() {
+        let folder = tempfile::tempdir().unwrap();
+        let root = folder.path().join("snapshots");
+        let archive = folder.path().join("wrong-status.zip");
+        make_fixture(&archive, false, "unknown");
+        assert!(import_archive_to_root(&root, archive.to_str().unwrap()).is_err());
     }
 
     #[test]
