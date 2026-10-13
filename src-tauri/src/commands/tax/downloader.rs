@@ -136,7 +136,8 @@ impl TaxDataDownloader {
 
     fn release_url(version: &str) -> Result<String> {
         // No untrusted URL from metadata is executed, and no path traversal possible.
-        let safe_prefix = version.starts_with("data-") || version.starts_with("target-duty-");
+        // Preview releases are intentionally not eligible for live installation.
+        let safe_prefix = version.starts_with("data-");
         ensure!(safe_prefix && version.len() <= 110 &&
             version.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'.'),
             "Unexpected tariff release identifier");
@@ -267,6 +268,7 @@ mod tests {
     fn reject_unsafe_release_identifiers() {
         assert!(TaxDataDownloader::release_url("data-36851279616").is_ok());
         assert!(TaxDataDownloader::release_url("../latest-data").is_err());
+        assert!(TaxDataDownloader::release_url("target-duty-test-001").is_err());
         assert!(TaxDataDownloader::release_url("https://evil.example").is_err());
     }
 
