@@ -4,6 +4,7 @@ use crate::commands::tax::excel::TaxExcelProcessor;
 use crate::commands::tax::query::TaxQuery;
 use crate::commands::tax::scraper::TaxScraper;
 use crate::commands::tax::preview::{self, PreviewSummary, PreviewRate};
+use crate::commands::tax::signed::{self, SignedReviewResult};
 use crate::models::tax::{BatchResult, TaxTariff, TaxVersionInfo, UpdateResult};
 use tauri::Emitter;
 use tauri_plugin_opener::OpenerExt;
@@ -122,6 +123,19 @@ pub async fn tax_preview_lookup(
     app_handle: tauri::AppHandle, digest: String, code: String,
 ) -> Result<Option<PreviewRate>, String> {
     preview::lookup(&app_handle, &digest, &code).map_err(|e| e.to_string())
+}
+
+/// Verify a review-only signed bundle using the public key pinned into the binary.
+#[tauri::command]
+pub async fn tax_verify_signed_review(archive_path: String)
+    -> Result<SignedReviewResult, String> {
+    tauri::async_runtime::spawn_blocking(move || signed::verify_signed_review(&archive_path))
+        .await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn tax_has_signed_review_trust_key() -> bool {
+    signed::trusted_key_available()
 }
 
 /// 检查更新
