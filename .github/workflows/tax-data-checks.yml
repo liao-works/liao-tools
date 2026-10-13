@@ -12,6 +12,18 @@ on:
 permissions:
   contents: read
 jobs:
+  lockfile-repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve exact Rust dependency lock without compiling Tauri
+        run: cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1 --no-deps >/dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: resolved-rust-lock-${{ github.run_id }}
+          path: src-tauri/Cargo.lock
+          retention-days: 2
   check:
     runs-on: windows-latest
     timeout-minutes: 30
