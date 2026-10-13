@@ -87,8 +87,13 @@ impl TaxDataDownloader {
 
         // On Windows, renaming a staged file over an open target can fail.
         // Move the old target away first, then promote the verified staged DB.
+        // Clear both obsolete backups BEFORE touching the live database.
+        // A cleanup error must never leave half an upgrade in place.
         if backup_db.exists() {
             std::fs::remove_file(&backup_db)?;
+        }
+        if backup_metadata.exists() {
+            std::fs::remove_file(&backup_metadata)?;
         }
         let had_old_db = live_db.exists();
         if had_old_db {
@@ -102,9 +107,6 @@ impl TaxDataDownloader {
             return Err(err).context("Unable to promote verified tax database");
         }
 
-        if backup_metadata.exists() {
-            std::fs::remove_file(&backup_metadata)?;
-        }
         let had_old_metadata = live_metadata.exists();
         let metadata_commit: Result<()> = (|| {
             if had_old_metadata {
