@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { taxApi } from '@/lib/api/tax';
-import type { TaxPreviewRate, TaxPreviewSummary } from '@/lib/api/tax';
+import type { TaxPreviewRate, TaxPreviewSummary, TaxSignedReviewResult } from '@/lib/api/tax';
 import type { TaxTariff, TaxVersionInfo } from '@/types';
 import { openUpdateHistory } from '@/hooks/use-update-history';
 
@@ -27,6 +27,9 @@ export function UpdateTab() {
   const [previewCode, setPreviewCode] = useState('0101210000');
   const [importingPreview, setImportingPreview] = useState(false);
   const [queryingPreview, setQueryingPreview] = useState(false);
+  const [hasTrustedSigner, setHasTrustedSigner] = useState(false);
+  const [verifyingSigned, setVerifyingSigned] = useState(false);
+  const [verifiedReview, setVerifiedReview] = useState<TaxSignedReviewResult | null>(null);
 
   const { toast } = useToast();
 
@@ -184,6 +187,38 @@ export function UpdateTab() {
       setQueryingPreview(false);
     }
   };
+
+  const handleVerifySigned = async () => {
+    const selected = await open({
+      multiple: false, directory: false,
+      filters: [{ name: 'Ed25519 签名审计包', extensions: ['zip'] }],
+    });
+    if (!selected || typeof selected !== 'string') return;
+    setVerifyingSigned(true);
+    setVerifiedReview(null);
+    try {
+      const result = await taxApi.verifySignedReview(selected);
+      setVerifiedReview(result);
+      toast({
+        title: '签名和数据完整性已验证',
+        description: '发行方身份已验证，但仍是非生产审计数据包。',
+      });
+    } catch (error) {
+      toast({
+        title: '签名验证失败 / 数据包不可信',
+        description: String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setVerifyingSigned(false);
+    }
+  };
+
+  useEffect(() => {
+    taxApi.hasSignedReviewTrustKey()
+      .then(setHasTrustedSigner)
+      .catch(() => setHasTrustedSigner(false));
+  }, []);
 
   // 组件加载时自动检查更新
   useEffect(() => {
@@ -402,6 +437,31 @@ export function UpdateTab() {
           )}
         </CardContent>
       </Card>
+
+      {hasTrustedSigner && (
+        <Card>
+          <CardHeader>
+            <CardTitle>签名审计包验证（非生产）</CardTitle>
+            <CardDescription>
+              使用桌面应用编译时内置的 Ed25519 公钥验证发行者身份和数据库完整性。
+              即使验证成功，也不会安装到正式税率数据库。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button variant="outline" onClick={handleVerifySigned} disabled={verifyingSigned}>
+              {verifyingSigned ? '正在核验签名...' : '选择签名审计 ZIP 进行验证'}
+            </Button>
+            {verifiedReview && (
+              <div className="text-sm space-y-1">
+                <p>签名状态：{verifiedReview.verified_signature ? '已通过可信公钥校验' : '未通过'}</p>
+                <p>签名密钥：{verifiedReview.key_id} · 版本：{verifiedReview.release_id}</p>
+                <p>数据：{verifiedReview.record_count.toLocaleString()} 条 · 日期：{verifiedReview.as_of}</p>
+                <p className="text-muted-foreground">此文件未获生产发布资格，也不证明 NI Other 税率业务正确性。</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* 更新日志 */}
       {versionInfo?.changelog && versionInfo.changelog.length > 0 && (

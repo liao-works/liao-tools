@@ -23,7 +23,28 @@ export interface TaxPreviewRate {
   ni_status: string;
 }
 
+export interface TaxSignedReviewResult {
+  release_id: string;
+  as_of: string;
+  key_id: string;
+  verified_signature: boolean;
+  production_eligible: false;
+  record_count: number;
+  gb_verified: number;
+  gb_conditional: number;
+  ni_unverified: number;
+  sha256: string;
+}
+
 export const taxApi = {
+  async hasSignedReviewTrustKey(): Promise<boolean> {
+    return invoke<boolean>('tax_has_signed_review_trust_key');
+  },
+
+  async verifySignedReview(archivePath: string): Promise<TaxSignedReviewResult> {
+    return invoke<TaxSignedReviewResult>('tax_verify_signed_review', { archivePath });
+  },
+
   /**
    * 检查数据库是否有数据
    */
