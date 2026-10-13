@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { taxApi } from '@/lib/api/tax';
 import type { TaxPreviewRate, TaxPreviewSummary } from '@/lib/api/tax';
-import type { TaxVersionInfo } from '@/types';
+import type { TaxTariff, TaxVersionInfo } from '@/types';
 import { openUpdateHistory } from '@/hooks/use-update-history';
 
 export function UpdateTab() {
@@ -23,6 +23,7 @@ export function UpdateTab() {
   const [logs, setLogs] = useState<string[]>([]);
   const [previewInfo, setPreviewInfo] = useState<TaxPreviewSummary | null>(null);
   const [previewRate, setPreviewRate] = useState<TaxPreviewRate | null>(null);
+  const [productionRate, setProductionRate] = useState<TaxTariff | null>(null);
   const [previewCode, setPreviewCode] = useState('0101210000');
   const [importingPreview, setImportingPreview] = useState(false);
   const [queryingPreview, setQueryingPreview] = useState(false);
@@ -150,6 +151,7 @@ export function UpdateTab() {
       const info = await taxApi.importPreview(selected);
       setPreviewInfo(info);
       setPreviewRate(null);
+      setProductionRate(null);
       toast({
         title: '预览包已隔离导入',
         description: `读取 ${info.record_count.toLocaleString()} 条，仅供审计，不会替换正式税率库`,
@@ -169,8 +171,12 @@ export function UpdateTab() {
     }
     setQueryingPreview(true);
     try {
-      const result = await taxApi.previewLookup(previewInfo.digest, previewCode);
+      const [result, live] = await Promise.all([
+        taxApi.previewLookup(previewInfo.digest, previewCode),
+        taxApi.exactSearch(previewCode).catch(() => null),
+      ]);
       setPreviewRate(result);
+      setProductionRate(live);
       if (!result) toast({ title: '预览包中未找到此商品编码' });
     } catch (error) {
       toast({ title: '预览查询失败', description: String(error), variant: 'destructive' });
@@ -352,7 +358,11 @@ export function UpdateTab() {
                   aria-label="预览商品编码"
                   value={previewCode}
                   maxLength={10}
-                  onChange={(event) => { setPreviewCode(event.target.value); setPreviewRate(null); }}
+                  onChange={(event) => {
+                    setPreviewCode(event.target.value);
+                    setPreviewRate(null);
+                    setProductionRate(null);
+                  }}
                   placeholder="输入完整 10 位商品编码"
                   className="max-w-xs font-mono"
                 />
@@ -363,10 +373,25 @@ export function UpdateTab() {
               {previewRate && (
                 <div className="rounded-md border p-3 space-y-1 text-sm">
                   <div>商品编码：<span className="font-mono">{previewRate.code}</span></div>
-                  <div>GB Third country duty：{previewRate.gb_status === 'verified'
-                    ? previewRate.gb_rate : '需条件复核（不得直接引用）'}</div>
-                  <div>GB 状态：{previewRate.gb_status}</div>
-                  <div>NI 历史值：{previewRate.ni_legacy_rate || '无'}（{previewRate.ni_status}，未获官方确认）</div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <div>
+                      <div className="font-medium">当前生产数据库</div>
+                      <div>GB：{productionRate?.rate || '未找到 / 本地未安装'}</div>
+                      <div>NI：{productionRate?.north_ireland_rate || '无'}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {productionRate?.uk_rate_status || '旧版·来源未经核验'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-medium">官方 GB 目标税率预览（不能直接申报）</div>
+                      <div>GB：{previewRate.gb_status === 'verified'
+                        ? previewRate.gb_rate : '条件/歧义：需人工复核'}</div>
+                      <div>NI 历史值：{previewRate.ni_legacy_rate || '无'}</div>
+                      <div className="text-xs text-muted-foreground">
+                        GB：{previewRate.gb_status} · NI：{previewRate.ni_status}（均未完成 NI Other 正式校验）
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
