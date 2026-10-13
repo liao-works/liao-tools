@@ -295,7 +295,16 @@ export function SingleQueryTab() {
                     <TableCell className="font-mono">{result.code}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <span className="font-medium">{result.rate}</span>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{result.rate || '待核验'}</span>
+                          {result.uk_rate_status && result.uk_rate_status !== 'verified' && (
+                            <span className="text-xs text-muted-foreground">
+                              {result.uk_rate_status === 'stale' ? '旧缓存·未核验' :
+                                result.uk_rate_status === 'conditional' ? '存在条件·不可直接使用' :
+                                '无确定税率'}
+                            </span>
+                          )}
+                        </div>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -310,7 +319,14 @@ export function SingleQueryTab() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <span className="font-medium">
-                          {result.north_ireland_rate || result.northIrelandRate || '-'}
+                          {result.north_ireland_rate || result.northIrelandRate || '待核验'}
+                          {result.ni_rate_status && result.ni_rate_status !== 'verified' && (
+                            <span className="block text-xs text-muted-foreground">
+                              {result.ni_rate_status === 'stale' ? '旧缓存·未经官方核验' :
+                                result.ni_rate_status === 'conditional' ? '条件限制' :
+                                '暂未获取可信数据'}
+                            </span>
+                          )}
                         </span>
                         {(result.north_ireland_rate || result.northIrelandRate) && (
                           <Button

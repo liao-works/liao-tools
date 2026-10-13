@@ -102,6 +102,10 @@ impl TaxExcelProcessor {
             "反倾销税率",
             "反补贴税率",
             "查询状态",
+            "英国数据状态",
+            "北爱数据状态",
+            "英国来源版本",
+            "北爱来源版本",
         ];
 
         for (col, header) in headers.iter().enumerate() {
@@ -138,13 +142,17 @@ impl TaxExcelProcessor {
                     tariff.countervailing_rate.as_deref().unwrap_or(""),
                 )?;
                 worksheet.write(row_num, 7, "成功")?;
+                worksheet.write(row_num, 8, tariff.uk_rate_status.as_deref().unwrap_or("legacy_unverified"))?;
+                worksheet.write(row_num, 9, tariff.ni_rate_status.as_deref().unwrap_or("legacy_unverified"))?;
+                worksheet.write(row_num, 10, tariff.uk_source_version.as_deref().unwrap_or(""))?;
+                worksheet.write(row_num, 11, tariff.ni_source_version.as_deref().unwrap_or(""))?;
             } else {
                 worksheet.write(row_num, 7, "未找到")?;
             }
         }
 
         // 自动调整列宽（现在是8列）
-        for col in 0..8 {
+        for col in 0..12 {
             worksheet.set_column_width(col, 20)?;
         }
         

@@ -144,6 +144,12 @@ export interface TaxTariff {
   anti_dumping_rate?: string; // 反倾销税率
   countervailing_rate?: string; // 反补贴税率
   last_updated?: string;
+  uk_source_version?: string | null;
+  ni_source_version?: string | null;
+  uk_verified_at?: string | null;
+  ni_verified_at?: string | null;
+  uk_rate_status?: string | null;
+  ni_rate_status?: string | null;
   similarity?: number;
 }
 
