@@ -2,11 +2,11 @@ use crate::commands::tax::database::TaxDatabase;
 use crate::commands::update_history::database::HistoryDatabase;
 use crate::commands::update_history::diff::diff_tariffs;
 use crate::models::tax::{RemoteMetadata, TaxVersionInfo, VersionDetail};
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{ensure, Context, Result};
 use futures_util::StreamExt;
 use sha2::{Digest, Sha256};
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tauri::Manager;
 
 const METADATA_URL: &str =
@@ -99,7 +99,7 @@ impl TaxDataDownloader {
         if had_old_db {
             std::fs::rename(&live_db, &backup_db)?;
         }
-        if let Err(err) = std::fs::rename(staged_db.as_ref(), &live_db) {
+        if let Err(err) = std::fs::rename(staged_db.as_ref() as &Path, &live_db) {
             if had_old_db {
                 std::fs::rename(&backup_db, &live_db)
                     .context("Database promotion failed and rollback failed")?;
@@ -112,7 +112,7 @@ impl TaxDataDownloader {
             if had_old_metadata {
                 std::fs::rename(&live_metadata, &backup_metadata)?;
             }
-            std::fs::rename(staged_metadata.as_ref(), &live_metadata)?;
+            std::fs::rename(staged_metadata.as_ref() as &Path, &live_metadata)?;
             Ok(())
         })();
         if let Err(err) = metadata_commit {
