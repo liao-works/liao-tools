@@ -21,9 +21,16 @@ jobs:
       - name: Rust tax code checks on supported Windows target
         working-directory: src-tauri
         run: |
-          cargo test --locked --lib commands::tax::downloader -- --nocapture
-          cargo test --locked --lib commands::tax::preview -- --nocapture
-          cargo test --locked --lib commands::tax::signed -- --nocapture
+          cargo test --lib commands::tax::downloader -- --nocapture
+          cargo test --lib commands::tax::preview -- --nocapture
+          cargo test --lib commands::tax::signed -- --nocapture
+      - name: Upload Cargo-generated dependency lock (temporary repair)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tax-cargo-lock-${{ github.run_id }}
+          path: src-tauri/Cargo.lock
+          retention-days: 2
       - uses: pnpm/action-setup@v4
         with:
           version: 9
