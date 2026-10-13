@@ -20,7 +20,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Rust tax code checks on supported Windows target
         working-directory: src-tauri
-        run: cargo test --locked --lib commands::tax::downloader -- --nocapture
+        run: |
+          cargo test --locked --lib commands::tax::downloader -- --nocapture
+          cargo test --locked --lib commands::tax::preview -- --nocapture
       - uses: pnpm/action-setup@v4
         with:
           version: 9
