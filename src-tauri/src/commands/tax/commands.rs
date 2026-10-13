@@ -3,6 +3,7 @@ use crate::commands::tax::downloader::TaxDataDownloader;
 use crate::commands::tax::excel::TaxExcelProcessor;
 use crate::commands::tax::query::TaxQuery;
 use crate::commands::tax::scraper::TaxScraper;
+use crate::commands::tax::preview::{self, PreviewSummary, PreviewRate};
 use crate::models::tax::{BatchResult, TaxTariff, TaxVersionInfo, UpdateResult};
 use tauri::Emitter;
 use tauri_plugin_opener::OpenerExt;
@@ -103,6 +104,24 @@ pub async fn tax_has_local_data(app_handle: tauri::AppHandle) -> Result<bool, St
 pub async fn tax_get_local_version(app_handle: tauri::AppHandle)
     -> Result<crate::models::tax::VersionDetail, String> {
     TaxDataDownloader::get_local_version(&app_handle).map_err(|e| e.to_string())
+}
+
+/// Explicit import of an unsigned shadow-only preview archive.
+#[tauri::command]
+pub async fn tax_import_preview(
+    app_handle: tauri::AppHandle, archive_path: String,
+) -> Result<PreviewSummary, String> {
+    tauri::async_runtime::spawn_blocking(move ||
+        preview::import_archive(&app_handle, &archive_path))
+        .await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())
+}
+
+/// Read only from an isolated shadow preview. Does not touch production SQLite.
+#[tauri::command]
+pub async fn tax_preview_lookup(
+    app_handle: tauri::AppHandle, digest: String, code: String,
+) -> Result<Option<PreviewRate>, String> {
+    preview::lookup(&app_handle, &digest, &code).map_err(|e| e.to_string())
 }
 
 /// 检查更新

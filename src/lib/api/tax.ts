@@ -2,6 +2,27 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { TaxTariff, TaxVersionInfo } from '@/types';
 
+
+export interface TaxPreviewSummary {
+  release_id: string;
+  as_of: string;
+  digest: string;
+  record_count: number;
+  gb_verified: number;
+  gb_conditional: number;
+  ni_unverified: number;
+  production_eligible: false;
+}
+
+export interface TaxPreviewRate {
+  code: string;
+  description?: string | null;
+  gb_rate: string;
+  ni_legacy_rate?: string | null;
+  gb_status: string;
+  ni_status: string;
+}
+
 export const taxApi = {
   /**
    * 检查数据库是否有数据
@@ -83,6 +104,15 @@ export const taxApi = {
     } finally {
       unlisten();
     }
+  },
+
+  /** Local, unsigned shadow-only preview. Never activates a production dataset. */
+  async importPreview(archivePath: string): Promise<TaxPreviewSummary> {
+    return invoke<TaxPreviewSummary>('tax_import_preview', { archivePath });
+  },
+
+  async previewLookup(digest: string, code: string): Promise<TaxPreviewRate | null> {
+    return invoke<TaxPreviewRate | null>('tax_preview_lookup', { digest, code });
   },
 
   /**

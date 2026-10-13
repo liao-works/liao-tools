@@ -101,6 +101,8 @@ pub fn run() {
             tax_has_local_data,
             tax_get_local_version,
             tax_download_update,
+            tax_import_preview,
+            tax_preview_lookup,
             tax_open_url,
             tax_update_single_row,
             // Update history commands
