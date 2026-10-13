@@ -575,7 +575,6 @@ dependencies = [
  "codepage",
  "encoding_rs",
  "log",
- "openssl",
  "quick-xml 0.31.0",
  "serde",
  "zip 2.4.2",

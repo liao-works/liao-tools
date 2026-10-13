@@ -2,8 +2,7 @@
 //! A public key MUST be compiled into the binary (TAX_V2_TRUSTED_PUBLIC_KEY_HEX).
 //! The manifest cannot choose its own trust key. No installation is performed.
 use anyhow::{ensure, Context, Result};
-use openssl::pkey::{Id, PKey};
-use openssl::sign::Verifier;
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use rusqlite::{Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -82,10 +81,12 @@ fn parse_key_hex(value: &str) -> Result<[u8; 32]> {
 
 fn verify_ed25519(pubkey: &[u8; 32], message: &[u8], signature: &[u8]) -> Result<()> {
     ensure!(signature.len() == 64, "Expected 64 Ed25519 signature bytes");
-    let key = PKey::public_key_from_raw_bytes(pubkey, Id::ED25519)?;
-    let mut verifier = Verifier::new_without_digest(&key)?;
-    ensure!(verifier.verify_oneshot(signature, message)?,
-        "Untrusted or corrupted tariff manifest signature");
+    let key = VerifyingKey::from_bytes(pubkey)
+        .context("Malformed embedded Ed25519 public key")?;
+    let signed = Signature::from_slice(signature)
+        .context("Malformed signed tariff manifest signature")?;
+    key.verify(message, &signed)
+        .context("Untrusted or corrupted tariff manifest signature")?;
     Ok(())
 }
 
@@ -200,7 +201,7 @@ fn verify_zip_with_key(path: &Path, key: &[u8; 32]) -> Result<SignedReviewResult
 #[cfg(test)]
 mod tests {
     use super::*;
-    use openssl::sign::Signer;
+    use ed25519_dalek::{Signer, SigningKey};
     use std::io::Write;
 
     fn test_bundle(path: &Path, seed: &[u8;32], bad: bool) {
@@ -224,9 +225,8 @@ mod tests {
             "artifact": {"name": "target-duty.db", "size": db_bytes.len(), "sha256": digest},
             "quality": {"record_count": 120,"gb_verified":120,"gb_conditional":0,"ni_unverified":120}
         }).to_string();
-        let signing_key = PKey::private_key_from_raw_bytes(seed, Id::ED25519).unwrap();
-        let mut signer = Signer::new_without_digest(&signing_key).unwrap();
-        let mut sig = signer.sign_oneshot_to_vec(manifest.as_bytes()).unwrap();
+        let signing_key = SigningKey::from_bytes(seed);
+        let mut sig = signing_key.sign(manifest.as_bytes()).to_bytes().to_vec();
         if bad { sig[0] ^= 0x80; }
         let mut zip = zip::ZipWriter::new(File::create(path).unwrap());
         let opts = zip::write::FileOptions::default();
@@ -242,9 +242,7 @@ mod tests {
     #[test]
     fn signed_review_is_authenticated_but_never_production_eligible() {
         let seed = [7u8;32];
-        let pk = PKey::private_key_from_raw_bytes(&seed, Id::ED25519).unwrap();
-        let public = pk.raw_public_key().unwrap();
-        let key: [u8;32] = public.as_slice().try_into().unwrap();
+        let key = SigningKey::from_bytes(&seed).verifying_key().to_bytes();
         let dir = tempfile::tempdir().unwrap();
         let archive = dir.path().join("signed.zip");
         test_bundle(&archive, &seed, false);
@@ -258,9 +256,7 @@ mod tests {
     #[test]
     fn rejects_tampered_signature_and_wrong_key() {
         let seed = [7u8;32];
-        let pk = PKey::private_key_from_raw_bytes(&seed, Id::ED25519).unwrap();
-        let public = pk.raw_public_key().unwrap();
-        let key: [u8;32] = public.as_slice().try_into().unwrap();
+        let key = SigningKey::from_bytes(&seed).verifying_key().to_bytes();
         let dir = tempfile::tempdir().unwrap();
         let archive = dir.path().join("tampered.zip");
         test_bundle(&archive, &seed, true);
