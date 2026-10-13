@@ -27,7 +27,7 @@ interface UpdateProgress {
 
 export function SingleQueryTab() {
   const [code, setCode] = useState('');
-  const [fuzzyMode, setFuzzyMode] = useState(true);
+  const [fuzzyMode, setFuzzyMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<TaxTariff[]>([]);
   const [searched, setSearched] = useState(false); // 标记是否已搜索
@@ -273,7 +273,7 @@ export function SingleQueryTab() {
             <CardTitle>查询结果</CardTitle>
             <CardDescription>
               找到 {results.length} 条记录
-              {fuzzyMode && '（按相似度排序）'}
+              {fuzzyMode && '（按相似度排序，仅供选码，不代表同一商品税率）'}
             </CardDescription>
           </CardHeader>
           <CardContent>
