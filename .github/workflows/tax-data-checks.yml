@@ -12,18 +12,6 @@ on:
 permissions:
   contents: read
 jobs:
-  lockfile-repair:
-    runs-on: ubuntu-latest
-    timeout-minutes: 6
-    steps:
-      - uses: actions/checkout@v4
-      - name: Resolve exact Rust dependency lock without compiling Tauri
-        run: cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1 >/dev/null
-      - uses: actions/upload-artifact@v4
-        with:
-          name: resolved-rust-lock-${{ github.run_id }}
-          path: src-tauri/Cargo.lock
-          retention-days: 2
   check:
     runs-on: windows-latest
     timeout-minutes: 30
@@ -33,16 +21,9 @@ jobs:
       - name: Rust tax code checks on supported Windows target
         working-directory: src-tauri
         run: |
-          cargo test --lib commands::tax::downloader -- --nocapture
-          cargo test --lib commands::tax::preview -- --nocapture
-          cargo test --lib commands::tax::signed -- --nocapture
-      - name: Upload Cargo-generated dependency lock (temporary repair)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: tax-cargo-lock-${{ github.run_id }}
-          path: src-tauri/Cargo.lock
-          retention-days: 2
+          cargo test --locked --lib commands::tax::downloader -- --nocapture
+          cargo test --locked --lib commands::tax::preview -- --nocapture
+          cargo test --locked --lib commands::tax::signed -- --nocapture
       - uses: pnpm/action-setup@v4
         with:
           version: 9
