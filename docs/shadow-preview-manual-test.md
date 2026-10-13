@@ -47,3 +47,40 @@ auditing aid. The production tariff `tariffs.db` is untouched.
 This preview is a controlled migration test stage. Future production promotion
 requires separately pinned signing keys, immutable release URLs and sign-off
 on XI/Other duty interpretation.
+
+## Signed review extension (2026-10-13)
+
+The signing protocol is **not** a production release and cannot be silently
+installed. It authenticates a source-signed shadow manifest with the **public
+key pinned at build time**, then verifies its SQLite digest and quality gates.
+
+**Build-time pinning:** The build environment must specify
+`TAX_V2_TRUSTED_PUBLIC_KEY_HEX` as a 64-character hex string encoding the
+32-byte Ed25519 public key corresponding to the source Actions secret. No
+key is downloaded from ZIP or remotely fetched. Without this setting the
+verification UI is absent and the backend fails closed.
+
+Example on PowerShell (public key only; this is not a private secret):
+```powershell
+$env:TAX_V2_TRUSTED_PUBLIC_KEY_HEX = "<64-hex-character-public-key>"
+pnpm tauri build
+```
+
+1. In `cursor-tax-tools`, configure GitHub Actions secret
+   `TAX_V2_ED25519_PRIVATE_SEED_HEX`. **Never commit any private seed.**
+2. Execute the manual workflow `Signed target duty review (manual, no release)`.
+   Extract `target-duty-signed-review.zip` from its Actions artifact.
+3. In the desktop app built with the corresponding pinned public key, use
+   **签名审计包验证（非生产）** to inspect it. The UI must display the
+   signing key ID, version, coverage, and a "not production" warning.
+4. Tamper with any manifest byte, signature byte or database byte: verification
+   must fail. Change `production_eligible` to `true`: signature check or
+   channel gate must reject it. Missing public key must also reject.
+5. Verify the current production database and preview query still work
+   independently. The command `tax_verify_signed_review` **never writes**
+   to any database or switches version pointers.
+
+A valid signature is not legal/semantic verification of `Other` applicability.
+The manual review protocol intentionally **cannot authorize** a production
+release. Key rotation/revocation and monotonic version gating must be designed
+before a separate production signature protocol is activated.
