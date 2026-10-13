@@ -297,11 +297,11 @@ export function SingleQueryTab() {
                       <div className="flex items-center gap-1">
                         <div className="flex flex-col">
                           <span className="font-medium">{result.rate || '待核验'}</span>
-                          {result.uk_rate_status && result.uk_rate_status !== 'verified' && (
+                          {result.uk_rate_status !== 'verified' && (
                             <span className="text-xs text-muted-foreground">
                               {result.uk_rate_status === 'stale' ? '旧缓存·未核验' :
                                 result.uk_rate_status === 'conditional' ? '存在条件·不可直接使用' :
-                                '无确定税率'}
+                                !result.uk_rate_status ? '旧版数据·来源未经核验' : '无确定税率'}
                             </span>
                           )}
                         </div>
@@ -310,6 +310,7 @@ export function SingleQueryTab() {
                           size="icon"
                           className="h-6 w-6"
                           onClick={() => copyToClipboard(result.rate)}
+                          disabled={!result.rate}
                           title="复制英国税率"
                         >
                           <Copy className="h-3 w-3" />
@@ -320,10 +321,11 @@ export function SingleQueryTab() {
                       <div className="flex items-center gap-1">
                         <span className="font-medium">
                           {result.north_ireland_rate || result.northIrelandRate || '待核验'}
-                          {result.ni_rate_status && result.ni_rate_status !== 'verified' && (
+                          {result.ni_rate_status !== 'verified' && (
                             <span className="block text-xs text-muted-foreground">
                               {result.ni_rate_status === 'stale' ? '旧缓存·未经官方核验' :
                                 result.ni_rate_status === 'conditional' ? '条件限制' :
+                                !result.ni_rate_status ? '旧版数据·来源未经核验' :
                                 '暂未获取可信数据'}
                             </span>
                           )}
