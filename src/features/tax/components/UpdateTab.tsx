@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
+import { open } from '@tauri-apps/plugin-dialog';
 import { RefreshCw, Download, Loader2, CheckCircle, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { taxApi } from '@/lib/api/tax';
+import type { TaxPreviewRate, TaxPreviewSummary } from '@/lib/api/tax';
 import type { TaxVersionInfo } from '@/types';
 import { openUpdateHistory } from '@/hooks/use-update-history';
 
@@ -18,6 +21,12 @@ export function UpdateTab() {
   const [downloadedBytes, setDownloadedBytes] = useState(0);
   const [totalBytes, setTotalBytes] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
+  const [previewInfo, setPreviewInfo] = useState<TaxPreviewSummary | null>(null);
+  const [previewRate, setPreviewRate] = useState<TaxPreviewRate | null>(null);
+  const [previewCode, setPreviewCode] = useState('0101210000');
+  const [importingPreview, setImportingPreview] = useState(false);
+  const [queryingPreview, setQueryingPreview] = useState(false);
+
   const { toast } = useToast();
 
   const addLog = (message: string) => {
@@ -125,6 +134,48 @@ export function UpdateTab() {
       });
     } finally {
       setDownloading(false);
+    }
+  };
+
+  // Shadow preview data is never promoted to the production tariff DB.
+  const handleImportPreview = async () => {
+    const selected = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: '第三国税率影子预览包', extensions: ['zip'] }],
+    });
+    if (!selected || typeof selected !== 'string') return;
+    setImportingPreview(true);
+    try {
+      const info = await taxApi.importPreview(selected);
+      setPreviewInfo(info);
+      setPreviewRate(null);
+      toast({
+        title: '预览包已隔离导入',
+        description: `读取 ${info.record_count.toLocaleString()} 条，仅供审计，不会替换正式税率库`,
+      });
+    } catch (error) {
+      toast({ title: '预览包校验失败', description: String(error), variant: 'destructive' });
+    } finally {
+      setImportingPreview(false);
+    }
+  };
+
+  const handlePreviewLookup = async () => {
+    if (!previewInfo) return;
+    if (!/^\\d{10}$/.test(previewCode)) {
+      toast({ title: '请输入完整 10 位商品编码', variant: 'destructive' });
+      return;
+    }
+    setQueryingPreview(true);
+    try {
+      const result = await taxApi.previewLookup(previewInfo.digest, previewCode);
+      setPreviewRate(result);
+      if (!result) toast({ title: '预览包中未找到此商品编码' });
+    } catch (error) {
+      toast({ title: '预览查询失败', description: String(error), variant: 'destructive' });
+    } finally {
+      setQueryingPreview(false);
     }
   };
 
@@ -262,6 +313,66 @@ export function UpdateTab() {
                   </span>
                 )}
               </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Experimental GB shadow-preview; cannot change production data. */}
+      <Card>
+        <CardHeader>
+          <CardTitle>第三国税率 · 独立预览</CardTitle>
+          <CardDescription>
+            导入采集端 CI 生成的 target-duty-preview.zip，与正式离线数据库完全隔离。
+            此数据包未经生产签名，NI Other 尚未通过规则核验，请勿据此办理关税申报。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button variant="outline" onClick={handleImportPreview} disabled={importingPreview}>
+            {importingPreview ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            {importingPreview ? '校验和导入中' : '选择影子预览 ZIP'}
+          </Button>
+          {previewInfo && (
+            <div className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                版本：{previewInfo.release_id} · 数据日期：{previewInfo.as_of}
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
+                <div>商品编码：{previewInfo.record_count.toLocaleString()}</div>
+                <div>GB 唯一税率：{previewInfo.gb_verified.toLocaleString()}</div>
+                <div>条件/歧义：{previewInfo.gb_conditional.toLocaleString()}</div>
+                <div>NI 未核验：{previewInfo.ni_unverified.toLocaleString()}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  aria-label="预览商品编码"
+                  value={previewCode}
+                  maxLength={10}
+                  onChange={(event) => { setPreviewCode(event.target.value); setPreviewRate(null); }}
+                  placeholder="输入完整 10 位商品编码"
+                  className="max-w-xs font-mono"
+                />
+                <Button variant="secondary" disabled={queryingPreview} onClick={handlePreviewLookup}>
+                  {queryingPreview ? '查询中...' : '查询预览'}
+                </Button>
+              </div>
+              {previewRate && (
+                <div className="rounded-md border p-3 space-y-1 text-sm">
+                  <div>商品编码：<span className="font-mono">{previewRate.code}</span></div>
+                  <div>GB Third country duty：{previewRate.gb_status === 'verified'
+                    ? previewRate.gb_rate : '需条件复核（不得直接引用）'}</div>
+                  <div>GB 状态：{previewRate.gb_status}</div>
+                  <div>NI 历史值：{previewRate.ni_legacy_rate || '无'}（{previewRate.ni_status}，未获官方确认）</div>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                此预览包仅验证来源数据与桌面查询兼容性，不会修改正式 tariffs.db，
+                不会自动同步，也不能直接升级为正式数据。
+              </p>
             </div>
           )}
         </CardContent>
