@@ -8,6 +8,7 @@ on:
       - 'src-tauri/Cargo.toml'
       - 'src-tauri/Cargo.lock'
       - 'src/lib/api/tax.ts'
+      - 'src/features/tax/components/UpdateTab.tsx'
       - '.github/workflows/tax-data-checks.yml'
 permissions:
   contents: read
