@@ -167,7 +167,7 @@ impl TaxDataDownloader {
         Ok(())
     }
 
-    fn get_local_version(app_handle: &tauri::AppHandle) -> Result<VersionDetail> {
+    pub fn get_local_version(app_handle: &tauri::AppHandle) -> Result<VersionDetail> {
         let dir = app_handle.path().app_data_dir().context("App data directory")?;
         if !dir.join("tariffs.db").exists() {
             return Ok(VersionDetail {

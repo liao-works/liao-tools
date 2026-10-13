@@ -10,6 +10,8 @@ import { openUpdateHistory } from '@/hooks/use-update-history';
 
 export function UpdateTab() {
   const [versionInfo, setVersionInfo] = useState<TaxVersionInfo | null>(null);
+  const [localVersion, setLocalVersion] = useState<TaxVersionInfo['local'] | null>(null);
+  const [offlineCheck, setOfflineCheck] = useState(false);
   const [checking, setChecking] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -35,10 +37,18 @@ export function UpdateTab() {
     setChecking(true);
     setLogs([]);
     addLog('开始检查更新...');
+    // Show local snapshot independently of connectivity or remote metadata.
+    try {
+      setLocalVersion(await taxApi.getLocalVersion());
+    } catch (error) {
+      addLog(`本地版本读取失败: ${String(error)}`);
+    }
 
     try {
       const data = await taxApi.checkUpdate();
       setVersionInfo(data);
+      setLocalVersion(data.local);
+      setOfflineCheck(false);
       addLog('检查完成');
       
       if (data.has_update) {
@@ -64,11 +74,12 @@ export function UpdateTab() {
       }
     } catch (error) {
       const errorMsg = String(error);
-      addLog(`检查失败: ${errorMsg}`);
+      setVersionInfo(null);
+      setOfflineCheck(true);
+      addLog(`未能连接远程数据源，仍可使用已有本地数据库: ${errorMsg}`);
       toast({
-        title: '检查失败',
-        description: errorMsg,
-        variant: 'destructive',
+        title: '无法联网检查最新版本',
+        description: '本地已安装的数据仍可离线查询，请注意版本日期。',
       });
     } finally {
       setChecking(false);
@@ -125,7 +136,7 @@ export function UpdateTab() {
   return (
     <div className="space-y-4">
       {/* 版本对比 */}
-      {versionInfo && (
+      {(localVersion || versionInfo) && (
         <div className="grid md:grid-cols-2 gap-4">
           {/* 本地版本 */}
           <Card>
@@ -139,21 +150,21 @@ export function UpdateTab() {
             <CardContent className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">版本号</span>
-                <span className="text-sm font-medium">{versionInfo.local.version}</span>
+                <span className="text-sm font-medium">{(localVersion ?? versionInfo!.local).version}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">记录数</span>
-                <span className="text-sm font-medium">{versionInfo.local.records.toLocaleString()}</span>
+                <span className="text-sm font-medium">{(localVersion ?? versionInfo!.local).records.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">更新日期</span>
-                <span className="text-sm font-medium">{versionInfo.local.date}</span>
+                <span className="text-sm font-medium">{(localVersion ?? versionInfo!.local).date}</span>
               </div>
             </CardContent>
           </Card>
 
-          {/* 远程版本 */}
-          <Card className={versionInfo.has_update ? 'border-primary' : ''}>
+          {/* Remote info is absent when offline, not a false "up to date". */}
+          {versionInfo && <Card className={versionInfo.has_update ? 'border-primary' : ''}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <div
@@ -179,8 +190,16 @@ export function UpdateTab() {
                 <span className="text-sm font-medium">{versionInfo.remote.date}</span>
               </div>
             </CardContent>
-          </Card>
+          </Card>}
         </div>
+      )}
+
+      {offlineCheck && (
+        <Card>
+          <CardContent className="pt-5 text-sm text-muted-foreground">
+            当前无法获取远程版本。本地数据仍可查询，但无法确认是不是最新税率。
+          </CardContent>
+        </Card>
       )}
 
       {/* 操作按钮 */}
@@ -206,7 +225,7 @@ export function UpdateTab() {
             </Button>
             <Button
               onClick={handleDownloadUpdate}
-              disabled={!versionInfo?.has_update || downloading}
+              disabled={!versionInfo?.has_update || downloading || offlineCheck}
               variant={versionInfo?.has_update ? 'default' : 'secondary'}
               className="flex-1"
             >

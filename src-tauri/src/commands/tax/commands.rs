@@ -98,6 +98,13 @@ pub async fn tax_has_local_data(app_handle: tauri::AppHandle) -> Result<bool, St
     TaxDataDownloader::local_has_data(&app_handle).map_err(|e| e.to_string())
 }
 
+/// Current local snapshot metadata even when completely offline.
+#[tauri::command]
+pub async fn tax_get_local_version(app_handle: tauri::AppHandle)
+    -> Result<crate::models::tax::VersionDetail, String> {
+    TaxDataDownloader::get_local_version(&app_handle).map_err(|e| e.to_string())
+}
+
 /// 检查更新
 #[tauri::command]
 pub async fn tax_check_update(app_handle: tauri::AppHandle) -> Result<TaxVersionInfo, String> {

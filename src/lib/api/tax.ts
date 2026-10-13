@@ -16,6 +16,10 @@ export const taxApi = {
     }
   },
 
+  async getLocalVersion(): Promise<TaxVersionInfo['local']> {
+    return invoke<TaxVersionInfo['local']>('tax_get_local_version');
+  },
+
   /**
    * 精确查询税率
    */

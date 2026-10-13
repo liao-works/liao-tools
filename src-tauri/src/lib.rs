@@ -99,6 +99,7 @@ pub fn run() {
             tax_download_template,
             tax_check_update,
             tax_has_local_data,
+            tax_get_local_version,
             tax_download_update,
             tax_open_url,
             tax_update_single_row,
