@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { taxApi } from '@/lib/api/tax';
-import type { TaxPreviewRate, TaxPreviewSummary, TaxSignedReviewResult } from '@/lib/api/tax';
+import type { TaxPreviewRate, TaxPreviewSummary, TaxSignedReviewResult, NiReviewReport } from '@/lib/api/tax';
 import type { TaxTariff, TaxVersionInfo } from '@/types';
 import { openUpdateHistory } from '@/hooks/use-update-history';
 
@@ -30,6 +30,8 @@ export function UpdateTab() {
   const [hasTrustedSigner, setHasTrustedSigner] = useState(false);
   const [verifyingSigned, setVerifyingSigned] = useState(false);
   const [verifiedReview, setVerifiedReview] = useState<TaxSignedReviewResult | null>(null);
+  const [niReview, setNiReview] = useState<NiReviewReport | null>(null);
+  const [readingNiReview, setReadingNiReview] = useState(false);
 
   const { toast } = useToast();
 
@@ -139,6 +141,38 @@ export function UpdateTab() {
     } finally {
       setDownloading(false);
     }
+  };
+
+  const handleReadNiReview = async () => {
+    const selected = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: 'NI Other 审核报告', extensions: ['json'] }],
+    });
+    if (typeof selected !== 'string') return;
+    setReadingNiReview(true);
+    setNiReview(null);
+    try {
+      const report = await taxApi.readNiReview(selected);
+      setNiReview(report);
+      toast({
+        title: 'NI 审核报告已读取',
+        description: `${report.samples} 个样本，${report.manual_review_count} 条需要人工复核`,
+      });
+    } catch (error) {
+      toast({ title: '审核报告无效', description: String(error), variant: 'destructive' });
+    } finally {
+      setReadingNiReview(false);
+    }
+  };
+
+  const showOfficialNiCode = (code: string) => {
+    if (!/^\\d{10}$/.test(code)) return;
+    void taxApi.openUrl(
+      `https://www.trade-tariff.service.gov.uk/xi/commodities/${code}`
+    ).catch((error) =>
+      toast({ title: '无法打开官方商品页面', description: String(error), variant: 'destructive' })
+    );
   };
 
   // Shadow preview data is never promoted to the production tariff DB.
@@ -354,6 +388,57 @@ export function UpdateTab() {
                   </span>
                 )}
               </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* XI Other candidates are *review evidence*, never tax rates to import. */}
+      <Card>
+        <CardHeader>
+          <CardTitle>NI Other · 证据审核</CardTitle>
+          <CardDescription>
+            加载采集端产生的 xi-review-gate.json，查看跨章节覆盖、差异和人工复核清单。
+            此报告未经生产签名验证，且不证明第三国措施与页面 Other 分组完全等价。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button variant="outline" disabled={readingNiReview} onClick={handleReadNiReview}>
+            {readingNiReview ? '校验报告中...' : '选择 NI 审核报告 JSON'}
+          </Button>
+          {niReview && (
+            <div className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                日期：{niReview.as_of} · {niReview.samples} 个样本 · 涉及 {niReview.chapters} 个 HS 章节
+                · 覆盖门槛：{niReview.required_chapters}
+              </div>
+              <div className="text-sm font-medium">
+                {niReview.evidence_complete ? '证据覆盖要求已达到，仍需业务确认' : '样本不足，不能进入业务核验'}
+                · 待人工复核：{niReview.manual_review_count} 项
+              </div>
+              <div className="rounded-md border p-3 text-xs text-muted-foreground">
+                所有 NI Other 结果仍为候选，不允许写入正式税率库。报告仅包含人工核验线索，
+                并非关税申报依据。原始审计数据的 SHA-256：{niReview.audit_sha256}
+              </div>
+              {niReview.manual_review_items.length > 0 && (
+                <div className="max-h-72 space-y-2 overflow-y-auto">
+                  {niReview.manual_review_items.map((item) => (
+                    <div key={item.code} className="rounded-md border px-3 py-2 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-mono font-medium">{item.code}</span>
+                        <Button size="sm" variant="ghost" onClick={() => showOfficialNiCode(item.code)}>
+                          核对官方页面
+                        </Button>
+                      </div>
+                      <div className="text-muted-foreground">{item.comparison} · {item.verdict}</div>
+                      <div className="grid grid-cols-1 gap-1 md:grid-cols-2">
+                        <div>旧版 NI：{item.legacy || '无'}</div>
+                        <div>XI 候选：{item.candidate || '无确定候选'}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
