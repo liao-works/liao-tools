@@ -178,36 +178,22 @@ export function SingleQueryTab() {
       const result = await taxApi.updateSingleRow(tariff.code);
       
       if (result.success) {
-        // 更新本地状态中的数据
-        setResults((prev) =>
-          prev.map((item) => {
-            if (item.code === tariff.code) {
-              return {
-                ...item,
-                rate: result.newUkRate || item.rate,
-                north_ireland_rate: result.newNiRate || item.north_ireland_rate,
-                description: result.newDescription || item.description,
-              };
-            }
-            return item;
-          })
-        );
-        
+        // HTML parsing is comparison only; never replace a verified local rate.
         toast({
-          title: '更新成功',
+          title: '网页比对完成（未修改本地数据）',
           description: result.message,
         });
       } else {
         toast({
-          title: '更新失败',
+          title: '网页比对失败',
           description: result.message,
           variant: 'destructive',
         });
       }
     } catch (error) {
-      console.error('更新失败:', error);
+      console.error('网页比对失败:', error);
       toast({
-        title: '更新失败',
+        title: '网页比对失败',
         description: String(error),
         variant: 'destructive',
       });
@@ -412,7 +398,7 @@ export function SingleQueryTab() {
                           className="h-8 w-8"
                           onClick={() => handleAutoUpdate(result)}
                           disabled={updatingCode === result.code}
-                          title="自动更新当前行"
+                          title="网页临时比对（不修改本地数据）"
                         >
                           {updatingCode === result.code ? (
                             <Loader2 className="h-3 w-3 animate-spin" />
@@ -450,7 +436,7 @@ export function SingleQueryTab() {
               <div className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span className="text-sm font-medium">
-                  正在更新商品 {updateProgress.code}
+                  正在比对商品 {updateProgress.code}
                 </span>
                 <span className="text-sm text-muted-foreground">
                   {updateProgress.stage}
@@ -469,7 +455,7 @@ export function SingleQueryTab() {
       {showLogs && updateLogs.length > 0 && (
         <div className="fixed bottom-20 right-4 w-96 bg-background border rounded-lg shadow-lg z-50">
           <div className="flex items-center justify-between p-3 border-b">
-            <h3 className="text-sm font-medium">更新日志</h3>
+            <h3 className="text-sm font-medium">比对日志</h3>
             <Button
               variant="ghost"
               size="icon"

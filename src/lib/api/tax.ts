@@ -7,11 +7,11 @@ export const taxApi = {
    * 检查数据库是否有数据
    */
   async checkDataExists(): Promise<boolean> {
+    // Must work when GitHub or the user's internet is unavailable.
     try {
-      const versionInfo = await this.checkUpdate();
-      return versionInfo.local.records > 0;
+      return await invoke<boolean>('tax_has_local_data');
     } catch (error) {
-      console.error('检查数据存在性失败:', error);
+      console.error('本地数据库检查失败:', error);
       return false;
     }
   },
