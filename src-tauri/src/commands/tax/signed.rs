@@ -26,6 +26,15 @@ struct SignedManifest {
     as_of: String,
     artifact: SignedArtifact,
     quality: SignedQuality,
+    source: SignedSource,
+}
+
+#[derive(Debug, Deserialize)]
+struct SignedSource {
+    measure_type: String,
+    geographical_area: String,
+    effective_date: String,
+    filtered_csv_sha256: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -106,6 +115,12 @@ fn validate_manifest(m: &SignedManifest) -> Result<()> {
         && m.artifact.sha256.len() == 64
         && m.artifact.sha256.bytes().all(|b| b.is_ascii_hexdigit()),
         "Signed DB format/digest invalid");
+    ensure!(m.source.measure_type == "103" && m.source.geographical_area == "1011"
+        && chrono::NaiveDate::parse_from_str(&m.source.effective_date, "%Y-%m-%d").is_ok()
+        && m.source.effective_date == m.as_of
+        && m.source.filtered_csv_sha256.len() == 64
+        && m.source.filtered_csv_sha256.bytes().all(|b| b.is_ascii_hexdigit()),
+        "Signed source is not a matching dated DBT third-country 103/1011 snapshot");
     ensure!(m.quality.record_count >= 100
         && m.quality.gb_verified + m.quality.gb_conditional == m.quality.record_count
         && m.quality.ni_unverified == m.quality.record_count,
@@ -222,6 +237,10 @@ mod tests {
             "signature_alg": "ed25519", "key_id": "ci-fixture",
             "release_id": "target-duty-signed-test",
             "as_of": "2026-10-13",
+            "source": {
+                "measure_type": "103", "geographical_area": "1011",
+                "effective_date": "2026-10-13", "filtered_csv_sha256": "a".repeat(64)
+            },
             "artifact": {"name": "target-duty.db", "size": db_bytes.len(), "sha256": digest},
             "quality": {"record_count": 120,"gb_verified":120,"gb_conditional":0,"ni_unverified":120}
         }).to_string();
@@ -264,6 +283,33 @@ mod tests {
         let valid = dir.path().join("valid.zip");
         test_bundle(&valid, &seed, false);
         assert!(verify_zip_with_key(&valid, &[8u8;32]).is_err());
+    }
+
+    #[test]
+    fn signature_contract_rejects_wrong_official_source_even_when_signed() {
+        let m = SignedManifest {
+            schema_version: 2, channel: "signed-shadow-review".into(), signed: true,
+            production_eligible: false, signature_alg: "ed25519".into(),
+            key_id: "ci".into(), release_id: "target-duty-test".into(),
+            as_of: "2026-10-13".into(),
+            source: SignedSource {
+                measure_type: "142".into(), geographical_area: "1011".into(),
+                effective_date: "2026-10-13".into(), filtered_csv_sha256: "a".repeat(64)
+            },
+            artifact: SignedArtifact {
+                name: "target-duty.db".into(), size: 1024, sha256: "b".repeat(64)
+            },
+            quality: SignedQuality {
+                record_count: 120, gb_verified: 120, gb_conditional: 0, ni_unverified: 120
+            },
+        };
+        assert!(validate_manifest(&m).is_err());
+        assert!(validate_manifest(&SignedManifest {
+            source: SignedSource {
+                measure_type: "103".into(), geographical_area: "1011".into(),
+                effective_date: "2026-10-12".into(), filtered_csv_sha256: "a".repeat(64)
+            }, ..m
+        }).is_err());
     }
 
     #[test]
