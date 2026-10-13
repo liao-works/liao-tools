@@ -94,6 +94,12 @@ pub async fn tax_download_template(output_path: String) -> Result<(), String> {
     TaxExcelProcessor::generate_template(&output_path).map_err(|e| e.to_string())
 }
 
+/// Read-only local database check. Does not require internet.
+#[tauri::command]
+pub async fn tax_has_local_data(app_handle: tauri::AppHandle) -> Result<bool, String> {
+    TaxDataDownloader::local_has_data(&app_handle).map_err(|e| e.to_string())
+}
+
 /// 检查更新
 #[tauri::command]
 pub async fn tax_check_update(app_handle: tauri::AppHandle) -> Result<TaxVersionInfo, String> {

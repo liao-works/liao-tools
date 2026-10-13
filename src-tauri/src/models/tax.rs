@@ -94,6 +94,8 @@ pub struct RemoteMetadata {
     pub timestamp: String,
     pub last_modified: String,
     pub file_size: u64,
+    #[serde(default)]
+    pub file_hash: Option<String>,
     pub record_count: i64,
     pub download_urls: DownloadUrls,
     #[serde(default)]

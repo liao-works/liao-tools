@@ -2,45 +2,49 @@ use crate::commands::tax::database::TaxDatabase;
 use crate::commands::update_history::database::HistoryDatabase;
 use crate::commands::update_history::diff::diff_tariffs;
 use crate::models::tax::{RemoteMetadata, TaxVersionInfo, VersionDetail};
-use anyhow::{Context, Result};
-use std::path::PathBuf;
+use anyhow::{bail, ensure, Context, Result};
+use futures_util::StreamExt;
+use sha2::{Digest, Sha256};
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use tauri::Manager;
 
 const METADATA_URL: &str =
     "https://github.com/liao-works/cursor-tax-tools/releases/download/latest-data/metadata.json";
-const DB_URL: &str =
-    "https://github.com/liao-works/cursor-tax-tools/releases/download/latest-data/tariffs.db";
+const RELEASE_BASE: &str =
+    "https://github.com/liao-works/cursor-tax-tools/releases/download";
 
-/// 数据下载器
+/// Install *immutable* release assets. The current public channel stays on latest-data.
+/// Future shadow or V2 data MUST NOT use this production installer until promoted.
 pub struct TaxDataDownloader;
 
 impl TaxDataDownloader {
-    /// 检查更新
     pub async fn check_update(app_handle: &tauri::AppHandle) -> Result<TaxVersionInfo> {
-        // 获取本地版本信息
-        let local_version = Self::get_local_version(app_handle).await?;
-        
-        // 获取远程版本信息
-        let remote_metadata = Self::fetch_remote_metadata().await?;
-        let remote_version = VersionDetail {
-            version: remote_metadata.version.clone(),
-            records: remote_metadata.record_count,
-            date: remote_metadata.timestamp.split('T').next().unwrap_or("unknown").to_string(),
+        let local = Self::get_local_version(app_handle)?;
+        let metadata = Self::fetch_remote_metadata().await?;
+        let remote = VersionDetail {
+            version: metadata.version.clone(),
+            records: metadata.record_count,
+            date: metadata.timestamp.split('T').next().unwrap_or("unknown").to_string(),
         };
-        
-        // 判断是否有更新
-        let has_update = remote_version.version != local_version.version;
-        
         Ok(TaxVersionInfo {
-            local: local_version,
-            remote: remote_version,
-            has_update,
-            changelog: remote_metadata.changelog.unwrap_or_default(),
-            data_changes: remote_metadata.data_changes,
+            has_update: remote.version != local.version,
+            local,
+            remote,
+            changelog: metadata.changelog.unwrap_or_default(),
+            data_changes: metadata.data_changes,
         })
     }
-    
-    /// 下载并安装数据库
+
+    /// Local availability is NEVER coupled to an HTTP request.
+    pub fn local_has_data(app_handle: &tauri::AppHandle) -> Result<bool> {
+        let dir = app_handle.path().app_data_dir().context("App data directory")?;
+        if !dir.join("tariffs.db").exists() {
+            return Ok(false);
+        }
+        Ok(TaxDatabase::new(app_handle)?.get_record_count()? > 0)
+    }
+
     pub async fn download_and_install<F>(
         app_handle: &tauri::AppHandle,
         mut progress_callback: F,
@@ -48,196 +52,228 @@ impl TaxDataDownloader {
     where
         F: FnMut(u64, u64),
     {
-        // 下载数据库文件
-        let temp_db_path = Self::download_database(&mut progress_callback).await?;
+        // Fetch metadata ONCE, then pin the binary to the versioned Release.
+        let metadata = Self::fetch_remote_metadata().await?;
+        let dir = app_handle.path().app_data_dir().context("App data directory")?;
+        std::fs::create_dir_all(&dir)?;
+        let staged_db = Self::download_database(&dir, &metadata, &mut progress_callback).await?;
+        Self::validate_database(staged_db.as_ref(), metadata.record_count)?;
 
-        // 提前获取远程元数据（用于 diff 的 version_to 与写 metadata 文件，避免重复 fetch）
-        let remote_metadata = Self::fetch_remote_metadata().await?;
+        // Prepare metadata before changing the live DB.
+        let staged_metadata = {
+            let mut file = tempfile::Builder::new()
+                .prefix("tariffs-metadata-").suffix(".tmp")
+                .tempfile_in(&dir)?;
+            file.write_all(serde_json::to_string_pretty(&metadata)?.as_bytes())?;
+            file.as_file_mut().sync_all()?;
+            file.into_temp_path()
+        };
 
-        // 获取目标路径
-        let app_data_dir = app_handle
-            .path()
-            .app_data_dir()
-            .context("Failed to get app data directory")?;
+        let live_db = dir.join("tariffs.db");
+        let backup_db = dir.join("tariffs.db.backup");
+        let live_metadata = dir.join("tariffs.db.metadata.json");
+        let backup_metadata = dir.join("tariffs.db.metadata.backup.json");
 
-        std::fs::create_dir_all(&app_data_dir)
-            .context("Failed to create app data directory")?;
-
-        let target_db_path = app_data_dir.join("tariffs.db");
-
-        // 备份旧数据库（如果存在）
-        if target_db_path.exists() {
-            let backup_path = app_data_dir.join("tariffs.db.backup");
-            std::fs::copy(&target_db_path, &backup_path)
-                .context("Failed to backup old database")?;
-        }
-
-        // 旁路：对比新旧库写入变更历史（必须在 rename 之前，否则旧库被覆盖）
-        // 失败仅告警，不阻断主流程
-        let local_version = Self::get_local_version(app_handle)
-            .await
-            .unwrap_or_else(|_| VersionDetail {
-                version: "unknown".into(),
-                records: 0,
-                date: "unknown".into(),
-            });
-        if let Err(e) = Self::record_full_update_diff(
-            app_handle,
-            &target_db_path,
-            &temp_db_path,
-            &local_version.version,
-            &remote_metadata.version,
+        // History is best-effort, but may never alter a downloaded authoritative snapshot.
+        let local = Self::get_local_version(app_handle).unwrap_or_else(|_| VersionDetail {
+            version: "unknown".into(), records: 0, date: "unknown".into()
+        });
+        if let Err(err) = Self::record_full_update_diff(
+            app_handle, &live_db, staged_db.as_ref(),
+            &local.version, &metadata.version
         ) {
-            log::warn!("写入 tax 全量变更历史失败: {}", e);
+            log::warn!("Cannot store tax update diff: {}", err);
         }
 
-        // 移动新数据库到目标位置
-        std::fs::rename(&temp_db_path, &target_db_path)
-            .context("Failed to install new database")?;
+        // On Windows, renaming a staged file over an open target can fail.
+        // Move the old target away first, then promote the verified staged DB.
+        if backup_db.exists() {
+            std::fs::remove_file(&backup_db)?;
+        }
+        let had_old_db = live_db.exists();
+        if had_old_db {
+            std::fs::rename(&live_db, &backup_db)?;
+        }
+        if let Err(err) = std::fs::rename(staged_db.as_ref(), &live_db) {
+            if had_old_db {
+                std::fs::rename(&backup_db, &live_db)
+                    .context("Database promotion failed and rollback failed")?;
+            }
+            return Err(err).context("Unable to promote verified tax database");
+        }
 
-        // 写入元数据文件（复用已获取的 remote_metadata，不再二次 fetch）
-        let metadata_path = app_data_dir.join("tariffs.db.metadata.json");
-        let metadata_json = serde_json::to_string_pretty(&remote_metadata)
-            .context("Failed to serialize metadata")?;
-        std::fs::write(&metadata_path, metadata_json)
-            .context("Failed to write metadata file")?;
+        if backup_metadata.exists() {
+            std::fs::remove_file(&backup_metadata)?;
+        }
+        let had_old_metadata = live_metadata.exists();
+        let metadata_commit: Result<()> = (|| {
+            if had_old_metadata {
+                std::fs::rename(&live_metadata, &backup_metadata)?;
+            }
+            std::fs::rename(staged_metadata.as_ref(), &live_metadata)?;
+            Ok(())
+        })();
+        if let Err(err) = metadata_commit {
+            // All possible failure paths attempt to restore the previous usable pair.
+            std::fs::remove_file(&live_db)
+                .context("Metadata install failed and new DB could not be removed")?;
+            if had_old_db {
+                std::fs::rename(&backup_db, &live_db)
+                    .context("Metadata install failed and previous DB could not be restored")?;
+            }
+            if had_old_metadata && backup_metadata.exists() {
+                std::fs::rename(&backup_metadata, &live_metadata)
+                    .context("Metadata install failed and previous metadata could not be restored")?;
+            }
+            return Err(err).context("Metadata install failed; old data restored");
+        }
 
+        log::info!("Tariff data safely installed: {}", metadata.version);
         Ok(true)
     }
 
-    /// 对比旧库与下载的新库，写入 tax 全量变更历史
+    fn release_url(version: &str) -> Result<String> {
+        // No untrusted URL from metadata is executed, and no path traversal possible.
+        let safe_prefix = version.starts_with("data-") || version.starts_with("target-duty-");
+        ensure!(safe_prefix && version.len() <= 110 &&
+            version.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'.'),
+            "Unexpected tariff release identifier");
+        Ok(format!("{}/{}/tariffs.db", RELEASE_BASE, version))
+    }
+
+    fn validate_database(path: &Path, expected_rows: i64) -> Result<()> {
+        let conn = rusqlite::Connection::open_with_flags(
+            path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+        ).context("Opening staged tax snapshot")?;
+        let check: String = conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+        ensure!(check == "ok", "SQLite integrity_check failed: {}", check);
+        let columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(tariffs)")?
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        for required in ["code", "rate", "url", "north_ireland_rate", "description"] {
+            ensure!(columns.iter().any(|col| col == required),
+                "Tariff snapshot missing column {}", required);
+        }
+        let actual: i64 = conn.query_row("SELECT COUNT(*) FROM tariffs", [], |row| row.get(0))?;
+        ensure!(actual > 0 && actual == expected_rows,
+            "Tax record count mismatch; expected {}, got {}", expected_rows, actual);
+        let rated: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM tariffs WHERE rate IS NOT NULL AND TRIM(rate) != ''",
+            [], |row| row.get(0))?;
+        ensure!(rated > 0, "Snapshot contains no populated UK rates");
+        Ok(())
+    }
+
+    fn get_local_version(app_handle: &tauri::AppHandle) -> Result<VersionDetail> {
+        let dir = app_handle.path().app_data_dir().context("App data directory")?;
+        if !dir.join("tariffs.db").exists() {
+            return Ok(VersionDetail {
+                version: "none".into(), records: 0, date: "none".into()
+            });
+        }
+        let actual_records = TaxDatabase::new(app_handle)?.get_record_count()?;
+        let metadata_path = dir.join("tariffs.db.metadata.json");
+        if let Ok(raw) = std::fs::read_to_string(&metadata_path) {
+            if let Ok(meta) = serde_json::from_str::<RemoteMetadata>(&raw) {
+                return Ok(VersionDetail {
+                    version: meta.version,
+                    records: actual_records,
+                    date: meta.timestamp.split('T').next().unwrap_or("unknown").to_string()
+                });
+            }
+        }
+        Ok(VersionDetail {
+            version: "unknown".into(), records: actual_records, date: "unknown".into()
+        })
+    }
+
+    async fn fetch_remote_metadata() -> Result<RemoteMetadata> {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30)).build()?;
+        let metadata = client.get(METADATA_URL).send().await?
+            .error_for_status()?
+            .json::<RemoteMetadata>().await?;
+        Ok(metadata)
+    }
+
+    async fn download_database<F>(
+        directory: &Path, metadata: &RemoteMetadata, progress: &mut F
+    ) -> Result<tempfile::TempPath>
+    where
+        F: FnMut(u64, u64),
+    {
+        let expected_hash = metadata.file_hash.as_ref()
+            .context("Missing file_hash: refusing unauthenticated snapshot")?;
+        let expected_hex = expected_hash.strip_prefix("sha256:")
+            .context("Unsupported checksum algorithm")?;
+        ensure!(expected_hex.len() == 64 &&
+            expected_hex.bytes().all(|byte| byte.is_ascii_hexdigit()),
+            "Invalid snapshot SHA-256 value");
+        ensure!(metadata.file_size > 0, "Metadata file_size must be positive");
+        let url = Self::release_url(&metadata.version)?;
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(300)).build()?;
+        let response = client.get(&url).send().await?.error_for_status()?;
+        let total = response.content_length().unwrap_or(metadata.file_size);
+        let mut file = tempfile::Builder::new()
+            .prefix("tariffs-download-").suffix(".db")
+            .tempfile_in(directory)?;
+        let mut received: u64 = 0;
+        let mut hash = Sha256::new();
+        let mut stream = response.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let bytes = chunk.context("Download stream failed")?;
+            received += bytes.len() as u64;
+            ensure!(received <= metadata.file_size, "Snapshot larger than manifest");
+            file.write_all(&bytes)?;
+            hash.update(&bytes);
+            progress(received, total);
+        }
+        ensure!(received == metadata.file_size,
+            "Snapshot size mismatch: received {} expected {}", received, metadata.file_size);
+        let digest = format!("{:x}", hash.finalize());
+        ensure!(digest.eq_ignore_ascii_case(expected_hex),
+            "Snapshot SHA-256 mismatch: refusing installation");
+        file.as_file_mut().sync_all()?;
+        Ok(file.into_temp_path()) // Automatically delete on failed validation or install.
+    }
+
     fn record_full_update_diff(
         app_handle: &tauri::AppHandle,
-        old_db_path: &std::path::Path,
-        new_db_path: &std::path::Path,
-        version_from: &str,
-        version_to: &str,
+        old_db_path: &Path, new_db_path: &Path, from: &str, to: &str
     ) -> Result<()> {
-        // 旧库可能不存在（首次下载），此时全部为 added
-        let old_tariffs = if old_db_path.exists() {
+        let old = if old_db_path.exists() {
             TaxDatabase::read_all_from_path(old_db_path).unwrap_or_default()
         } else {
             Vec::new()
         };
-        let new_tariffs = TaxDatabase::read_all_from_path(new_db_path)?;
-
+        let new = TaxDatabase::read_all_from_path(new_db_path)?;
         let session_id = uuid::Uuid::new_v4().to_string();
-        let records = diff_tariffs(
-            &old_tariffs,
-            &new_tariffs,
-            &session_id,
-            Some(version_from),
-            Some(version_to),
-        );
-
-        let history_db = HistoryDatabase::new(app_handle)?;
-        history_db.insert_changes(&records)?;
+        let records = diff_tariffs(&old, &new, &session_id, Some(from), Some(to));
+        let db = HistoryDatabase::new(app_handle)?;
+        db.insert_changes(&records)?;
         Ok(())
     }
-    
-    /// 获取本地版本信息
-    async fn get_local_version(app_handle: &tauri::AppHandle) -> Result<VersionDetail> {
-        let app_data_dir = app_handle
-            .path()
-            .app_data_dir()
-            .context("Failed to get app data directory")?;
-        
-        let metadata_path = app_data_dir.join("tariffs.db.metadata.json");
-        
-        if metadata_path.exists() {
-            // 读取本地元数据
-            let metadata_json = std::fs::read_to_string(&metadata_path)
-                .context("Failed to read local metadata")?;
-            let metadata: RemoteMetadata = serde_json::from_str(&metadata_json)
-                .context("Failed to parse local metadata")?;
-            
-            Ok(VersionDetail {
-                version: metadata.version,
-                records: metadata.record_count,
-                date: metadata.timestamp.split('T').next().unwrap_or("unknown").to_string(),
-            })
-        } else {
-            // 如果没有元数据文件，尝试从数据库读取记录数
-            match TaxDatabase::new(app_handle) {
-                Ok(db) => {
-                    let records = db.get_record_count().unwrap_or(0);
-                    Ok(VersionDetail {
-                        version: "unknown".to_string(),
-                        records,
-                        date: "unknown".to_string(),
-                    })
-                }
-                Err(_) => Ok(VersionDetail {
-                    version: "none".to_string(),
-                    records: 0,
-                    date: "none".to_string(),
-                }),
-            }
-        }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reject_unsafe_release_identifiers() {
+        assert!(TaxDataDownloader::release_url("data-36851279616").is_ok());
+        assert!(TaxDataDownloader::release_url("../latest-data").is_err());
+        assert!(TaxDataDownloader::release_url("https://evil.example").is_err());
     }
-    
-    /// 获取远程元数据
-    async fn fetch_remote_metadata() -> Result<RemoteMetadata> {
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .context("Failed to create HTTP client")?;
-        
-        let response = client
-            .get(METADATA_URL)
-            .send()
-            .await
-            .context("Failed to fetch remote metadata")?;
-        
-        let metadata = response
-            .json::<RemoteMetadata>()
-            .await
-            .context("Failed to parse remote metadata")?;
-        
-        Ok(metadata)
-    }
-    
-    /// 下载数据库文件
-    async fn download_database<F>(progress_callback: &mut F) -> Result<PathBuf>
-    where
-        F: FnMut(u64, u64),
-    {
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(300)) // 5分钟超时
-            .build()
-            .context("Failed to create HTTP client")?;
-        
-        let response = client
-            .get(DB_URL)
-            .send()
-            .await
-            .context("Failed to start download")?;
-        
-        let total_size = response.content_length().unwrap_or(0);
-        
-        // 创建临时文件
-        let temp_dir = std::env::temp_dir();
-        let temp_path = temp_dir.join("tariffs_download.db");
-        let mut file = std::fs::File::create(&temp_path)
-            .context("Failed to create temporary file")?;
-        
-        // 下载文件并报告进度
-        let mut downloaded: u64 = 0;
-        
-        use futures_util::StreamExt;
-        use std::io::Write;
-        
-        let mut stream = response.bytes_stream();
-        
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk.context("Failed to read chunk")?;
-            file.write_all(&chunk)
-                .context("Failed to write to temporary file")?;
-            
-            downloaded += chunk.len() as u64;
-            progress_callback(downloaded, total_size);
-        }
-        
-        Ok(temp_path)
+
+    #[test]
+    fn reject_wrong_schema_even_for_valid_sqlite() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let db = rusqlite::Connection::open(file.path()).unwrap();
+        db.execute("CREATE TABLE other (code TEXT)", []).unwrap();
+        drop(db);
+        assert!(TaxDataDownloader::validate_database(file.path(), 1).is_err());
     }
 }

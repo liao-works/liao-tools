@@ -2670,6 +2670,7 @@ dependencies = [
  "rusqlite",
  "rust_xlsxwriter",
  "scraper",
+ "sha2",
  "serde",
  "serde_json",
  "strsim",
