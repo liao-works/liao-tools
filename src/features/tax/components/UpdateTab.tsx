@@ -167,7 +167,7 @@ export function UpdateTab() {
   };
 
   const showOfficialNiCode = (code: string) => {
-    if (!/^\\d{10}$/.test(code)) return;
+    if (!/^\d{10}$/.test(code)) return;
     void taxApi.openUrl(
       `https://www.trade-tariff.service.gov.uk/xi/commodities/${code}`
     ).catch((error) =>
@@ -202,7 +202,7 @@ export function UpdateTab() {
 
   const handlePreviewLookup = async () => {
     if (!previewInfo) return;
-    if (!/^\\d{10}$/.test(previewCode)) {
+    if (!/^\d{10}$/.test(previewCode)) {
       toast({ title: '请输入完整 10 位商品编码', variant: 'destructive' });
       return;
     }
