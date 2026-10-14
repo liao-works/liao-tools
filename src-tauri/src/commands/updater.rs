@@ -4,7 +4,7 @@ use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::io::{Write, BufWriter};
 use crate::commands::error::CommandError;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use sha2::{Sha256, Digest};
 use std::io::Read;
 
