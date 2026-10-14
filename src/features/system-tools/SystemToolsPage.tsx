@@ -391,10 +391,22 @@ export function SystemToolsPage() {
       {/* 编辑对话框 */}
       <ToolEditDialog
         tool={selectedTool?.type === 'custom' ? {
-          ...selectedTool,
           id: Number(selectedTool.id.replace('custom_', '')),
+          name: selectedTool.name,
+          description: selectedTool.description,
+          icon: selectedTool.icon,
           executablePath: selectedTool.executablePath || '',
-        } as UserTool : null}
+          arguments: selectedTool.arguments,
+          workingDirectory: '',
+          category: selectedTool.category,
+          order: selectedTool.order ?? 0,
+          hotkey: selectedTool.hotkey,
+          enabled: selectedTool.enabled,
+          platform: selectedTool.platform.join(','),
+          createdAt: '',
+          updatedAt: '',
+          launchCount: 0,
+        } : null}
         open={editDialogOpen}
         onSave={handleAddTool}
         onCancel={() => { setEditDialogOpen(false); setSelectedTool(null); }}
