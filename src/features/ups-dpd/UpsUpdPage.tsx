@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileOpenDialog } from '@/components/common/FileOpenDialog';
 import { useToast } from '@/hooks/use-toast';
 import { getFileName } from '@/lib/file-opener';
-import { FileText, Play, Settings, X, Package } from 'lucide-react';
+import { FileText, Play, Settings, X, Package, Upload, Loader2, CheckCircle2, AlertTriangle, FileCheck2 } from 'lucide-react';
 import {
   type TemplateType,
   type ProcessRequest,
@@ -25,6 +25,8 @@ export function UpsUpdPage() {
   const [mainFile, setMainFile] = useState<string | null>(null);
   const [detailFile, setDetailFile] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [completedPath, setCompletedPath] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
   const [showFileDialog, setShowFileDialog] = useState(false);
   const [outputFilePath, setOutputFilePath] = useState<string>('');
@@ -62,6 +64,8 @@ export function UpsUpdPage() {
       if (selected && typeof selected === 'string') {
         setMainFile(selected);
         setLogs([]);
+        setErrorMessage('');
+        setCompletedPath('');
       }
     } catch (error) {
       console.error('选择文件失败:', error);
@@ -87,6 +91,8 @@ export function UpsUpdPage() {
 
       if (selected && typeof selected === 'string') {
         setDetailFile(selected);
+        setErrorMessage('');
+        setCompletedPath('');
       }
     } catch (error) {
       console.error('选择文件失败:', error);
@@ -110,6 +116,8 @@ export function UpsUpdPage() {
 
     setProcessing(true);
     setLogs([]);
+    setErrorMessage('');
+    setCompletedPath('');
 
     try {
       const request: ProcessRequest = {
@@ -123,6 +131,7 @@ export function UpsUpdPage() {
       setLogs(result.logs);
 
       if (result.success) {
+        setCompletedPath(result.output_path);
         setOutputFilePath(result.output_path);
         setShowFileDialog(true);
         
@@ -131,6 +140,7 @@ export function UpsUpdPage() {
           description: `${TemplateTypeLabels[templateType]} 数据处理完成`,
         });
       } else {
+        setErrorMessage(result.message || '处理失败，请检查源文件及模板配置。');
         toast({
           title: '处理失败',
           description: result.message,
@@ -139,6 +149,7 @@ export function UpsUpdPage() {
       }
     } catch (error: any) {
       console.error('处理失败:', error);
+      setErrorMessage(error?.message || '处理失败，请检查源文件及模板配置。');
       toast({
         title: '处理失败',
         description: error?.message || '未知错误',
@@ -223,147 +234,96 @@ export function UpsUpdPage() {
         </TabsList>
 
         <TabsContent value="process" className="space-y-4">
-          <Card className="p-6">
-            <div className="space-y-6">
-              {/* 模板类型选择 */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">模板类型</Label>
-                <div className="flex gap-4">
-                  {(Object.entries(TemplateTypeLabels) as [TemplateType, string][]).map(
-                    ([value, label]) => (
-                      <div key={value} className="flex items-center space-x-2">
-                        <input
-                          type="radio"
-                          id={value}
-                          name="templateType"
-                          value={value}
-                          checked={templateType === value}
-                          onChange={(e) => {
-                            setTemplateType(e.target.value as TemplateType);
-                            setMainFile(null);
-                            setDetailFile(null);
-                            setLogs([]);
-                          }}
-                          className="w-4 h-4 text-primary border-input focus:ring-2 focus:ring-primary cursor-pointer"
-                        />
-                        <Label
-                          htmlFor={value}
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          {label}
-                        </Label>
-                      </div>
-                    )
-                  )}
+          <div className="lt-process-steps">
+            <div><span className="lt-step-index">01</span><strong>选择承运商</strong><small>UPS / DPD</small></div>
+            <div><span className="lt-step-index">02</span><strong>准备源数据</strong><small>主表及可选明细</small></div>
+            <div><span className="lt-step-index">03</span><strong>生成预报文件</strong><small>当前模板填充</small></div>
+          </div>
+          <div className="lt-operation-grid">
+            <Card className="lt-operation-primary">
+              <div className="p-6 space-y-6">
+                <div>
+                  <div className="lt-operation-heading"><span className="lt-step-index">01</span>
+                    <div><h2 className="lt-operation-title">选择物流模板</h2>
+                      <p className="lt-operation-subtitle">模板类型决定输出格式，已有自定义模板可在「模板设置」管理。</p></div>
+                  </div>
+                  <div className="lt-mode-card-grid lt-mode-card-grid--two" role="radiogroup" aria-label="物流模板类型">
+                    {(Object.entries(TemplateTypeLabels) as [TemplateType,string][]).map(([value,label]) =>
+                      <label className={`lt-mode-card ${templateType===value?'is-selected':''}`} key={value}>
+                        <input type="radio" name="templateType" value={value} checked={templateType===value}
+                          disabled={processing} onChange={evt => {
+                            setTemplateType(evt.target.value as TemplateType);setMainFile(null);setDetailFile(null);
+                            setLogs([]);setCompletedPath('');setErrorMessage('');
+                          }}/>
+                        <span className="lt-mode-card-mark"><Package size={20}/></span>
+                        <strong>{label}</strong>
+                        <small>{value==='ups'?'使用 UPS 当前保存的模板':'使用 DPD 当前保存的模板'}</small>
+                      </label>)}
+                  </div>
                 </div>
-              </div>
-
-              {/* 主数据文件选择 */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">主数据文件 *</Label>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleSelectMainFile}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    {mainFile ? '更换文件' : '选择 Excel 文件'}
-                  </Button>
-                  {mainFile && (
-                    <Button
-                      onClick={() => setMainFile(null)}
-                      variant="ghost"
-                      size="icon"
-                    >
-                      <X className="w-4 h-4" />
+                <div className="lt-operation-file-select">
+                  <label><span className="lt-step-index">02</span>主数据工作簿 <span>必选</span></label>
+                  <div className="lt-operation-drop">
+                    <span className="lt-operation-file-symbol"><FileText size={23}/></span>
+                    <div className="lt-operation-file-details">
+                      <strong>{mainFile?getFileName(mainFile):'请选择主数据 Excel 文件'}</strong>
+                      <small title={mainFile ?? undefined}>{mainFile||'支持 .xls / .xlsx'}</small>
+                    </div>
+                    <Button variant="outline" onClick={handleSelectMainFile} disabled={processing}>
+                      <Upload className="mr-2 h-4 w-4"/>{mainFile?'更换':'选择文件'}
                     </Button>
-                  )}
+                    {mainFile && <button type="button" className="lt-operation-clear" disabled={processing}
+                      aria-label="移除主数据文件" onClick={() => {setMainFile(null);setCompletedPath('');setErrorMessage('');}}>
+                      <X size={16}/></button>}
+                  </div>
                 </div>
-                {mainFile && (
-                  <p
-                    className="text-sm text-muted-foreground truncate"
-                    title={mainFile}
-                  >
-                    {mainFile}
-                  </p>
-                )}
-              </div>
-
-              {/* 明细表文件选择（可选） */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  单件明细表文件（可选）
-                </Label>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleSelectDetailFile}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <Package className="w-4 h-4 mr-2" />
-                    {detailFile ? '更换明细表' : '选择明细表文件'}
+                <div className="lt-operation-file-select">
+                  <label>单件明细表 <small>可选</small></label>
+                  <div className="lt-operation-drop lt-operation-drop--optional">
+                    <span className="lt-operation-file-symbol"><Package size={23}/></span>
+                    <div className="lt-operation-file-details">
+                      <strong>{detailFile?getFileName(detailFile):'可选：添加明细工作簿'}</strong>
+                      <small title={detailFile ?? undefined}>{detailFile||'用于补充子单号等细节，无需时可以跳过'}</small>
+                    </div>
+                    <Button variant="outline" onClick={handleSelectDetailFile} disabled={processing}>
+                      {detailFile?'更换':'选择文件'}</Button>
+                    {detailFile && <button type="button" className="lt-operation-clear" disabled={processing}
+                      aria-label="移除明细表" onClick={() => {setDetailFile(null);setCompletedPath('');}}>
+                      <X size={16}/></button>}
+                  </div>
+                </div>
+                <div className="lt-operation-next">
+                  <div className="lt-operation-next-copy"><span className="lt-step-index">03</span>
+                    <div><strong>生成 {TemplateTypeLabels[templateType]} 文件</strong>
+                      <p>使用后台对应模板和已选源文件处理，完成后提供输出路径。</p></div>
+                  </div>
+                  <Button className="lt-operation-run" onClick={handleProcess} disabled={!mainFile||processing}>
+                    {processing?<><Loader2 size={16} className="mr-2 animate-spin"/>正在生成…</>:
+                      <><Play size={16} className="mr-2"/>开始处理</>}
                   </Button>
-                  {detailFile && (
-                    <Button
-                      onClick={() => setDetailFile(null)}
-                      variant="ghost"
-                      size="icon"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  )}
                 </div>
-                {detailFile && (
-                  <p
-                    className="text-sm text-muted-foreground truncate"
-                    title={detailFile}
-                  >
-                    {detailFile}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  用于补充子单号等详细信息
-                </p>
-              </div>
-
-              {/* 处理按钮 */}
-              <Button
-                onClick={handleProcess}
-                disabled={!mainFile || processing}
-                className="w-full"
-              >
-                {processing ? (
-                  <>
-                    <span className="animate-spin mr-2">⏳</span>
-                    处理中...
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4 mr-2" />
-                    开始处理
-                  </>
-                )}
-              </Button>
-            </div>
-          </Card>
-
-          {/* 处理日志 */}
-          {logs.length > 0 && (
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">处理日志</h3>
-              <div className="space-y-1 max-h-96 overflow-y-auto">
-                {logs.map((log, index) => (
-                  <p
-                    key={index}
-                    className="text-sm font-mono text-muted-foreground"
-                  >
-                    {log}
-                  </p>
-                ))}
+                {errorMessage && <div className="lt-operation-error" role="alert"><AlertTriangle size={17}/>{errorMessage}</div>}
               </div>
             </Card>
-          )}
+            <aside className="lt-operation-side"><div className="lt-operation-side-card">
+              <span className="lt-kicker">SHIPPING PROCESS</span>
+              <h3>模板与输出</h3>
+              <p>此页使用后台保存的 {TemplateTypeLabels[templateType]} 模板。不需要单件明细的文件可以留空；处理后请核对导出表的关键字段。</p>
+              <div className="lt-operation-note"><Settings size={17}/> 自定义模板请到「模板设置」选择或重置</div>
+              <div className="lt-operation-note"><FileCheck2 size={17}/> 处理完成后可查看原始日志及输出文件</div>
+              <img className="lt-operation-illustration" src="/illustrations/file-workflow.svg" alt="" aria-hidden="true"/>
+            </div></aside>
+          </div>
+          {completedPath && <div className="lt-operation-output lt-operation-finished">
+            <CheckCircle2 size={22} className="text-success-fg"/>
+            <div><strong>处理完成 · {getFileName(completedPath)}</strong><span>{completedPath}</span></div>
+            <Button variant="outline" onClick={() => setShowFileDialog(true)}>打开结果</Button>
+          </div>}
+          {logs.length>0 && <Card className="p-5">
+            <h3 className="lt-operation-title mb-3">处理日志 · {logs.length} 条</h3>
+            <div className="lt-process-log">{logs.map((log,index)=>
+              <p key={index}><span>{String(index+1).padStart(2,'0')}</span>{log}</p>)}</div>
+          </Card>}
         </TabsContent>
 
         <TabsContent value="config" className="space-y-4">
