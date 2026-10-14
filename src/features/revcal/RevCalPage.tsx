@@ -398,7 +398,6 @@ export function RevCalPage() {
                 <div><small>未找到或失败</small><strong>{results.length - foundCount}</strong></div>
                 <div><small>商品结果</small><strong>{rows.filter(row => row.product).length}</strong></div>
               </div>
-            <>
               {/* 筛选工具栏 */}
               <div className="mb-3 flex flex-wrap items-center gap-3">
                 <Input
