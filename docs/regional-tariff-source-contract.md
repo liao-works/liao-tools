@@ -463,3 +463,37 @@ An independent actual CI run confirms matching SQLite SHA, all unique
 16,742 code rows, unchanged GB v4.0.1626->1627 source measures and
 correct classification:
 https://github.com/liao-works/cursor-tax-tools/actions/runs/38540798878
+
+## Phase 17 — NI data-first source scope and 103/105 lookup
+
+Managed NI source collection is now **independent from backup infrastructure**:
+the operator workflow defaults to `archive_mode=none`, requiring only
+the authorized HMRC API credentials and raw data source replay/continuity
+gates. Optional Ed25519 or offsite S3 does NOT block taking a source
+snapshot. No product tariff is published by source collection alone.
+
+A real official PUBLIC partial five-chapter inventory from 2026-10-14
+contained **2,590 original goods records, 1,652 active declarable codes**;
+20 original XI commodity import-measure responses were successfully
+replayed with zero source failures; 1,632 are still uncollected within
+that sample. Public data is not a managed full NI source.
+
+A separate read-only **all-public-chapters** inventory mode enumerates
+the entire 97-chapter official public catalogue with rate limits,
+but is deliberately stored as `public_full_untrusted`, which fails
+the managed-full/production readiness gate regardless of coverage.
+
+Producer `xi_source_lookup.py` supports up to 1,000 requested 10-digit
+codes per batch from previously replay-verified HMRC source evidence.
+It distinguishes missing data, source error, an explicit empty import
+measure list, non-catalogue code and original raw 103/105 candidates.
+The evidence includes unmodified duty expressions, linked duty bases,
+conditions, additional codes and source SHA. Crucially, NONE of these
+states contains an authenticated `payable_rate`; `null` is not `0%`.
+
+NI `Other` still requires the desktop's exact business mapping plus
+an actual origin-country filter, declaration circumstances,
+conditional measures and any UKIMS requirements. No production rate
+fields or installed `tariffs.db` may be updated by this phase.
+
+Producer runbook: cursor-tax-tools/docs/xi-source-first-phase17.md
