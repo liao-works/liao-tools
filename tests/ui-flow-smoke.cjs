@@ -245,7 +245,7 @@ const BASE = 'http://127.0.0.1:1420';
       );
       assert.equal(signedChecksAfter, signedChecksBefore,
         'recheck must reuse downloaded native updater session');
-      assert(await page.getByRole('button', { name: '重新检查' }).isDisabled(),
+      assert(await page.getByRole('button', { name: '重新检查', exact: true }).isDisabled(),
         'do not allow recheck UI to drop downloaded session');
       await page.getByRole('button', { name: '安装已签名更新' }).click();
       await page.getByText('签名更新安装已执行').waitFor();
