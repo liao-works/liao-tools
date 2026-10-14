@@ -1,5 +1,4 @@
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
-import { Calculator } from 'lucide-react';
 import { useState } from 'react';
 import { Calculator, Download, FileSpreadsheet, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

@@ -1,5 +1,4 @@
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
-import { Package } from 'lucide-react';
 import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { Button } from '@/components/ui/button';
