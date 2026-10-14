@@ -108,7 +108,7 @@ function SortableToolCard({ tool, onEdit, onDelete, onToggle }: SortableToolCard
             ) : (
               <PowerOff className="h-4 w-4" />
             )}
-          </Button>}}
+          </Button>}
           {tool.type === 'custom' && <Button
             variant="ghost"
             size="icon"
