@@ -192,6 +192,23 @@ const BASE = 'http://127.0.0.1:1420';
       await page.getByRole('button', { name: '下载签名更新包' }).click();
       await page.getByText('签名更新包已下载，等待安装验证').waitFor();
       await page.screenshot({ path: 'ui-screenshots/updates-signed-verified-mocked.png', fullPage: true });
+      // A second check in the same JS runtime must not close the signed updater
+      // resource that the current page is about to install.
+      const signedChecksBefore = await page.evaluate(
+        () => window.__liaoBridgeCalls.filter(call => call.command === 'plugin:updater|check').length
+      );
+      const repeatedResult = await page.evaluate(async () => {
+        const module = await import('/src/lib/updater.ts');
+        return module.checkForUpdates();
+      });
+      assert.equal(repeatedResult.latest_version, '0.0.14');
+      const signedChecksAfter = await page.evaluate(
+        () => window.__liaoBridgeCalls.filter(call => call.command === 'plugin:updater|check').length
+      );
+      assert.equal(signedChecksAfter, signedChecksBefore,
+        'recheck must reuse downloaded native updater session');
+      assert(await page.getByRole('button', { name: '重新检查' }).isDisabled(),
+        'do not allow recheck UI to drop downloaded session');
       await page.getByRole('button', { name: '安装已签名更新' }).click();
       await page.getByText('签名更新安装已执行').waitFor();
       const calls = await page.evaluate(() => window.__liaoBridgeCalls);

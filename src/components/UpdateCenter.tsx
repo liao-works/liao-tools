@@ -48,6 +48,7 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
   const [installerMessage, setInstallerMessage] = useState('');
   const started = useRef(false);
   const busy = phase === 'checking' || phase === 'downloading' || phase === 'launching';
+  const recheckDisabled = busy || (info?.update_channel === 'signed' && (phase === 'ready' || phase === 'launched'));
 
   useEffect(() => {
     let active = true;
@@ -165,7 +166,7 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
           <span>安装渠道 <strong>{signed ? '官方签名更新' : '校验下载 · 手动安装'}</strong></span>
         </div>
         <div className="lt-update-action-row">
-          <Button onClick={() => void check()} disabled={busy} variant="outline">
+          <Button onClick={() => void check()} disabled={recheckDisabled} variant="outline" title={recheckDisabled && !busy ? "请先完成当前签名更新或重新启动应用" : undefined}>
             {phase === 'checking' ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCw className="mr-2 h-4 w-4"/>}
             {phase === 'checking' ? '检查中…' : '重新检查'}
           </Button>

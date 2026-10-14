@@ -35,6 +35,8 @@ const RELEASES = 'https://github.com/liao-works/liao-tools/releases';
 const SIGNED_TOKEN = 'tauri-signed-update';
 let pendingUpdate: Update | null = null;
 let pendingSignedVersion = '';
+let signedPhase: 'idle' | 'downloading' | 'ready' | 'installing' = 'idle';
+let latestSignedInfo: UpdateInfo | null = null;
 let activeCheck: Promise<UpdateInfo> | null = null;
 let checkingMode: Promise<boolean> | null = null;
 
@@ -59,13 +61,21 @@ async function clearPendingUpdate(): Promise<void> {
   const old = pendingUpdate;
   pendingUpdate = null;
   pendingSignedVersion = '';
+  latestSignedInfo = null;
+  signedPhase = 'idle';
   if (old) await old.close().catch(() => undefined);
 }
 
 async function checkSignedUpdates(): Promise<UpdateInfo> {
-  await clearPendingUpdate();
+  // A periodic background check or a second UpdateCenter must never close
+  // an in-flight or already downloaded native updater resource.
+  if (signedPhase !== 'idle' && latestSignedInfo && pendingUpdate) {
+    return latestSignedInfo;
+  }
+  // Do not release the previous update until the new check succeeds.
   const update = await checkSigned();
   if (!update) {
+    await clearPendingUpdate();
     const current = await invoke<string>('get_current_version');
     return {
       current_version: current,
@@ -79,9 +89,10 @@ async function checkSignedUpdates(): Promise<UpdateInfo> {
       update_channel: 'signed',
     };
   }
+  const old = pendingUpdate;
   pendingUpdate = update;
   pendingSignedVersion = update.version;
-  return {
+  latestSignedInfo = {
     current_version: update.currentVersion,
     latest_version: update.version,
     has_update: true,
@@ -89,9 +100,11 @@ async function checkSignedUpdates(): Promise<UpdateInfo> {
     release_notes: update.body || '',
     published_at: update.date || '',
     platform_specific_url: SIGNED_TOKEN,
-    checksum_sha256: null, // signed channel uses the trusted public key, never local SHA metadata
+    checksum_sha256: null,
     update_channel: 'signed',
   };
+  if (old && old !== update) await old.close().catch(() => undefined);
+  return latestSignedInfo;
 }
 
 /** Coalesce startup + modal checks. Signed builds never fall back to unsigned installers. */
@@ -128,24 +141,33 @@ export async function downloadUpdate(
     if (!pendingUpdate || pendingSignedVersion !== version || url !== SIGNED_TOKEN) {
       throw new Error('签名更新会话已失效，请重新检查版本。');
     }
+    if (signedPhase === 'ready') return SIGNED_TOKEN;
+    if (signedPhase !== 'idle') throw new Error('更新正在处理，请勿同时发起多个下载或安装。');
+    signedPhase = 'downloading';
     let downloaded = 0;
     let total = 0;
-    await pendingUpdate.download(event => {
-      if (event.event === 'Started') {
-        total = event.data.contentLength || 0;
-        downloaded = 0;
-      } else if (event.event === 'Progress') {
-        downloaded += event.data.chunkLength;
-      } else if (event.event === 'Finished' && total > 0) {
-        downloaded = total;
-      }
-      onProgress?.({
-        downloaded,
-        total,
-        percentage: total > 0 ? Math.min(100, downloaded / total * 100) : 0,
+    try {
+      await pendingUpdate.download(event => {
+        if (event.event === 'Started') {
+          total = event.data.contentLength || 0;
+          downloaded = 0;
+        } else if (event.event === 'Progress') {
+          downloaded += event.data.chunkLength;
+        } else if (event.event === 'Finished' && total > 0) {
+          downloaded = total;
+        }
+        onProgress?.({
+          downloaded,
+          total,
+          percentage: total > 0 ? Math.min(100, downloaded / total * 100) : 0,
+        });
       });
-    });
-    return SIGNED_TOKEN;
+      signedPhase = 'ready';
+      return SIGNED_TOKEN;
+    } catch (error) {
+      signedPhase = 'idle';
+      throw error;
+    }
   }
   if (!checksumSha256) throw new Error('缺少官方 SHA-256，拒绝下载。');
   return invoke<string>('download_update', { url, version, checksumSha256 });
@@ -158,16 +180,25 @@ export async function installUpdate(filePath: string, silent = false): Promise<s
     if (filePath !== SIGNED_TOKEN || !pendingUpdate) {
       throw new Error('签名安装会话已失效，请重新检查更新。');
     }
-    const update = pendingUpdate;
-    // Official plugin verifies the signature before installing.
-    // On Windows the native updater closes the application when installing.
-    await update.install();
-    await clearPendingUpdate();
-    // macOS/Linux need restart after installation.
-    if (navigator.userAgent.includes('Mac') || navigator.userAgent.includes('Linux')) {
-      return '签名校验与安装已完成，请重新启动应用以使用新版本。';
+    if (signedPhase !== 'ready') {
+      throw new Error('必须先成功下载签名更新包，才能开始安装。');
     }
-    return '签名安装程序已启动，请按照系统提示完成升级。';
+    signedPhase = 'installing';
+    const update = pendingUpdate;
+    try {
+      // The official plugin checks the trusted signature during installation.
+      await update.install();
+      await clearPendingUpdate();
+      if (navigator.userAgent.includes('Mac') || navigator.userAgent.includes('Linux')) {
+        return '签名校验与安装操作已执行，请重新启动并核对实际应用版本。';
+      }
+      return '已启动签名安装程序，请按照系统提示完成升级。';
+    } catch (error) {
+      // Retain a verified download so the user can retry installation without
+      // silently falling back to the unsigned legacy updater.
+      signedPhase = 'ready';
+      throw error;
+    }
   }
   return invoke<string>('install_update', { filePath, silent });
 }
