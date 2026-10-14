@@ -145,3 +145,34 @@ managed XI API credentials have not yet been exercised for a 97-chapter
 full import. Do not infer NI Other or update north_ireland_rate/other_rate
 from a mere successful raw-source checkpoint. No signed customer-facing
 release is authorized by this stage.
+
+## Phase 8 — GB compact 103/1011 evidence is NOT an app tariff database
+
+Producer src/target_duty/gb_compact_review.py now creates a small
+review-only GB SQLite from the independently verified full DBT measure
+export. Its tables are provenance, commodities and evidence; this schema
+has NO payable rate or north_ireland_rate field and is incompatible with
+the installed tariffs.db. Do not import it automatically.
+
+Every active GB commodity leaf remains covered as a status row. A source
+type-103/geography-1011 record is merely an evidence candidate: preserve
+original duty expression, date, conditions, additions and exclusions.
+Geography 1080 (Channel Islands) is stored as explicitly non-GB context
+only when explaining unresolved target gaps; never map it to 1011.
+Unresolved special Chapter 99 codes must never receive an invented 0%.
+
+First actual DBT full-to-compact replay confirmed 16,376 GB target
+codes, 359 non-GB geography-only gaps, seven special missing codes
+and 1,123,765 measures in the pinned full source. After the footprint
+optimization, a new CI source replay checks compact statistics and size.
+All compact outputs preserve production_eligible=false,
+rate_applicability_verified=false and ni_other_verified=false.
+
+Official DBT latest-alias returned HTTP 404 during an Oct 14 CI probe.
+Reproducible GB data staging uses previously verified pinned v4.0.1626
+with a separate independent latest-source health check. A passing pinned
+replay must not imply a passing current-freshness gate or justify release.
+
+An explicit sign-off on regional duty applicability, source freshness,
+condition evaluation and signing is required before desktop integration.
+NI Other, VAT and quota balances are not delivered by this shadow.
