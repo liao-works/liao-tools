@@ -45,3 +45,15 @@ test('CLI accepts new tag and refuses downgrade on disk',()=>{
    assert.match(bad.stderr,/refused publication/);
  } finally {fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('signed channel cannot regress to unsigned once latest.json was public', () => {
+ const previous = [release('v0.0.15', { assets:[{name:'latest.json'}] })];
+ assert.equal(verifyReleaseVersion('v0.0.16',previous,{requireSigned:false}).ok,false);
+ assert.equal(verifyReleaseVersion('v0.0.16',previous,{requireSigned:true}).ok,true);
+});
+test('legacy unsigned release can transition to signed or another manual release', () => {
+ const previous = [release('v0.0.13',{assets:[]})];
+ assert.equal(verifyReleaseVersion('v0.0.14',previous,{requireSigned:true}).ok,true);
+ assert.equal(verifyReleaseVersion('v0.0.14',previous,{requireSigned:false}).ok,true);
+ assert.equal(verifyReleaseVersion('v0.0.14',[release('v0.0.13')],{requireSigned:false}).ok,false);
+});

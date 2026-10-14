@@ -23,12 +23,27 @@ function normalizeReleaseResponse(input) {
   }
   return releases;
 }
-function verifyReleaseVersion(candidate, rawReleases) {
+function verifyReleaseVersion(candidate, rawReleases, options = {}) {
   const target = parseVersion(candidate);
   if (!target) return { ok:false, reason:'Release tag must be stable vMAJOR.MINOR.PATCH' };
   const releases = normalizeReleaseResponse(rawReleases);
   if (releases.some(r=>!r.draft && r.tag_name===candidate))
     return { ok:false, reason:candidate+' is already public; cannot overwrite an existing Release' };
+  // Once a public stable release contains the official signed updater manifest,
+  // unsigned successors would strand already-installed signed clients.
+  if (options.requireSigned === false) {
+    for (const release of releases) {
+      if (release.draft || release.prerelease || !parseVersion(release.tag_name)) continue;
+      if (!Array.isArray(release.assets)) {
+        return { ok:false, reason:'Cannot verify signing-channel continuity from incomplete assets metadata' };
+      }
+      if (release.assets.some(asset => asset && asset.name === 'latest.json')) {
+        return { ok:false,
+          reason:'Signed updater channel already launched at '+release.tag_name+
+            '; unsigned publication would break existing signed clients' };
+      }
+    }
+  }
   let highest=null, highestTag=null;
   for (const release of releases) {
     if (release.draft || release.prerelease) continue;
@@ -50,7 +65,9 @@ if (require.main===module) {
     process.exitCode=2;
   } else {
     try {
-      const result=verifyReleaseVersion(tag,JSON.parse(fs.readFileSync(jsonPath,'utf8')));
+      const result=verifyReleaseVersion(tag,JSON.parse(fs.readFileSync(jsonPath,'utf8')), {
+        requireSigned:process.env.REQUIRE_SIGNED_UPDATER==='true'
+      });
       if (!result.ok) throw new Error(result.reason);
       console.log('Version gate passed: '+tag+' > '+(result.highestPublic||'(none)'));
     } catch(error) {
