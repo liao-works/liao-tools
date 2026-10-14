@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Search, Loader2, AlertCircle } from 'lucide-react';
+import { Search, Loader2, AlertCircle, ShieldAlert, CheckCircle2, X, FileSearch2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { altaApi } from '@/lib/api/alta';
-import type { AltaQueryResult, AltaMatchedItem } from '@/types';
+import type { AltaQueryResult } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
 /**
@@ -80,30 +80,32 @@ export function QueryTab({ onSwitchToManage }: QueryTabProps) {
   const [matchLength, setMatchLength] = useState<number | undefined>(6);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AltaQueryResult | null>(null);
+  const [inputError, setInputError] = useState('');
+  const [queryError, setQueryError] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
   const { toast } = useToast();
 
   const handleQuery = async () => {
-    if (!code.trim()) return;
-
+    const normalized = code.replace(/[\\s-]/g, '');
+    if (!/^\\d{4,10}$/.test(normalized) || (matchLength != null && normalized.length < matchLength)) {
+      setInputError(matchLength != null
+        ? `请输入至少 ${matchLength} 位、最多 10 位的数字编码。`
+        : '请输入 4–10 位有效的数字编码。');
+      return;
+    }
     setLoading(true);
+    setInputError('');
+    setQueryError('');
+    setHasSearched(true);
+    setResult(null);
     try {
-      const data = await altaApi.querySingle(code, matchLength);
-
-      // 调试日志
-      console.log('查询结果:', data);
-      console.log('matched_items:', data.matched_items);
-      data.matched_items?.forEach((item: AltaMatchedItem, idx) => {
-        console.log(`Item ${idx}:`, {
-          code: item.code,
-          description: item.description,
-          raw_text: item.raw_text,
-          has_exceptions: item.has_exceptions
-        });
-      });
+      const data = await altaApi.querySingle(normalized, matchLength);
 
       setResult(data);
     } catch (error: any) {
       console.error('查询失败:', error);
+      setQueryError(error?.code === 'DATABASE_EMPTY' ? '本地禁运数据库为空，请先完成数据更新。' :
+        error?.message || '查询失败，请检查本地数据库后重试。');
       
       // 检查是否是数据库为空的错误
       if (error.code === 'DATABASE_EMPTY') {
@@ -140,76 +142,77 @@ export function QueryTab({ onSwitchToManage }: QueryTabProps) {
 
   return (
     <div className="space-y-4">
-      {/* 搜索区域 */}
-      <Card>
+      <Card className="lt-alta-query-card">
         <CardHeader>
-          <CardTitle>HS Code查询</CardTitle>
-          <CardDescription>输入HS编码查询其禁运状态</CardDescription>
+          <CardTitle>HS Code 禁运条目检查</CardTitle>
+          <CardDescription>按选定编码位数匹配本地 Alta 数据，结果保留原始条目和例外提示</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="请输入HS编码，如：0101210000"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="flex-1"
-              />
-              <Select
-                value={matchLength?.toString() || 'full'}
-                onValueChange={(value) => setMatchLength(value === 'full' ? undefined : parseInt(value))}
-              >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="匹配位数" />
-                </SelectTrigger>
+        <CardContent className="space-y-3">
+          <div className="lt-alta-search-fields">
+            <div className="lt-alta-input-field">
+              <label htmlFor="alta-hs-code">商品编码 <span>HS Code</span></label>
+              <div className="lt-alta-input-wrap">
+                <Search size={17} aria-hidden="true"/>
+                <Input id="alta-hs-code" placeholder="例如：0101210000" value={code}
+                  inputMode="numeric" maxLength={24} aria-invalid={!!inputError}
+                  aria-describedby={inputError ? 'alta-input-error' : 'alta-code-help'}
+                  onChange={e => {setCode(e.target.value);setResult(null);setInputError('');setQueryError('');setHasSearched(false);}}
+                  onKeyDown={handleKeyPress}/>
+                {code && <button type="button" aria-label="清空编码" onClick={() => {
+                  setCode('');setResult(null);setInputError('');setQueryError('');setHasSearched(false);
+                }}><X size={16}/></button>}
+              </div>
+            </div>
+            <div className="lt-alta-match-field">
+              <label htmlFor="alta-match-length">匹配位数</label>
+              <Select value={matchLength?.toString() || 'full'} onValueChange={v => {
+                setMatchLength(v === 'full' ? undefined : Number(v));setResult(null);setInputError('');setHasSearched(false);
+              }}>
+                <SelectTrigger id="alta-match-length"><SelectValue placeholder="匹配位数"/></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="4">4位匹配</SelectItem>
-                  <SelectItem value="6">6位匹配</SelectItem>
-                  <SelectItem value="8">8位匹配</SelectItem>
-                  <SelectItem value="full">完全匹配</SelectItem>
+                  <SelectItem value="4">4 位匹配</SelectItem>
+                  <SelectItem value="6">6 位匹配</SelectItem>
+                  <SelectItem value="8">8 位匹配</SelectItem>
+                  <SelectItem value="full">完整编码</SelectItem>
                 </SelectContent>
               </Select>
-              <Button onClick={handleQuery} disabled={loading || !code.trim()}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    查询中
-                  </>
-                ) : (
-                  <>
-                    <Search className="mr-2 h-4 w-4" />
-                    查询
-                  </>
-                )}
-              </Button>
             </div>
+            <Button className="lt-alta-submit" onClick={handleQuery} disabled={loading || !code.trim()}>
+              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>查询中…</> :
+                <><Search className="mr-2 h-4 w-4"/>检查禁运</>}
+            </Button>
           </div>
+          <p className="lt-alta-form-note" id="alta-code-help">默认按前 6 位匹配。4 / 6 / 8 位或完整编码匹配范围不同，请结合原始条目和例外条件判断。</p>
+          {inputError && <p id="alta-input-error" className="lt-alta-input-error" role="alert">{inputError}</p>}
+          {queryError && <p className="lt-alta-input-error" role="alert">{queryError}</p>}
         </CardContent>
       </Card>
+      {!result && !hasSearched && !queryError &&
+        <div className="lt-alta-idle">
+          <img src="/illustrations/alta-inspection.svg" alt="" aria-hidden="true"/>
+          <div><strong>输入商品编码，即可开始检查</strong><p>结果将展示匹配编码、匹配级别及例外信息；未命中不等于全面合规。</p></div>
+        </div>}
 
       {/* 结果显示 */}
       {result && (
-        <Card>
+        <Card className="lt-alta-result-card">
           <CardHeader>
-            <CardTitle>查询结果</CardTitle>
-            <CardDescription>HS Code: {result.code}</CardDescription>
+            <CardTitle>查询结果 · {result.code}</CardTitle>
+            <CardDescription>匹配级别：{matchLength == null ? '完整编码' : `${matchLength} 位`} · 匹配条目 {result.matched_items?.length || 0} 项</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* 状态显示 */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">状态：</span>
-                <span
-                  className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
-                    result.status === 'forbidden'
-                      ? 'bg-destructive/20 text-destructive'
-                      : 'bg-success-subtle text-success-subtle-fg'
-                  }`}
-                >
-                  {result.description === '无效的HS编码' || result.description.startsWith('编码长度不足')
-                  ? '⚠ 编码无效' : result.status === 'forbidden' ? '命中禁运条目' : '未命中禁运条目'}
+              <div className={`lt-alta-verdict ${result.status === 'forbidden' ? 'lt-alta-verdict--hit' : 'lt-alta-verdict--clear'}`}>
+                <span className="lt-alta-verdict-icon">
+                  {result.status === 'forbidden' ? <ShieldAlert size={24}/> : <CheckCircle2 size={24}/>}
                 </span>
+                <div>
+                  <strong>{result.description === '无效的HS编码' || result.description.startsWith('编码长度不足')
+                    ? '编码无效' : result.status === 'forbidden' ? '命中禁运条目' : '当前数据库未命中'}</strong>
+                  <p>{result.status === 'forbidden'
+                    ? '至少存在一条匹配的限制记录。请核对商品说明、例外条款与实际适用条件。'
+                    : '未找到当前匹配级别的禁运条目。这不是货物全面合规或允许出口的结论。'}</p>
+                </div>
               </div>
 
               <p className="text-xs text-muted-foreground">
@@ -226,7 +229,7 @@ export function QueryTab({ onSwitchToManage }: QueryTabProps) {
               {result.matched_items && result.matched_items.length > 0 && (
                 <div>
                   <span className="text-sm font-medium">匹配项：</span>
-                  <Table className="mt-2">
+                  <div className="lt-alta-result-table"><Table className="mt-2">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[140px]">编码</TableHead>
@@ -243,7 +246,7 @@ export function QueryTab({ onSwitchToManage }: QueryTabProps) {
                         return (
                           <TableRow key={index}>
                             <TableCell className="font-mono">{item.code}</TableCell>
-                            <TableCell className="max-w-[300px] truncate" title={item.description}>
+                            <TableCell className="max-w-[380px] whitespace-normal break-words leading-6" title={item.description}>
                               {item.description}
                             </TableCell>
                             <TableCell>{item.level}位匹配</TableCell>
@@ -276,7 +279,7 @@ export function QueryTab({ onSwitchToManage }: QueryTabProps) {
                         );
                       })}
                     </TableBody>
-                  </Table>
+                  </Table></div>
                 </div>
               )}
             </div>
