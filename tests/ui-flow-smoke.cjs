@@ -27,7 +27,9 @@ const BASE = 'http://127.0.0.1:1420';
           switch (command) {
             case 'plugin:event|listen': return 1;
             case 'plugin:event|unlisten': return null;
-            case 'signed_updater_available': return window.location.search.includes('mode=signed');
+            case 'signed_updater_available':
+              if (window.location.search.includes('mode=unknown')) return null;
+              return window.location.search.includes('mode=signed');
             case 'plugin:updater|check': return {
               rid: 41, currentVersion: '0.0.13', version: '0.0.14',
               date: '2026-10-14T10:00:00Z', body: '签名更新测试', rawJson: {}
@@ -170,6 +172,13 @@ const BASE = 'http://127.0.0.1:1420';
       const finalCalls = await page.evaluate(() => window.__liaoBridgeCalls);
       assert(finalCalls.some(call => call.command === 'install_update' && call.payload.silent === false),
         'update should never silently install without consent');
+    });
+    await scenario('signed-mode-unknown-fails-closed', '/updates?mode=unknown', async page => {
+      await page.getByRole('heading', { name: '应用更新' }).waitFor();
+      await page.getByText('无法确认客户端更新签名状态').first().waitFor();
+      const calls = await page.evaluate(() => window.__liaoBridgeCalls);
+      assert(!calls.some(call => call.command === 'check_for_updates' || call.command === 'download_update'),
+        'updater must not choose the unsigned channel when signed mode inspection fails');
     });
     await scenario('official-signed-update', '/updates?mode=signed', async page => {
       await page.getByRole('heading', { name: '发现可用的新版本' }).waitFor();

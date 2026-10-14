@@ -41,8 +41,16 @@ let checkingMode: Promise<boolean> | null = null;
 /** The signed channel is enabled solely by the trusted key baked into the Rust binary. */
 export function signedUpdaterAvailable(): Promise<boolean> {
   if (!checkingMode) {
-    checkingMode = invoke<boolean>('signed_updater_available')
-      .then(Boolean).catch(() => false);
+    checkingMode = invoke<unknown>('signed_updater_available')
+      .then(value => {
+        if (typeof value !== 'boolean') {
+          throw new Error('无法确认客户端更新签名状态，已停止更新操作以避免降级。');
+        }
+        return value;
+      }).catch(error => {
+        checkingMode = null; // Retry mode inspection next time; never assume unsigned.
+        throw error;
+      });
   }
   return checkingMode;
 }
