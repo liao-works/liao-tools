@@ -29,6 +29,21 @@ const BASE = 'http://127.0.0.1:1420';
             case 'plugin:event|unlisten': return null;
             case 'plugin:dialog|open': return 'C:/fixtures/source.xlsx';
             case 'plugin:dialog|save': return 'C:/fixtures/template.xlsx';
+            case 'load_update_settings':
+              return { auto_check: true, last_check_time: 0, check_interval_hours: 24 };
+            case 'save_update_settings': return null;
+            case 'update_last_check_time': return null;
+            case 'check_for_updates':
+              return {
+                current_version: '0.0.13', latest_version: '0.0.14',
+                has_update: true, published_at: '2026-10-13T08:00:00Z',
+                release_notes: '修复本地文件处理与更新提示',
+                download_url: 'https://github.com/liao-works/liao-tools/releases',
+                platform_specific_url: 'https://github.com/liao-works/liao-tools/releases/download/v0.0.14/liao-tools_x64-setup.exe',
+                checksum_sha256: 'a'.repeat(64), file_size: 1024 * 1024
+              };
+            case 'download_update': return 'C:/Temp/liao-tools-update/liao-tools_0.0.14.exe';
+            case 'install_update': return '安装程序已启动';
             case 'tax_has_local_data': return true;
             case 'tax_get_local_version': return { version: 'mock-v1', records: 812 };
             case 'tax_exact_search': return {
@@ -94,7 +109,7 @@ const BASE = 'http://127.0.0.1:1420';
       await page.locator('#lt-hs-input').fill('0101-210 000');
       await page.getByRole('button', { name: '开始查询' }).click();
       await page.getByText('商品与税率详情').waitFor();
-      await page.getByText('来源与核验').waitFor();
+      await page.locator('.lt-tax-sources').getByRole('heading', { name: '来源与核验' }).waitFor();
       const calls = await page.evaluate(() => window.__liaoBridgeCalls);
       assert(calls.some(call => call.command === 'tax_exact_search' && call.payload.code === '0101210000'),
         'tax backend must receive normalized numeric code');
@@ -132,6 +147,19 @@ const BASE = 'http://127.0.0.1:1420';
       await page.getByRole('button', { name: '详情' }).first().click();
       await page.getByRole('dialog').getByText('商品信息详情').waitFor();
       await page.getByRole('dialog').getByText('回归测试商品详情').waitFor();
+    });
+    await scenario('secure-update-center', '/updates', async page => {
+      await page.getByRole('heading', { name: '发现可用的新版本' }).waitFor();
+      await page.getByRole('button', { name: '下载并验证更新' }).click();
+      await page.getByText('下载完成，完整性校验通过').waitFor();
+      const calls = await page.evaluate(() => window.__liaoBridgeCalls);
+      assert(calls.some(call => call.command === 'download_update' &&
+        call.payload.checksumSha256 === 'a'.repeat(64)), 'download must supply official digest');
+      await page.getByRole('button', { name: '打开系统安装程序' }).click();
+      await page.getByText('安装程序已启动').first().waitFor();
+      const finalCalls = await page.evaluate(() => window.__liaoBridgeCalls);
+      assert(finalCalls.some(call => call.command === 'install_update' && call.payload.silent === false),
+        'update should never silently install without consent');
     });
     console.log('PASS all ' + passed + ' mocked native-bridge browser scenarios');
   } finally {

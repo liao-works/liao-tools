@@ -49,13 +49,18 @@ jobs:
           /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/revcal ui-screenshots/amazon-desktop.png
           /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/alta ui-screenshots/alta-compact.png
           /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/ups-dpd ui-screenshots/shipping-compact.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/updates ui-screenshots/updates-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/updates ui-screenshots/updates-compact.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/settings ui-screenshots/settings-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/system-tools ui-screenshots/tools-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/todo ui-screenshots/todo-desktop.png
       - name: Mocked Tauri browser flows
         run: node tests/ui-flow-smoke.cjs
       - name: Upload visual review images
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: liao-ui-r6-screenshots
+          name: liao-ui-r8-screenshots
           path: ui-screenshots/*.png
           if-no-files-found: warn
           retention-days: 14
