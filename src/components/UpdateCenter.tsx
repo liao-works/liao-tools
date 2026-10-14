@@ -45,6 +45,7 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
   const [error, setError] = useState('');
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [downloadPath, setDownloadPath] = useState('');
+  const [installerMessage, setInstallerMessage] = useState('');
   const started = useRef(false);
   const busy = phase === 'checking' || phase === 'downloading' || phase === 'launching';
 
@@ -57,7 +58,7 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
   }, []);
 
   const check = useCallback(async () => {
-    setPhase('checking'); setError(''); setInfo(null); setDownloadPath(''); setProgress(null);
+    setPhase('checking'); setError(''); setInfo(null); setDownloadPath(''); setProgress(null); setInstallerMessage('');
     try {
       const next = await checkForUpdates();
       setInfo(next);
@@ -116,7 +117,8 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
     try {
       // Always show the OS installer. Starting an installer is NOT equivalent
       // to successful installation; never claim "installed" here.
-      await installUpdate(downloadPath, false);
+      const message = await installUpdate(downloadPath, false);
+      setInstallerMessage(message);
       setPhase('launched');
     } catch (err) {
       setPhase('error'); setError(friendlyError(err));
@@ -183,8 +185,8 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
         <p>安装包已验证，现在可以打开系统安装程序。升级完成后可能需要重新启动应用。</p>
       </div></div>}
     {phase === 'launched' && <div className="lt-update-status lt-update-status--good" role="status">
-      <CheckCircle2 size={20}/><div><strong>安装程序已启动</strong>
-        <p>请按照系统提示完成升级。这里不会将“已启动安装程序”误报为“安装完成”。</p>
+      <CheckCircle2 size={20}/><div><strong>安装包已打开</strong>
+        <p>{installerMessage || '请按照系统提示完成升级。启动安装程序不代表升级已经完成。'}</p>
       </div></div>}
     {error && <div className="lt-update-status lt-update-status--error" role="alert">
       <AlertTriangle size={20}/><div><strong>更新操作未完成</strong><p>{error}</p></div>

@@ -394,8 +394,14 @@ pub async fn install_update(file_path: String, silent: bool) -> Result<String, C
         )),
     };
 
-    // Launching an installer does not prove the OS upgrade is complete.
-    result.map(|_| "安装程序已启动，请按照系统提示完成升级".to_string())
+    // Opening a macOS DMG merely mounts an image; it does not install the app.
+    // Likewise, launching Windows setup is not proof of completed installation.
+    result.map(|_| match platform_info.os_family.as_str() {
+        "macos" => "DMG 已打开。请在 Finder 中将 Liao Tools 拖入“应用程序”文件夹，完成后重新启动应用。",
+        "windows" => "安装程序已启动。请按系统提示完成升级，然后重新启动 Liao Tools。",
+        "linux" => "已启动系统安装操作。请根据安装程序提示完成升级。",
+        _ => "已打开更新包，请根据系统提示完成安装。",
+    }.to_string())
 }
 
 /// 安装 macOS DMG
