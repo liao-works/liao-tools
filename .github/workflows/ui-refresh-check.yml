@@ -18,6 +18,8 @@ on:
       - 'tests/verify-signed-release-manifest.test.cjs'
       - 'tests/release-workflow-contract.test.cjs'
       - 'tests/signed-release-cli-rehearsal.test.cjs'
+      - 'scripts/release-version-gate.cjs'
+      - 'tests/release-version-gate.test.cjs'
   workflow_dispatch:
 jobs:
   frontend:
@@ -37,4 +39,5 @@ jobs:
       - run: node --test tests/verify-release-assets.test.cjs tests/build-signed-updater-manifest.test.cjs tests/prepare-signed-release.test.cjs tests/verify-signed-release-manifest.test.cjs
       - run: node --test tests/release-workflow-contract.test.cjs
       - run: node --test tests/signed-release-cli-rehearsal.test.cjs
+      - run: node --test tests/release-version-gate.test.cjs
       - run: pnpm run build

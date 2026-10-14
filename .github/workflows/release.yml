@@ -10,7 +10,8 @@ permissions:
 
 # Do not let two release jobs overwrite the same Draft Release assets.
 concurrency:
-  group: liao-tools-release-${{ github.ref }}
+  # Global serial publication: a v0.0.15 release must not overtake v0.0.14.
+  group: liao-tools-release-all-versions
   cancel-in-progress: false
 
 jobs:
@@ -60,6 +61,15 @@ jobs:
             echo "::error::This tag does not point to a commit reachable from master."
             exit 1
           fi
+
+      - name: Reject downgrade or duplicate stable release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > "${RUNNER_TEMP}/published-releases.json"
+          node scripts/release-version-gate.cjs "${GITHUB_REF_NAME}" "${RUNNER_TEMP}/published-releases.json"
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
@@ -193,6 +203,15 @@ jobs:
             echo "::error::Tag commit is not reachable from master; publication blocked."
             exit 1
           fi
+      - name: Reject downgrade or duplicate stable release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > "${RUNNER_TEMP}/published-releases.json"
+          node scripts/release-version-gate.cjs "${GITHUB_REF_NAME}" "${RUNNER_TEMP}/published-releases.json"
+
       - name: Consolidate the complete signed updater manifest
         if: vars.REQUIRE_SIGNED_UPDATER == 'true'
         shell: bash

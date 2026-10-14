@@ -29,3 +29,11 @@ test('release only builds and publishes commits reachable from reviewed master',
   assert.match(yml, /fetch-depth:\s*0/);
   assert.match(yml, /cancel-in-progress:\s*false/);
 });
+
+test('publishing requires strictly increasing stable versions before and after builds', () => {
+  assert.equal((yml.match(/node scripts\/release-version-gate\.cjs/g) || []).length, 2);
+  assert.match(yml, /group:\s*liao-tools-release-all-versions/);
+  assert.match(yml, /gh api --paginate --slurp/);
+  assert(yml.indexOf('node scripts/release-version-gate.cjs') < yml.indexOf('uses: tauri-apps/tauri-action@v0'));
+  assert(yml.lastIndexOf('node scripts/release-version-gate.cjs') < yml.indexOf('await github.rest.repos.updateRelease'));
+});
