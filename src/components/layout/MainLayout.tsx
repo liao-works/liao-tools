@@ -1,71 +1,72 @@
 import { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, Search, Moon, Sun } from 'lucide-react';
 import { Sidebar } from './Sidebar';
+import { CommandPalette } from './CommandPalette';
 import { UpdateDialog } from '@/components/UpdateDialog';
 import { checkForUpdates, loadUpdateSettings, updateLastCheckTime } from '@/lib/updater';
+import { useDarkMode } from '@/hooks/use-dark-mode';
 
 export function MainLayout() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [autoUpdateDialogOpen, setAutoUpdateDialogOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('lt-sidebar-collapsed') === '1');
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [autoUpdateOpen, setAutoUpdateOpen] = useState(false);
+  const { isDark, toggleDarkMode } = useDarkMode();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // 应用启动时自动检查更新
+  useEffect(() => { localStorage.setItem('lt-sidebar-collapsed', collapsed ? '1' : '0'); }, [collapsed]);
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
   useEffect(() => {
-    const autoCheckUpdate = async () => {
-      try {
-        const settings = await loadUpdateSettings();
-
-        // 如果未启用自动检查，直接返回
-        if (!settings.auto_check) {
-          return;
-        }
-
-        // 检查是否应该检查更新（基于时间间隔）
-        const now = Math.floor(Date.now() / 1000);
-        const elapsed_hours = (now - settings.last_check_time) / 3600;
-        const interval = settings.check_interval_hours || 24;
-
-        if (elapsed_hours < interval) {
-          console.log(`距离上次检查仅 ${elapsed_hours.toFixed(1)} 小时，跳过自动检查`);
-          return;
-        }
-
-        console.log('开始自动检查更新...');
-        const updateInfo = await checkForUpdates();
-        await updateLastCheckTime();
-
-        // 如果有更新，显示对话框
-        if (updateInfo.has_update) {
-          setAutoUpdateDialogOpen(true);
-        }
-      } catch (error) {
-        console.error('自动检查更新失败:', error);
-      }
+    const handler = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault(); event.stopPropagation(); setCommandOpen(x => !x);
+      } else if (event.key === 'Escape') setCommandOpen(false);
     };
-
-    // 延迟3秒后执行，避免影响应用启动速度
-    const timer = setTimeout(autoCheckUpdate, 3000);
-    return () => clearTimeout(timer);
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, []);
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const cfg = await loadUpdateSettings();
+        if (!cfg.auto_check) return;
+        const elapsed = (Math.floor(Date.now()/1000) - cfg.last_check_time)/3600;
+        if (elapsed < (cfg.check_interval_hours || 24)) return;
+        const info = await checkForUpdates();
+        await updateLastCheckTime();
+        if (info.has_update) setAutoUpdateOpen(true);
+      } catch (error) { console.error('更新检查失败', error); }
+    };
+    const timer = window.setTimeout(() => { void check(); }, 3000);
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {/* 侧边栏 */}
-      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-
-      {/* 主内容区 */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* 页面内容 */}
-        <main className="flex-1 min-h-0 overflow-y-auto p-8">
-          <Outlet />
-        </main>
+    <div className="lt-app">
+      {mobileOpen && <button className="lt-mobile-scrim" type="button" onClick={() => setMobileOpen(false)} aria-label="关闭导航"/>}
+      <div className={['lt-sidebar-host', mobileOpen ? 'lt-sidebar-host--open' : ''].join(' ')}>
+        <Sidebar collapsed={collapsed && !mobileOpen} onToggle={() => setCollapsed(x => !x)}
+          onNavigate={() => setMobileOpen(false)}/>
       </div>
-
-      {/* 自动检查更新对话框 */}
-      <UpdateDialog
-        open={autoUpdateDialogOpen}
-        onOpenChange={setAutoUpdateDialogOpen}
-        autoCheck={true}
-      />
+      <div className="lt-main">
+        <header className="lt-topbar">
+          <button type="button" className="lt-icon-button lt-mobile-menu" aria-label="展开导航" onClick={() => setMobileOpen(true)}><Menu size={20}/></button>
+          <button type="button" className="lt-top-search" onClick={() => setCommandOpen(true)}>
+            <Search size={17}/><span>搜索工具、查询 HS Code、快速打开功能…</span><kbd>Ctrl K</kbd>
+          </button>
+          <div className="lt-top-actions">
+            <span className="lt-local-note"><i/>本地桌面工具</span>
+            <button type="button" className="lt-icon-button" title={isDark ? '切换到浅色模式' : '切换到深色模式'}
+              onClick={toggleDarkMode}>{isDark ? <Sun size={18}/> : <Moon size={18}/>}</button>
+            <button type="button" className="lt-avatar" title="偏好设置" onClick={() => navigate('/settings')}>L</button>
+          </div>
+        </header>
+        <main className="lt-content" id="main-content"><Outlet/></main>
+      </div>
+      <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)}/>
+      <UpdateDialog open={autoUpdateOpen} onOpenChange={setAutoUpdateOpen} autoCheck/>
     </div>
   );
 }
