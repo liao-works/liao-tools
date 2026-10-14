@@ -8,7 +8,7 @@ interface ThemeStore {
   changeTheme: (themeId: string) => void;
 }
 
-const DEFAULT_THEME_ID = 'default-dark';
+const DEFAULT_THEME_ID = 'warm-coral';
 
 export const useThemeStore = create<ThemeStore>()(
   persist(
