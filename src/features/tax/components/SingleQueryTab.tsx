@@ -11,6 +11,7 @@ import { listen } from '@tauri-apps/api/event';
 import type { TaxTariff } from '@/types';
 import { TaxResultDetail } from './TaxResultDetail';
 import { Link } from 'react-router-dom';
+import { validateTaxHsCode } from '@/lib/hs-code';
 
 interface UpdateLog {
   code: string;
@@ -144,9 +145,9 @@ export function SingleQueryTab() {
   }, []);
 
   const handleSearch = async () => {
-    const normalized = code.replace(/[\\s-]/g, '');
-    if (!(fuzzyMode ? /^\\d{4,10}$/ : /^\\d{10}$/).test(normalized)) {
-      setInputError(fuzzyMode ? '模糊查询需要 4–10 位数字编码。' : '精确查询需要完整 10 位数字商品编码。');
+    const validation = validateTaxHsCode(code, fuzzyMode);
+    if (!validation.ok) {
+      setInputError(validation.message);
       return;
     }
     setInputError('');
@@ -157,10 +158,10 @@ export function SingleQueryTab() {
 
     try {
       if (fuzzyMode) {
-        const data = await taxApi.fuzzySearch(code);
+        const data = await taxApi.fuzzySearch(validation.code);
         setResults(data);
       } else {
-        const data = await taxApi.exactSearch(code);
+        const data = await taxApi.exactSearch(validation.code);
         setResults(data ? [data] : []);
       }
     } catch (error) {

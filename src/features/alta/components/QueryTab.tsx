@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { altaApi } from '@/lib/api/alta';
 import type { AltaQueryResult } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { validateAltaHsCode } from '@/lib/hs-code';
 
 /**
  * 解析原始文本，获取主编码和例外编码
@@ -80,11 +81,9 @@ export function QueryTab({ onSwitchToManage }: QueryTabProps) {
   const { toast } = useToast();
 
   const handleQuery = async () => {
-    const normalized = code.replace(/[\\s-]/g, '');
-    if (!/^\\d{4,10}$/.test(normalized) || (matchLength != null && normalized.length < matchLength)) {
-      setInputError(matchLength != null
-        ? `请输入至少 ${matchLength} 位、最多 10 位的数字编码。`
-        : '请输入 4–10 位有效的数字编码。');
+    const validation = validateAltaHsCode(code, matchLength);
+    if (!validation.ok) {
+      setInputError(validation.message);
       return;
     }
     setLoading(true);
@@ -93,7 +92,7 @@ export function QueryTab({ onSwitchToManage }: QueryTabProps) {
     setHasSearched(true);
     setResult(null);
     try {
-      const data = await altaApi.querySingle(normalized, matchLength);
+      const data = await altaApi.querySingle(validation.code, matchLength);
 
       setResult(data);
     } catch (error: any) {
