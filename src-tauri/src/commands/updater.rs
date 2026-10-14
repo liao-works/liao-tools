@@ -13,6 +13,8 @@ const GITHUB_REPO: &str = "liao-works/liao-tools";
 const GITHUB_API_URL: &str = "https://api.github.com/repos/liao-works/liao-tools/releases/latest";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_CHECK_INTERVAL_HOURS: u64 = 24;
+/// Serializes download/install commands across windows, including the update modal and update page.
+static UPDATE_OPERATION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 // 可选的 GitHub Token（用于访问私有仓库）
 fn get_github_token() -> Option<String> {
@@ -110,12 +112,14 @@ pub fn get_platform_info_impl() -> PlatformInfo {
 /// 获取平台特定的下载 URL
 fn get_platform_download_url(assets: &[GitHubAsset]) -> Result<Option<String>, CommandError> {
     let platform_info = get_platform_info_impl();
-    
-    // 严格匹配当前操作系统和架构，不允许以泛化的 .exe 等格式回退。
-    let arch = platform_info.arch.as_str();
+    get_platform_download_url_for(assets, &platform_info.os_family, &platform_info.arch)
+}
+
+fn get_platform_download_url_for(assets: &[GitHubAsset], platform: &str, arch: &str) -> Result<Option<String>, CommandError> {
+    // Strict OS/architecture matching; never fall back to a generic executable name.
     let mut matching: Vec<&GitHubAsset> = assets.iter().filter(|asset| {
         let name = asset.name.to_ascii_lowercase();
-        match platform_info.os_family.as_str() {
+        match platform {
             "windows" if arch == "x86_64" =>
                 (name.ends_with(".exe") || name.ends_with(".msi"))
                     && (name.contains("x64") || name.contains("x86_64") || name.contains("amd64"))
@@ -196,6 +200,7 @@ fn get_download_dir() -> Result<PathBuf, CommandError> {
 pub async fn download_update(
     url: String, version: String, checksum_sha256: String, app: tauri::AppHandle
 ) -> Result<String, CommandError> {
+    let _guard = UPDATE_OPERATION_LOCK.lock().await;
     if version.is_empty() || version.len() > 64
         || !version.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-') {
         return Err(CommandError::new("更新版本号非法", "INVALID_VERSION"));
@@ -278,7 +283,8 @@ pub async fn download_update(
 
 /// 安装更新
 #[tauri::command]
-pub async fn install_update(file_path: String, silent: bool, app: tauri::AppHandle) -> Result<String, CommandError> {
+pub async fn install_update(file_path: String, silent: bool) -> Result<String, CommandError> {
+    let _guard = UPDATE_OPERATION_LOCK.lock().await;
     if silent {
         return Err(CommandError::new(
             "当前版本不支持无人值守静默安装，请使用系统安装程序完成升级",
@@ -303,6 +309,29 @@ pub async fn install_update(file_path: String, silent: bool, app: tauri::AppHand
     let sha = sha.trim();
     if sha.len() != 64 || !sha.bytes().all(|b| b.is_ascii_hexdigit()) || file_sha256(&target)? != sha {
         return Err(CommandError::new("安装包校验失败，已拒绝执行", "INTEGRITY_ERROR"));
+    }
+
+    // The sidecar checksum file is writable on disk and cannot be trusted as an
+    // independent authority. Re-check official GitHub asset digest, size and
+    // release-version-specific filename at INSTALL time, not only download time.
+    let official = check_for_updates().await?;
+    let official_url = official.platform_specific_url.as_deref()
+        .ok_or_else(|| CommandError::new("官方 Release 缺少当前平台的安装包", "UNTRUSTED_RELEASE"))?;
+    let extension = [".exe", ".msi", ".dmg", ".AppImage", ".deb"]
+        .iter().copied().find(|ext| official_url.ends_with(ext))
+        .ok_or_else(|| CommandError::new("官方安装包格式不支持", "UNSUPPORTED_FORMAT"))?;
+    let expected_name = format!("liao-tools_{}{}", official.latest_version, extension);
+    let current_name = target.file_name().and_then(|name| name.to_str()).unwrap_or("");
+    let actual_size = fs::metadata(&target)
+        .map_err(|e| CommandError::new(format!("读取安装包大小失败: {}", e), "IO_ERROR"))?.len();
+    if !official.has_update || current_name != expected_name
+        || official.checksum_sha256.as_deref() != Some(sha)
+        || official.file_size != Some(actual_size)
+    {
+        return Err(CommandError::new(
+            "安装包与当前 GitHub 官方 Release 的版本、大小或 SHA-256 不一致",
+            "UNTRUSTED_RELEASE"
+        ));
     }
     let path = target.as_path();
 
@@ -357,25 +386,8 @@ pub async fn install_update(file_path: String, silent: bool, app: tauri::AppHand
         )),
     };
 
-    // 如果安装成功且是静默模式，发送安装完成事件
-    if result.is_ok() && silent {
-        // 发送安装完成事件
-        app.emit("install-complete", serde_json::json!({
-            "success": true,
-            "message": "安装完成",
-            "needs_restart": true
-        }))
-        .map_err(|e| CommandError::new(
-            format!("发送安装完成事件失败: {}", e),
-            "EMIT_ERROR"
-        ))?;
-
-        return Ok("安装完成".to_string());
-    }
-
-    result.map(|_| {
-        "安装程序已启动，请按照提示完成安装".to_string()
-    })
+    // Launching an installer does not prove the OS upgrade is complete.
+    result.map(|_| "安装程序已启动，请按照系统提示完成升级".to_string())
 }
 
 /// 安装 macOS DMG
@@ -827,6 +839,55 @@ mod tests {
         assert!(compare_versions("v1.2.4", "1.2.3"));
         assert!(!compare_versions("1.2.invalid", "1.2.3"));
         assert!(!compare_versions("1.2.4-beta", "1.2.3"));
+    }
+
+    #[test]
+    fn release_asset_matching_rejects_wrong_architecture() {
+        fn asset(name: &str) -> GitHubAsset {
+            GitHubAsset {
+                name: name.to_string(),
+                browser_download_url: format!("https://github.com/test/releases/download/v1/{}", name),
+                size: 150,
+                digest: None,
+            }
+        }
+        let list = vec![
+            asset("liao-tools_1.0.0_aarch64.dmg"),
+            asset("liao-tools_1.0.0_x64.dmg"),
+            asset("liao-tools_1.0.0_universal.dmg"),
+            asset("liao-tools_1.0.0_x64-setup.exe"),
+            asset("liao-tools_1.0.0_arm64-setup.exe"),
+        ];
+        let windows_x64 = get_platform_download_url_for(&list, "windows", "x86_64").unwrap().unwrap();
+        assert!(windows_x64.ends_with("_x64-setup.exe"));
+        let windows_arm = get_platform_download_url_for(&list, "windows", "aarch64").unwrap().unwrap();
+        assert!(windows_arm.ends_with("_arm64-setup.exe"));
+        let mac_arm = get_platform_download_url_for(&list, "macos", "aarch64").unwrap().unwrap();
+        assert!(mac_arm.ends_with("_aarch64.dmg"));
+        let mac_intel = get_platform_download_url_for(&list, "macos", "x86_64").unwrap().unwrap();
+        assert!(mac_intel.ends_with("_x64.dmg"));
+        assert!(get_platform_download_url_for(&list, "linux", "x86_64").unwrap().is_none());
+    }
+
+    #[test]
+    fn release_digest_must_be_valid_sha256() {
+        let mut asset = GitHubAsset {
+            name: "test.dmg".to_string(), browser_download_url: "https://example.org/test.dmg".to_string(),
+            size: 100, digest: Some(format!("sha256:{}", "a".repeat(64))),
+        };
+        assert_eq!(validated_digest(&asset), Some("a".repeat(64)));
+        asset.digest = Some("sha256:invalid".to_string());
+        assert!(validated_digest(&asset).is_none());
+        asset.digest = Some(format!("sha1:{}", "f".repeat(64)));
+        assert!(validated_digest(&asset).is_none());
+    }
+
+    #[test]
+    fn local_sha256_has_expected_value() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        fs::write(file.path(), b"hello").unwrap();
+        assert_eq!(file_sha256(file.path()).unwrap(),
+            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
     }
 
     #[test]
