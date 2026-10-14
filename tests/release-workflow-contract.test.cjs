@@ -22,3 +22,10 @@ test('unsigned releases cannot turn on signed mode without required configured k
   assert.match(yml,/vars\.REQUIRE_SIGNED_UPDATER/);
   assert.doesNotMatch(yml,/git push origin HEAD:master/);
 });
+
+test('release only builds and publishes commits reachable from reviewed master', () => {
+  assert.match(yml, /git merge-base --is-ancestor HEAD refs\/remotes\/origin\/master/g);
+  assert.equal((yml.match(/git merge-base --is-ancestor HEAD refs\/remotes\/origin\/master/g) || []).length, 2);
+  assert.match(yml, /fetch-depth:\s*0/);
+  assert.match(yml, /cancel-in-progress:\s*false/);
+});
