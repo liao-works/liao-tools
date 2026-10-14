@@ -27,6 +27,8 @@ pub struct AppState {
     pub db: Arc<Mutex<DatabaseManager>>,
     pub matcher: Arc<Mutex<HSCodeMatcher>>,
     pub db_path: Arc<Mutex<PathBuf>>,
+    /// revcal 公开接口客户端（全局复用连接池，避免每码重新 TLS 握手）
+    pub revcal_client: Arc<commands::revcal::api::RevCalClient>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -67,10 +69,15 @@ pub fn run() {
             let matcher = Arc::new(Mutex::new(HSCodeMatcher::new(db.clone())));
 
             // 创建应用状态
+            let revcal_client = Arc::new(
+                commands::revcal::api::RevCalClient::new()
+                    .expect("Failed to create revcal client"),
+            );
             let state = AppState {
                 db,
                 matcher,
                 db_path: Arc::new(Mutex::new(db_path)),
+                revcal_client,
             };
 
             // 设置状态
@@ -98,7 +105,14 @@ pub fn run() {
             tax_batch_query,
             tax_download_template,
             tax_check_update,
+            tax_has_local_data,
+            tax_get_local_version,
             tax_download_update,
+            tax_import_preview,
+            tax_preview_lookup,
+            tax_verify_signed_review,
+            tax_read_ni_review,
+            tax_has_signed_review_trust_key,
             tax_open_url,
             tax_update_single_row,
             // Update history commands

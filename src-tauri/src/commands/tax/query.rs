@@ -9,6 +9,9 @@ impl TaxQuery {
     /// 精确查询
     pub fn exact_search(db: &TaxDatabase, code: &str) -> Result<Option<TaxTariff>> {
         let normalized_code = Self::normalize_code(code);
+        if normalized_code.len() != 10 {
+            return Ok(None);
+        }
         let mut result = db.get_tariff(&normalized_code)?;
         
         if let Some(ref mut tariff) = result {
@@ -22,7 +25,7 @@ impl TaxQuery {
     pub fn fuzzy_search(db: &TaxDatabase, query: &str, limit: usize) -> Result<Vec<TaxTariff>> {
         let normalized_query = Self::normalize_code(query);
         
-        if normalized_query.is_empty() {
+        if normalized_query.len() < 4 || normalized_query.len() > 10 {
             return Ok(Vec::new());
         }
         
@@ -83,6 +86,10 @@ impl TaxQuery {
     
     /// 标准化编码（只保留数字）
     fn normalize_code(code: &str) -> String {
+        // Never silently erase letters/symbols and match a different HS code.
+        if code.chars().any(|c| !c.is_ascii_digit() && c != '-' && !c.is_ascii_whitespace()) {
+            return String::new();
+        }
         code.chars().filter(|c| c.is_ascii_digit()).collect()
     }
 }
@@ -95,7 +102,7 @@ mod tests {
     fn test_normalize_code() {
         assert_eq!(TaxQuery::normalize_code("0101-210-000"), "0101210000");
         assert_eq!(TaxQuery::normalize_code("0101 210 000"), "0101210000");
-        assert_eq!(TaxQuery::normalize_code("abc0101210000xyz"), "0101210000");
+        assert_eq!(TaxQuery::normalize_code("abc0101210000xyz"), "");
     }
     
     #[test]

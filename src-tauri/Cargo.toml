@@ -25,9 +25,14 @@ tauri-plugin-store = "2"
 tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
+ed25519-dalek = "2.2"
 
 # HTTP 请求（异步）
 reqwest = { version = "0.11", features = ["json", "stream"] }
+# 浏览器 TLS 指纹模拟（revcal 专用，模拟 Chrome 绕过 Amazon 边缘节点指纹检测）
+wreq = { version = "0.16.1", features = ["json"] }
+wreq-util = "0.2"
 
 # HTML 解析
 scraper = "0.20"

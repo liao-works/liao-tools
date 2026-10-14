@@ -3,6 +3,9 @@ pub mod database;
 pub mod downloader;
 pub mod excel;
 pub mod query;
+pub mod preview;
+pub mod ni_review;
 pub mod scraper;
+pub mod signed;
 
 pub use commands::*;

@@ -15,6 +15,18 @@ pub struct TaxTariff {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub countervailing_rate: Option<String>, // 反补贴税率
     pub last_updated: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uk_source_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ni_source_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uk_verified_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ni_verified_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uk_rate_status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ni_rate_status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub similarity: Option<f64>, // 仅用于模糊查询
 }
@@ -94,6 +106,8 @@ pub struct RemoteMetadata {
     pub timestamp: String,
     pub last_modified: String,
     pub file_size: u64,
+    #[serde(default)]
+    pub file_hash: Option<String>,
     pub record_count: i64,
     pub download_urls: DownloadUrls,
     #[serde(default)]

@@ -27,7 +27,7 @@ interface UpdateProgress {
 
 export function SingleQueryTab() {
   const [code, setCode] = useState('');
-  const [fuzzyMode, setFuzzyMode] = useState(true);
+  const [fuzzyMode, setFuzzyMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<TaxTariff[]>([]);
   const [searched, setSearched] = useState(false); // 标记是否已搜索
@@ -178,36 +178,22 @@ export function SingleQueryTab() {
       const result = await taxApi.updateSingleRow(tariff.code);
       
       if (result.success) {
-        // 更新本地状态中的数据
-        setResults((prev) =>
-          prev.map((item) => {
-            if (item.code === tariff.code) {
-              return {
-                ...item,
-                rate: result.newUkRate || item.rate,
-                north_ireland_rate: result.newNiRate || item.north_ireland_rate,
-                description: result.newDescription || item.description,
-              };
-            }
-            return item;
-          })
-        );
-        
+        // HTML parsing is comparison only; never replace a verified local rate.
         toast({
-          title: '更新成功',
+          title: '网页比对完成（未修改本地数据）',
           description: result.message,
         });
       } else {
         toast({
-          title: '更新失败',
+          title: '网页比对失败',
           description: result.message,
           variant: 'destructive',
         });
       }
     } catch (error) {
-      console.error('更新失败:', error);
+      console.error('网页比对失败:', error);
       toast({
-        title: '更新失败',
+        title: '网页比对失败',
         description: String(error),
         variant: 'destructive',
       });
@@ -287,7 +273,7 @@ export function SingleQueryTab() {
             <CardTitle>查询结果</CardTitle>
             <CardDescription>
               找到 {results.length} 条记录
-              {fuzzyMode && '（按相似度排序）'}
+              {fuzzyMode && '（按相似度排序，仅供选码，不代表同一商品税率）'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -309,12 +295,22 @@ export function SingleQueryTab() {
                     <TableCell className="font-mono">{result.code}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <span className="font-medium">{result.rate}</span>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{result.rate || '待核验'}</span>
+                          {result.uk_rate_status !== 'verified' && (
+                            <span className="text-xs text-muted-foreground">
+                              {result.uk_rate_status === 'stale' ? '旧缓存·未核验' :
+                                result.uk_rate_status === 'conditional' ? '存在条件·不可直接使用' :
+                                !result.uk_rate_status ? '旧版数据·来源未经核验' : '无确定税率'}
+                            </span>
+                          )}
+                        </div>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6"
                           onClick={() => copyToClipboard(result.rate)}
+                          disabled={!result.rate}
                           title="复制英国税率"
                         >
                           <Copy className="h-3 w-3" />
@@ -324,7 +320,15 @@ export function SingleQueryTab() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <span className="font-medium">
-                          {result.north_ireland_rate || result.northIrelandRate || '-'}
+                          {result.north_ireland_rate || result.northIrelandRate || '待核验'}
+                          {result.ni_rate_status !== 'verified' && (
+                            <span className="block text-xs text-muted-foreground">
+                              {result.ni_rate_status === 'stale' ? '旧缓存·未经官方核验' :
+                                result.ni_rate_status === 'conditional' ? '条件限制' :
+                                !result.ni_rate_status ? '旧版数据·来源未经核验' :
+                                '暂未获取可信数据'}
+                            </span>
+                          )}
                         </span>
                         {(result.north_ireland_rate || result.northIrelandRate) && (
                           <Button
@@ -412,7 +416,7 @@ export function SingleQueryTab() {
                           className="h-8 w-8"
                           onClick={() => handleAutoUpdate(result)}
                           disabled={updatingCode === result.code}
-                          title="自动更新当前行"
+                          title="网页临时比对（不修改本地数据）"
                         >
                           {updatingCode === result.code ? (
                             <Loader2 className="h-3 w-3 animate-spin" />
@@ -450,7 +454,7 @@ export function SingleQueryTab() {
               <div className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span className="text-sm font-medium">
-                  正在更新商品 {updateProgress.code}
+                  正在比对商品 {updateProgress.code}
                 </span>
                 <span className="text-sm text-muted-foreground">
                   {updateProgress.stage}
@@ -469,7 +473,7 @@ export function SingleQueryTab() {
       {showLogs && updateLogs.length > 0 && (
         <div className="fixed bottom-20 right-4 w-96 bg-background border rounded-lg shadow-lg z-50">
           <div className="flex items-center justify-between p-3 border-b">
-            <h3 className="text-sm font-medium">更新日志</h3>
+            <h3 className="text-sm font-medium">比对日志</h3>
             <Button
               variant="ghost"
               size="icon"

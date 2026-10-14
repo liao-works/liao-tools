@@ -2,7 +2,7 @@ use crate::commands::tax::database::TaxDatabase;
 use crate::commands::tax::query::TaxQuery;
 use crate::models::tax::BatchResult;
 use anyhow::{Context, Result};
-use calamine::{open_workbook, DataType, Reader, Xlsx};
+use calamine::{open_workbook, Data, Reader, Xlsx};
 use rust_xlsxwriter::{Format, Workbook};
 
 /// Excel批量处理器
@@ -37,8 +37,8 @@ impl TaxExcelProcessor {
         let mut codes = Vec::new();
         for row in range.rows().skip(1) {
             if let Some(cell) = row.first() {
-                if let Some(code) = cell.as_string() {
-                    codes.push(code.trim().to_string());
+                if let Some(code) = Self::parse_commodity_code(cell) {
+                    codes.push(code);
                 }
             }
         }
@@ -79,6 +79,24 @@ impl TaxExcelProcessor {
         })
     }
     
+    /// Excel frequently stores a 10-digit commodity code in a numeric cell.
+    /// Preserve leading zeros when converting valid integers; reject fractions.
+    /// Text cells retain their exact content for normalisation by TaxQuery.
+    fn parse_commodity_code(value: &Data) -> Option<String> {
+        match value {
+            Data::String(s) => {
+                let code = s.trim();
+                if code.is_empty() { None } else { Some(code.to_string()) }
+            }
+            Data::Int(n) if *n >= 0 && *n <= 9_999_999_999 =>
+                Some(format!("{:010}", n)),
+            Data::Float(n) if n.is_finite() && *n >= 0.0
+                && *n <= 9_999_999_999.0 && n.fract() == 0.0 =>
+                Some(format!("{:010}", *n as u64)),
+            _ => None,
+        }
+    }
+
     /// 写入查询结果到Excel
     fn write_results(
         output_path: &str,
@@ -102,6 +120,10 @@ impl TaxExcelProcessor {
             "反倾销税率",
             "反补贴税率",
             "查询状态",
+            "英国数据状态",
+            "北爱数据状态",
+            "英国来源版本",
+            "北爱来源版本",
         ];
 
         for (col, header) in headers.iter().enumerate() {
@@ -138,13 +160,17 @@ impl TaxExcelProcessor {
                     tariff.countervailing_rate.as_deref().unwrap_or(""),
                 )?;
                 worksheet.write(row_num, 7, "成功")?;
+                worksheet.write(row_num, 8, tariff.uk_rate_status.as_deref().unwrap_or("legacy_unverified"))?;
+                worksheet.write(row_num, 9, tariff.ni_rate_status.as_deref().unwrap_or("legacy_unverified"))?;
+                worksheet.write(row_num, 10, tariff.uk_source_version.as_deref().unwrap_or(""))?;
+                worksheet.write(row_num, 11, tariff.ni_source_version.as_deref().unwrap_or(""))?;
             } else {
                 worksheet.write(row_num, 7, "未找到")?;
             }
         }
 
         // 自动调整列宽（现在是8列）
-        for col in 0..8 {
+        for col in 0..12 {
             worksheet.set_column_width(col, 20)?;
         }
         
@@ -188,5 +214,25 @@ impl TaxExcelProcessor {
             .context("Failed to save template file")?;
         
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod commodity_code_tests {
+    use super::*;
+
+    #[test]
+    fn excel_numeric_codes_keep_leading_zero() {
+        assert_eq!(TaxExcelProcessor::parse_commodity_code(&Data::Int(101210000)),
+                   Some("0101210000".to_string()));
+        assert_eq!(TaxExcelProcessor::parse_commodity_code(&Data::Float(101210000.0)),
+                   Some("0101210000".to_string()));
+    }
+
+    #[test]
+    fn excel_fractional_code_is_not_rounded() {
+        assert_eq!(TaxExcelProcessor::parse_commodity_code(&Data::Float(101210000.5)), None);
+        assert_eq!(TaxExcelProcessor::parse_commodity_code(&Data::String("0101210000".into())),
+                   Some("0101210000".into()));
     }
 }

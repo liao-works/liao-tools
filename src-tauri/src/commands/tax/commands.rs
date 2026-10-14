@@ -3,9 +3,10 @@ use crate::commands::tax::downloader::TaxDataDownloader;
 use crate::commands::tax::excel::TaxExcelProcessor;
 use crate::commands::tax::query::TaxQuery;
 use crate::commands::tax::scraper::TaxScraper;
-use crate::commands::update_history::database::HistoryDatabase;
+use crate::commands::tax::preview::{self, PreviewSummary, PreviewRate};
+use crate::commands::tax::signed::{self, SignedReviewResult};
+use crate::commands::tax::ni_review::{self, NiReviewReport};
 use crate::models::tax::{BatchResult, TaxTariff, TaxVersionInfo, UpdateResult};
-use crate::models::update_history::ChangeRecord;
 use tauri::Emitter;
 use tauri_plugin_opener::OpenerExt;
 use log::{info, warn};
@@ -92,6 +93,57 @@ pub async fn tax_batch_query(
 #[tauri::command]
 pub async fn tax_download_template(output_path: String) -> Result<(), String> {
     TaxExcelProcessor::generate_template(&output_path).map_err(|e| e.to_string())
+}
+
+/// Read-only local database check. Does not require internet.
+#[tauri::command]
+pub async fn tax_has_local_data(app_handle: tauri::AppHandle) -> Result<bool, String> {
+    TaxDataDownloader::local_has_data(&app_handle).map_err(|e| e.to_string())
+}
+
+/// Current local snapshot metadata even when completely offline.
+#[tauri::command]
+pub async fn tax_get_local_version(app_handle: tauri::AppHandle)
+    -> Result<crate::models::tax::VersionDetail, String> {
+    TaxDataDownloader::get_local_version(&app_handle).map_err(|e| e.to_string())
+}
+
+/// Explicit import of an unsigned shadow-only preview archive.
+#[tauri::command]
+pub async fn tax_import_preview(
+    app_handle: tauri::AppHandle, archive_path: String,
+) -> Result<PreviewSummary, String> {
+    tauri::async_runtime::spawn_blocking(move ||
+        preview::import_archive(&app_handle, &archive_path))
+        .await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())
+}
+
+/// Read only from an isolated shadow preview. Does not touch production SQLite.
+#[tauri::command]
+pub async fn tax_preview_lookup(
+    app_handle: tauri::AppHandle, digest: String, code: String,
+) -> Result<Option<PreviewRate>, String> {
+    preview::lookup(&app_handle, &digest, &code).map_err(|e| e.to_string())
+}
+
+/// Verify a review-only signed bundle using the public key pinned into the binary.
+#[tauri::command]
+pub async fn tax_verify_signed_review(archive_path: String)
+    -> Result<SignedReviewResult, String> {
+    tauri::async_runtime::spawn_blocking(move || signed::verify_signed_review(&archive_path))
+        .await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn tax_has_signed_review_trust_key() -> bool {
+    signed::trusted_key_available()
+}
+
+/// Read-only review of a generated NI Other evidence report. Not duty data.
+#[tauri::command]
+pub async fn tax_read_ni_review(path: String) -> Result<NiReviewReport, String> {
+    tauri::async_runtime::spawn_blocking(move || ni_review::load_ni_review(&path))
+        .await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())
 }
 
 /// 检查更新
@@ -346,82 +398,18 @@ pub async fn tax_update_single_row(
         }
     }
     
-    // 7. 如果有更新，写入数据库
+    // 7. Read-only comparison only. Never let an HTML parser mutate
+    // the immutable/validated offline snapshot; HTML is NOT authoritative
+    // validation. A future HMRC API-backed gateway can supply verified values.
     let any_updated = uk_updated || ni_updated;
     if any_updated {
         let _ = window.emit("update-log", serde_json::json!({
             "code": code,
-            "message": "正在更新数据库",
+            "message": "发现网页差异；未修改本地数据。请核对官方页面。",
             "level": "info"
         }));
-        
-        // 进度 90%
-        let _ = window.emit("update-progress", serde_json::json!({
-            "code": code,
-            "progress": 90,
-            "stage": "更新数据库"
-        }));
-        
-        db.update_tariff_fields(
-            &code,
-            new_uk_rate.as_deref(),
-            new_ni_rate.as_deref(),
-            new_description.as_deref(),
-        )
-        .map_err(|e| e.to_string())?;
-        
-        info!("数据库更新成功");
-
-        let _ = window.emit("update-log", serde_json::json!({
-            "code": code,
-            "message": "数据库更新成功",
-            "level": "success"
-        }));
-
-        // 旁路：写入变更历史（失败不阻断主流程）
-        if let Ok(history_db) = HistoryDatabase::new(&app_handle) {
-            let session_id = uuid::Uuid::new_v4().to_string();
-            let mk = |field: &str, old: Option<String>, new: Option<String>| ChangeRecord {
-                session_id: session_id.clone(),
-                module: "tax".into(),
-                update_type: "single".into(),
-                version_from: None,
-                version_to: None,
-                code: code.clone(),
-                field: Some(field.into()),
-                old_value: old,
-                new_value: new,
-                change_type: "modified".into(),
-            };
-            let mut records = Vec::new();
-            // 按各字段实际是否变化（Option::Some）判断，而非 uk_updated（后者含 description 变化）
-            if let Some(new_rate) = &new_uk_rate {
-                records.push(mk(
-                    "rate",
-                    Some(old_tariff.rate.clone()),
-                    Some(new_rate.clone()),
-                ));
-            }
-            if let Some(new_ni) = &new_ni_rate {
-                records.push(mk(
-                    "north_ireland_rate",
-                    old_tariff.north_ireland_rate.clone(),
-                    Some(new_ni.clone()),
-                ));
-            }
-            if let Some(new_desc) = &new_description {
-                records.push(mk(
-                    "description",
-                    old_tariff.description.clone(),
-                    Some(new_desc.clone()),
-                ));
-            }
-            if let Err(e) = history_db.insert_changes(&records) {
-                log::warn!("写入变更历史失败(tax 单行): {}", e);
-            }
-        }
     }
-    
+
     // 8. 构建返回结果
     let success = uk_success || ni_success;
     
@@ -432,9 +420,9 @@ pub async fn tax_update_single_row(
         "stage": "完成"
     }));
     let message = if any_updated {
-        format!("✅ {}", status_messages.join(" | "))
+        format!("仅网页比对，未更新本地库: {}", status_messages.join(" | "))
     } else if success {
-        format!("ℹ️ {}", status_messages.join(" | "))
+        format!("网页比对未发现差异: {}", status_messages.join(" | "))
     } else {
         format!("❌ {}", status_messages.join(" | "))
     };
@@ -442,7 +430,7 @@ pub async fn tax_update_single_row(
     // 发送最终完成日志
     let _ = window.emit("update-log", serde_json::json!({
         "code": code,
-        "message": if any_updated { "更新完成" } else { "检查完成，无需更新" },
+        "message": if any_updated { "网页比对有差异，未覆盖本地数据" } else { "网页比对完成，未修改本地数据" },
         "level": if any_updated { "success" } else { "info" }
     }));
     

@@ -136,6 +136,12 @@ mod tests {
             anti_dumping_rate: None,
             countervailing_rate: None,
             last_updated: None,
+            uk_source_version: None,
+            ni_source_version: None,
+            uk_verified_at: None,
+            ni_verified_at: None,
+            uk_rate_status: None,
+            ni_rate_status: None,
             similarity: None,
         }
     }

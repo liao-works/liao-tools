@@ -2,18 +2,91 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { TaxTariff, TaxVersionInfo } from '@/types';
 
+
+export interface TaxPreviewSummary {
+  release_id: string;
+  as_of: string;
+  digest: string;
+  record_count: number;
+  gb_verified: number;
+  gb_conditional: number;
+  ni_unverified: number;
+  production_eligible: false;
+}
+
+export interface TaxPreviewRate {
+  code: string;
+  description?: string | null;
+  gb_rate: string;
+  ni_legacy_rate?: string | null;
+  gb_status: string;
+  ni_status: string;
+}
+
+export interface TaxSignedReviewResult {
+  release_id: string;
+  as_of: string;
+  key_id: string;
+  verified_signature: boolean;
+  production_eligible: false;
+  record_count: number;
+  gb_verified: number;
+  gb_conditional: number;
+  ni_unverified: number;
+  sha256: string;
+}
+
+export interface NiReviewItem {
+  code: string;
+  verdict: string;
+  comparison: string;
+  legacy?: string | null;
+  candidate?: string | null;
+  source_url?: string | null;
+}
+
+export interface NiReviewReport {
+  kind: 'xi-other-evidence-gate-v1';
+  as_of: string;
+  samples: number;
+  chapters: number;
+  required_chapters: number;
+  audit_sha256: string;
+  evidence_complete: boolean;
+  status: 'review_required' | 'insufficient_evidence';
+  manual_review_count: number;
+  manual_review_items: NiReviewItem[];
+  production_eligible: false;
+  other_semantics_verified: false;
+}
+
 export const taxApi = {
+  async readNiReview(path: string): Promise<NiReviewReport> {
+    return invoke<NiReviewReport>('tax_read_ni_review', { path });
+  },
+  async hasSignedReviewTrustKey(): Promise<boolean> {
+    return invoke<boolean>('tax_has_signed_review_trust_key');
+  },
+
+  async verifySignedReview(archivePath: string): Promise<TaxSignedReviewResult> {
+    return invoke<TaxSignedReviewResult>('tax_verify_signed_review', { archivePath });
+  },
+
   /**
    * 检查数据库是否有数据
    */
   async checkDataExists(): Promise<boolean> {
+    // Must work when GitHub or the user's internet is unavailable.
     try {
-      const versionInfo = await this.checkUpdate();
-      return versionInfo.local.records > 0;
+      return await invoke<boolean>('tax_has_local_data');
     } catch (error) {
-      console.error('检查数据存在性失败:', error);
+      console.error('本地数据库检查失败:', error);
       return false;
     }
+  },
+
+  async getLocalVersion(): Promise<TaxVersionInfo['local']> {
+    return invoke<TaxVersionInfo['local']>('tax_get_local_version');
   },
 
   /**
@@ -79,6 +152,15 @@ export const taxApi = {
     } finally {
       unlisten();
     }
+  },
+
+  /** Local, unsigned shadow-only preview. Never activates a production dataset. */
+  async importPreview(archivePath: string): Promise<TaxPreviewSummary> {
+    return invoke<TaxPreviewSummary>('tax_import_preview', { archivePath });
+  },
+
+  async previewLookup(digest: string, code: string): Promise<TaxPreviewRate | null> {
+    return invoke<TaxPreviewRate | null>('tax_preview_lookup', { digest, code });
   },
 
   /**

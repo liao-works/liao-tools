@@ -66,6 +66,15 @@ impl TaxDatabase {
             [],
         );
 
+        // Presence-aware source/status fields. Old snapshots get NULL, not 'verified'.
+        for field in [
+            "uk_source_version", "ni_source_version", "uk_verified_at",
+            "ni_verified_at", "uk_rate_status", "ni_rate_status"
+        ] {
+            let statement = format!("ALTER TABLE tariffs ADD COLUMN {} TEXT", field);
+            let _ = self.conn.execute(&statement, []);
+        }
+
         // 使用 core 的工具批量创建索引
         let indexes = [
             "CREATE INDEX IF NOT EXISTS idx_code ON tariffs(code)",
@@ -90,7 +99,9 @@ impl TaxDatabase {
     pub fn get_tariff(&self, code: &str) -> Result<Option<TaxTariff>> {
         let mut stmt = self.conn.prepare(
             "SELECT code, description, rate, url, north_ireland_rate,
-                    north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated
+                    north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated,
+                    uk_source_version, ni_source_version, uk_verified_at,
+                    ni_verified_at, uk_rate_status, ni_rate_status
              FROM tariffs
              WHERE code = ?1",
         )?;
@@ -109,6 +120,12 @@ impl TaxDatabase {
                 anti_dumping_rate: row.get(7)?,
                 countervailing_rate: row.get(8)?,
                 last_updated: row.get(9)?,
+                uk_source_version: row.get(10)?,
+                ni_source_version: row.get(11)?,
+                uk_verified_at: row.get(12)?,
+                ni_verified_at: row.get(13)?,
+                uk_rate_status: row.get(14)?,
+                ni_rate_status: row.get(15)?,
                 similarity: None,
             }))
         } else {
@@ -120,7 +137,9 @@ impl TaxDatabase {
     pub fn get_all_tariffs(&self) -> Result<Vec<TaxTariff>> {
         let mut stmt = self.conn.prepare(
             "SELECT code, description, rate, url, north_ireland_rate,
-                    north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated
+                    north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated,
+                    uk_source_version, ni_source_version, uk_verified_at,
+                    ni_verified_at, uk_rate_status, ni_rate_status
              FROM tariffs",
         )?;
 
@@ -136,6 +155,12 @@ impl TaxDatabase {
                 anti_dumping_rate: row.get(7)?,
                 countervailing_rate: row.get(8)?,
                 last_updated: row.get(9)?,
+                uk_source_version: row.get(10)?,
+                ni_source_version: row.get(11)?,
+                uk_verified_at: row.get(12)?,
+                ni_verified_at: row.get(13)?,
+                uk_rate_status: row.get(14)?,
+                ni_rate_status: row.get(15)?,
                 similarity: None,
             })
         })?;
@@ -169,6 +194,12 @@ impl TaxDatabase {
                 anti_dumping_rate: row.get(7)?,
                 countervailing_rate: row.get(8)?,
                 last_updated: row.get(9)?,
+                uk_source_version: None,
+                ni_source_version: None,
+                uk_verified_at: None,
+                ni_verified_at: None,
+                uk_rate_status: None,
+                ni_rate_status: None,
                 similarity: None,
             })
         })?;
