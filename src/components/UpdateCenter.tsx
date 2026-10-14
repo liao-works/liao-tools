@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import {
   checkForUpdates, downloadUpdate, installUpdate, listenToDownloadProgress,
-  loadUpdateSettings, saveUpdateSettings, updateLastCheckTime,
+  loadUpdateSettings, saveUpdateSettings, updateLastCheckTime, restartAfterSignedInstall,
   type UpdateInfo, type UpdateSettings, type DownloadProgress
 } from '@/lib/updater';
 
@@ -94,14 +94,19 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
     }
   };
 
-  const canDownload = !!info?.has_update && !!info.platform_specific_url && !!info.checksum_sha256;
+  const signed = info?.update_channel === 'signed';
+  const canDownload = !!info?.has_update &&
+    (signed ? !!info.platform_specific_url : !!info.platform_specific_url && !!info.checksum_sha256);
   const handleDownload = async () => {
     if (!info || !canDownload || busy) return;
     setPhase('downloading'); setError(''); setDownloadPath(''); setProgress(null);
     let stop: (() => void) | undefined;
     try {
-      stop = await listenToDownloadProgress(value => setProgress(value));
-      const path = await downloadUpdate(info.platform_specific_url!, info.latest_version, info.checksum_sha256!);
+      if (!signed) stop = await listenToDownloadProgress(value => setProgress(value));
+      const path = await downloadUpdate(
+        info.platform_specific_url!, info.latest_version, info.checksum_sha256,
+        signed ? value => setProgress(value) : undefined
+      );
       setDownloadPath(path);
       setPhase('ready');
     } catch (err) {
@@ -115,8 +120,8 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
     if (!downloadPath || busy) return;
     setPhase('launching'); setError('');
     try {
-      // Always show the OS installer. Starting an installer is NOT equivalent
-      // to successful installation; never claim "installed" here.
+      // Signed updates are installed by the official Tauri verifier.
+      // The legacy channel only opens an OS installer; do not conflate them.
       const message = await installUpdate(downloadPath, false);
       setInstallerMessage(message);
       setPhase('launched');
@@ -141,7 +146,7 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
     {!embedded && <header className="lt-update-page-head">
       <span className="lt-kicker">APPLICATION / UPDATES</span>
       <h1>应用更新</h1>
-      <p>检查官方版本、核对下载包完整性，并由系统安装程序完成升级。</p>
+      <p>检查官方版本，按当前安装渠道进行签名或完整性验证，确认后完成升级。</p>
     </header>}
     <div className="lt-update-hero">
       <div className="lt-update-summary">
@@ -149,12 +154,15 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
         <h2>{phase === 'checking' ? '正在检查新版本…' :
           info?.has_update ? '发现可用的新版本' :
           info ? '当前已是最新版本' : '保持工具稳定更新'}</h2>
-        <p>{info?.has_update ? `Liao Tools ${info.latest_version} 已发布，下载前会核对 GitHub 提供的 SHA-256。` :
+        <p>{info?.has_update ? (signed
+            ? `Liao Tools ${info.latest_version} 已发布。将使用 Tauri 官方签名更新器与内置公钥验证更新包。`
+            : `Liao Tools ${info.latest_version} 已发布，下载前会核对 GitHub 提供的 SHA-256。`) :
           info ? '你可以继续使用当前版本，也可以随时重新检查官方发布。' :
           '建议启用启动时检查：有新版本时提醒，由你确认后再下载安装。'}</p>
         <div className="lt-update-version-pills">
           <span>当前版本 <strong>{info?.current_version || '等待检查'}</strong></span>
           <span>最新版本 <strong>{info?.latest_version || '—'}</strong></span>
+          <span>安装渠道 <strong>{signed ? '官方签名更新' : '校验下载 · 手动安装'}</strong></span>
         </div>
         <div className="lt-update-action-row">
           <Button onClick={() => void check()} disabled={busy} variant="outline">
@@ -162,10 +170,10 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
             {phase === 'checking' ? '检查中…' : '重新检查'}
           </Button>
           {info?.has_update && canDownload && !downloadPath && <Button onClick={() => void handleDownload()} disabled={busy}>
-            <Download className="mr-2 h-4 w-4"/>下载并验证更新
+            <Download className="mr-2 h-4 w-4"/>{signed ? '下载签名更新包' : '下载并验证更新'}
           </Button>}
           {downloadPath && phase !== 'launched' && <Button onClick={() => void handleInstall()} disabled={busy}>
-            <PackageCheck className="mr-2 h-4 w-4"/>打开系统安装程序
+            <PackageCheck className="mr-2 h-4 w-4"/>{signed ? '安装已签名更新' : '打开系统安装程序'}
           </Button>}
           <Button variant="ghost" onClick={openRelease}>
             官方发布页面 <ExternalLink className="ml-2 h-4 w-4"/>
@@ -178,15 +186,20 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
     {phase === 'downloading' && <div className="lt-update-progress" role="status" aria-live="polite">
       <div><strong>正在下载官方更新包…</strong><span>{progress ? `${progress.percentage.toFixed(1)}%` : '正在连接…'}</span></div>
       <Progress value={progress?.percentage || 0}/>
-      <p>{progress ? `${sizeLabel(progress.downloaded)} / ${sizeLabel(progress.total)}` : '下载完成后自动核验 SHA-256，校验失败不会进入安装。'}</p>
+      <p>{progress ? `${sizeLabel(progress.downloaded)} / ${sizeLabel(progress.total)}`
+        : signed ? '官方 updater 会使用内置公钥验证签名，不可信的更新包无法安装。'
+          : '下载完成后自动核验 SHA-256，校验失败不会进入安装。'}</p>
     </div>}
     {phase === 'ready' && <div className="lt-update-status lt-update-status--good" role="status">
-      <ShieldCheck size={20}/><div><strong>下载完成，完整性校验通过</strong>
-        <p>安装包已验证，现在可以打开系统安装程序。升级完成后可能需要重新启动应用。</p>
+      <ShieldCheck size={20}/><div><strong>{signed ? '签名更新包已下载并验证' : '下载完成，完整性校验通过'}</strong>
+        <p>{signed ? '更新包已由 Tauri 官方 updater 验证，可确认安装。' : '安装包已验证，现在可以打开系统安装程序。升级完成后可能需要重新启动应用。'}</p>
       </div></div>}
     {phase === 'launched' && <div className="lt-update-status lt-update-status--good" role="status">
-      <CheckCircle2 size={20}/><div><strong>安装包已打开</strong>
+      <CheckCircle2 size={20}/><div><strong>{signed ? '签名更新安装已执行' : '安装包已打开'}</strong>
         <p>{installerMessage || '请按照系统提示完成升级。启动安装程序不代表升级已经完成。'}</p>
+        {signed && <Button className="mt-3" variant="outline" onClick={() => void restartAfterSignedInstall().catch(e => setError(friendlyError(e)))}>
+          重新启动以应用新版
+        </Button>}
       </div></div>}
     {error && <div className="lt-update-status lt-update-status--error" role="alert">
       <AlertTriangle size={20}/><div><strong>更新操作未完成</strong><p>{error}</p></div>
@@ -194,7 +207,8 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
     {info?.has_update && !canDownload && <div className="lt-update-status lt-update-status--warning" role="status">
       <AlertTriangle size={20}/><div><strong>当前发布暂不支持应用内安全安装</strong>
         <p>{!info.platform_specific_url ? '此版本没有适合当前操作系统和架构的安装包。' :
-          '此安装包缺少有效的 SHA-256 元数据，为安全起见只提供官方发布页面。'}</p>
+          signed ? '签名更新元数据不完整，请检查最新发行版的 latest.json。'
+            : '此安装包缺少有效的 SHA-256 元数据，为安全起见只提供官方发布页面。'}</p>
       </div></div>}
 
     <div className="lt-update-grid">
@@ -232,9 +246,12 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
           <div><dt>来源</dt><dd>GitHub 官方 Release</dd></div>
           <div><dt>发布日期</dt><dd>{info?.published_at ? new Date(info.published_at).toLocaleDateString('zh-CN') : '—'}</dd></div>
           <div><dt>安装包大小</dt><dd>{sizeLabel(info?.file_size)}</dd></div>
-          <div><dt>SHA-256</dt><dd>{info?.checksum_sha256 ? '可校验 · 已由 GitHub 发布信息提供' : '未提供'}</dd></div>
+          <div><dt>验证机制</dt><dd>{signed ? 'Tauri 签名验证（内置公钥）'
+            : info?.checksum_sha256 ? 'GitHub SHA-256 · 下载前后验证' : '发布物尚无摘要'}</dd></div>
         </dl>
-        <p className="lt-update-security-foot">更新包需要通过完整性校验。应用不会自动运行未知 URL 或第三方安装程序。</p>
+        <p className="lt-update-security-foot">{signed
+          ? '签名渠道使用官方 Tauri updater，校验可信签名后才安装；不会退回未签名的安装包。'
+          : '旧版渠道严格校验下载地址、版本及 SHA-256；需要你确认后由系统安装程序完成升级。'}</p>
       </section>
     </div>
     {info?.has_update && !!info.release_notes && <section className="lt-update-panel lt-update-release-notes">
