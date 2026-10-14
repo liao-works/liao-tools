@@ -277,3 +277,26 @@ signed desktop tariff pack. The existing `north_ireland_rate`,
 `other_rate` and installed tariffs.db MUST remain unchanged.
 
 Producer doc: cursor-tax-tools/docs/xi-chapter-coverage-receipt.md
+
+## Phase 13 — detect NI source drift before resuming a prior checkpoint
+
+Even a frozen NI `as_of` date does not prove that HMRC returns an
+atomic/unchanged snapshot across separately timed API calls.
+The collector now requires raw-source SHA-256 + measure-row replay before
+skipping both prior merged checkpoint successes and local checkpoint
+successes. A corrupted `status=ok` record may never be silently skipped.
+
+The producer `xi_drift_guard.py` additionally re-requests up to three
+previously verified commodity source anchors (first, middle, last),
+canonicalizes the complete original source relationship graph and
+compares the old/new semantic SHA-256. Different duty expressions,
+conditions or linked data block the old-snapshot resume. A 429, failed
+request or malformed response is also blocking, not evidence of zero
+duty. The manual managed workflow performs this check before extending
+prior checkpoints; the two-chapter public canary separately tests it.
+
+Stable sampled source anchors are explicitly NOT proof that HMRC provided
+a globally atomic XI snapshot; source/version consistency and NI
+`Other` applicability remain unverified. No review source data is
+eligible for direct insertion into `tariffs.db` or any consumer duty
+field. See producer docs/xi-cross-run-drift-guard.md.
