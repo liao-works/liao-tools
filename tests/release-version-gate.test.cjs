@@ -55,5 +55,7 @@ test('legacy unsigned release can transition to signed or another manual release
  const previous = [release('v0.0.13',{assets:[]})];
  assert.equal(verifyReleaseVersion('v0.0.14',previous,{requireSigned:true}).ok,true);
  assert.equal(verifyReleaseVersion('v0.0.14',previous,{requireSigned:false}).ok,true);
- assert.equal(verifyReleaseVersion('v0.0.14',[release('v0.0.13')],{requireSigned:false}).ok,false);
+ assert.equal(verifyReleaseVersion('v0.0.14',[{
+   tag_name:'v0.0.13',draft:false,prerelease:false
+ }],{requireSigned:false}).ok,false);
 });
