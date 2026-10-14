@@ -82,6 +82,42 @@ function buildSignedManifest(tag, assets, signatures, options = {}) {
   return manifest;
 }
 
+
+/** Verify the actual signed manifest points to release packages and preserves .sig bytes.
+ * This is structural validation, not cryptographic signature verification.
+ */
+function verifySignedManifest(tag, assets, signatures, manifest) {
+  const issues = [];
+  if (!TAG.test(tag) || !manifest || typeof manifest !== 'object')
+    return { ok: false, issues: ['Invalid tag or manifest'] };
+  const version = tag.slice(1), targets = expectedTargets(version);
+  if (manifest.version !== version) issues.push('Manifest version differs from Release tag');
+  const platforms = manifest.platforms;
+  if (!platforms || Array.isArray(platforms) || typeof platforms !== 'object')
+    return { ok: false, issues: ['Manifest platforms missing'] };
+  for (const target of Object.keys(platforms))
+    if (!Object.hasOwn(targets, target)) issues.push('Unexpected platform: ' + target);
+  for (const [target, names] of Object.entries(targets)) {
+    const entry = platforms[target];
+    if (!entry || typeof entry !== 'object') {
+      issues.push('Missing platform: ' + target);
+      continue;
+    }
+    const matches = assets.filter(a => names.includes(a.name) && a.browser_download_url === entry.url);
+    if (matches.length !== 1 || !isTrustedAsset(tag, matches[0])) {
+      issues.push('Untrusted URL or missing package for ' + target);
+      continue;
+    }
+    const actualSignature = signatures[matches[0].name + '.sig'];
+    if (typeof actualSignature !== 'string' || actualSignature.trim() !== entry.signature ||
+        typeof entry.signature !== 'string' || entry.signature.length < 72 ||
+        !/^[a-zA-Z0-9+/=]+$/.test(entry.signature)) {
+      issues.push('Signature contents disagree with published file for ' + target);
+    }
+  }
+  return { ok: issues.length === 0, issues, version };
+}
+
 function main() {
   const [, , tag, assetsPath, signatureDir, outputPath] = process.argv;
   if (!tag || !assetsPath || !signatureDir || !outputPath) {
@@ -108,4 +144,4 @@ function main() {
   }
 }
 if (require.main === module) main();
-module.exports = { expectedTargets, isTrustedAsset, buildSignedManifest };
+module.exports = { expectedTargets, isTrustedAsset, buildSignedManifest, verifySignedManifest };

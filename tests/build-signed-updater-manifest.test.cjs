@@ -1,7 +1,7 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { buildSignedManifest, expectedTargets, isTrustedAsset } =
+const { buildSignedManifest, expectedTargets, isTrustedAsset, verifySignedManifest } =
   require('../scripts/build-signed-updater-manifest.cjs');
 
 const TAG = 'v0.0.14';
@@ -69,4 +69,21 @@ test('accepts Windows MSI signed fallback when NSIS is not published', () => {
   data.signatures[selected + '.sig'] = signature;
   const manifest = buildSignedManifest(TAG, data.assets, data.signatures);
   assert(manifest.platforms['windows-x86_64'].url.endsWith('.msi'));
+});
+
+test('manifest signature contents must match actual published sidecar', () => {
+ const f=fixture(), manifest=buildSignedManifest(TAG,f.assets,f.signatures);
+ assert.equal(verifySignedManifest(TAG,f.assets,f.signatures,manifest).ok,true);
+ const tampered=JSON.parse(JSON.stringify(manifest));
+ tampered.platforms['darwin-x86_64'].signature='B'.repeat(88);
+ assert.equal(verifySignedManifest(TAG,f.assets,f.signatures,tampered).ok,false);
+});
+test('signed manifest rejects stale versions, external package URLs and extra platforms', () => {
+ const f=fixture(), manifest=buildSignedManifest(TAG,f.assets,f.signatures);
+ assert.equal(verifySignedManifest(TAG,f.assets,f.signatures,{...manifest,version:'0.0.13'}).ok,false);
+ const wrong=JSON.parse(JSON.stringify(manifest));
+ wrong.platforms['windows-x86_64'].url='https://malicious.example.com/file.exe';
+ assert.equal(verifySignedManifest(TAG,f.assets,f.signatures,wrong).ok,false);
+ const extra={...manifest,platforms:{...manifest.platforms,'linux-x86_64':{}}};
+ assert.equal(verifySignedManifest(TAG,f.assets,f.signatures,extra).ok,false);
 });
