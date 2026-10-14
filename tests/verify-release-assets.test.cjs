@@ -31,6 +31,10 @@ test('reject missing, duplicated and foreign-host assets', () => {
   assets.pop();
   assets[2].browser_download_url = 'https://example.com/install.dmg';
   assert.equal(checkRelease(tag, assets).ok, false);
+  assets[2].browser_download_url = 'https://github.com/liao-works/liao-tools/releases/download/' + tag + '/other-file.dmg';
+  assert.equal(checkRelease(tag, assets).ok, false);
+  assets[2].browser_download_url = 'https://github.com/liao-works/liao-tools/releases/download/' + tag + '/liao-tools_0.0.14_x64.dmg/extra';
+  assert.equal(checkRelease(tag, assets).ok, false);
 });
 test('reject non-semver release tags', () => {
   assert.equal(checkRelease('main', fixtures()).ok, false);

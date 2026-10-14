@@ -32,9 +32,11 @@ function checkRelease(tag, assets) {
     if (typeof asset.digest !== 'string' || !/^sha256:[a-fA-F0-9]{64}$/.test(asset.digest)) {
       problems.push(name + ': 缺失有效 SHA-256');
     }
-    if (typeof asset.browser_download_url !== 'string' ||
-      !asset.browser_download_url.startsWith('https://github.com/liao-works/liao-tools/releases/download/' + tag + '/')) {
-      problems.push(name + ': 下载地址不属于当前官方 Release');
+    // The declared GitHub asset name and URL must match exactly, not just
+    // share a trusted-looking prefix with another release or extra path.
+    const expected = 'https://github.com/liao-works/liao-tools/releases/download/' + tag + '/' + name;
+    if (asset.browser_download_url !== expected) {
+      problems.push(name + ': 下载地址与当前官方 Release 资产文件名不一致');
     }
   }
   return { ok: problems.length === 0, issues: problems, version };
