@@ -1,0 +1,30 @@
+name: UI R7 · Windows Tauri Compile
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ui-r7-windows.yml'
+      - 'src-tauri/**'
+  workflow_dispatch:
+jobs:
+  tauri-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install frontend
+        run: pnpm install --frozen-lockfile
+      - name: Build frontend
+        run: pnpm run build
+      - name: Check actual Windows Tauri Rust target
+        run: cargo check --locked --manifest-path src-tauri/Cargo.toml
