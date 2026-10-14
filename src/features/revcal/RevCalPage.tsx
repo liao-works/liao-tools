@@ -50,39 +50,6 @@ const COUNTRY_OPTIONS = [
 /** 官方国旗图标（Amazon 官方 CDN，小写国家码） */
 const flagUrl = (cc: string) => `https://d1uznvntk80v7s.cloudfront.net/flags/${cc.toLowerCase()}.svg`;
 
-/** 官方合并格式下的单位文案（法语，与官方页面一致） */
-const UNIT_FR: Record<string, string> = {
-  centimeters: 'centimètres',
-  kilograms: 'kilogrammes',
-  inches: 'pouces',
-  pounds: 'livres',
-  grams: 'grammes',
-  millimeters: 'millimètres',
-};
-
-function frNum(n: number): string {
-  return String(Math.round(n * 100) / 100).replace('.', ',');
-}
-
-function unitFr(unit: string | null): string {
-  if (!unit) return '';
-  return UNIT_FR[unit] ?? unit;
-}
-
-/** 官方合并格式：20,2 X 30,3 X 35 centimètres 4,85 kilogrammes */
-function formatDimensionsOfficial(p: RevCalProduct): string {
-  const parts: string[] = [];
-  if (p.length != null && p.width != null && p.height != null) {
-    parts.push(
-      `${frNum(p.length)} X ${frNum(p.width)} X ${frNum(p.height)} ${unitFr(p.dimension_unit)}`.trim()
-    );
-  }
-  if (p.weight != null) {
-    parts.push(`${frNum(p.weight)} ${unitFr(p.weight_unit)}`.trim());
-  }
-  return parts.join(' ');
-}
-
 function formatPrice(p: RevCalProduct): string {
   if (p.price == null) return '—';
   return String(p.price);
@@ -113,9 +80,13 @@ export function RevCalPage() {
   const [batchCodes, setBatchCodes] = useState('');
   const [querying, setQuerying] = useState(false);
   const [batchRunning, setBatchRunning] = useState(false);
-  const [progress, setProgress] = useState({ current: 0, total: 0, code: '' });
+  const [progress, setProgress] = useState({ current: 0, total: 0, code: '', status: '' });
   const [results, setResults] = useState<RevCalQueryResult[]>([]);
   const [exporting, setExporting] = useState(false);
+  const [filterText, setFilterText] = useState('');
+  const [onlyFailed, setOnlyFailed] = useState(false);
+  const [sortKey, setSortKey] = useState<'code' | 'price' | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const { toast } = useToast();
 
   const handleSingleSearch = async () => {
@@ -164,24 +135,27 @@ export function RevCalPage() {
   };
 
   const handleBatchSearch = async () => {
-    const codes = batchCodes
+    const raw = batchCodes
       .split('\n')
       .map((c) => c.trim())
       .filter(Boolean);
+    // 去重：重复码会白白消耗接口配额
+    const codes = [...new Set(raw)];
     if (codes.length === 0) {
       toast({ title: '请输入要查询的编码', variant: 'destructive' });
       return;
     }
     setBatchRunning(true);
-    setProgress({ current: 0, total: codes.length, code: '' });
+    setProgress({ current: 0, total: codes.length, code: '', status: '' });
     try {
       const result = await revCalApi.batchSearch(codes, countryCode, (p) => {
-        setProgress({ current: p.current, total: p.total, code: p.code });
+        setProgress({ current: p.current, total: p.total, code: p.code, status: p.status });
       });
       setResults(result.results);
+      const dupNote = raw.length > codes.length ? `（已去除 ${raw.length - codes.length} 个重复）` : '';
       toast({
         title: '批量查询完成',
-        description: `成功 ${result.success} 条，未找到/失败 ${result.failed} 条`,
+        description: `成功 ${result.success} 条，未找到/失败 ${result.failed} 条${dupNote}`,
       });
     } catch (error) {
       toast({ title: '批量查询失败', description: String(error), variant: 'destructive' });
@@ -206,7 +180,7 @@ export function RevCalPage() {
           ''
         );
       const path = await save({
-        defaultPath: `收益计算器结果_${ts}.xlsx`,
+        defaultPath: `收益计算器结果_${countryCode}_${ts}.xlsx`,
         filters: [{ name: 'Excel', extensions: ['xlsx'] }],
       });
       if (!path) return;
@@ -220,7 +194,7 @@ export function RevCalPage() {
     }
   };
 
-  // 展开成表格行：每个商品一行
+  // 展开成表格行：每个商品一行，再按筛选/排序条件加工
   const rows = results.flatMap((result) => {
     if (result.products.length === 0) {
       return [
@@ -241,6 +215,44 @@ export function RevCalPage() {
       product,
     }));
   });
+
+  const visibleRows = rows.filter((row) => {
+    if (onlyFailed && row.status === '成功') return false;
+    if (!filterText.trim()) return true;
+    const t = filterText.trim().toLowerCase();
+    return (
+      row.code.toLowerCase().includes(t) ||
+      (row.product?.asin ?? '').toLowerCase().includes(t) ||
+      (row.product?.title ?? '').toLowerCase().includes(t)
+    );
+  });
+  if (sortKey) {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    visibleRows.sort((a, b) => {
+      if (sortKey === 'price') {
+        const pa = a.product?.price ?? null;
+        const pb = b.product?.price ?? null;
+        // 无价格的行始终排在最后
+        if (pa == null && pb == null) return 0;
+        if (pa == null) return 1;
+        if (pb == null) return -1;
+        return (pa - pb) * dir;
+      }
+      return a.code.localeCompare(b.code) * dir;
+    });
+  }
+
+  const toggleSort = (key: 'code' | 'price') => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const sortIndicator = (key: 'code' | 'price') =>
+    sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
 
   const foundCount = results.filter((r) => r.products.length > 0).length;
 
@@ -302,6 +314,7 @@ export function RevCalPage() {
               <div className="space-y-1">
                 <Progress value={(progress.current / progress.total) * 100} />
                 <p className="text-xs text-muted-foreground">
+                  {progress.status.startsWith('retry') ? '补查 ' : ''}
                   {progress.current}/{progress.total}：{progress.code}
                 </p>
               </div>
@@ -324,7 +337,7 @@ export function RevCalPage() {
       <div className="flex flex-wrap items-center gap-6">
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold">Boutique Amazon</span>
-          <Select value={countryCode} onValueChange={setCountryCode}>
+          <Select value={countryCode} onValueChange={setCountryCode} disabled={batchRunning || querying}>
             <SelectTrigger className="w-[200px]">
               <SelectValue />
             </SelectTrigger>
@@ -393,11 +406,38 @@ export function RevCalPage() {
               暂无查询结果，请先在上方查询单码或批量编码
             </p>
           ) : (
+            <>
+              {/* 筛选工具栏 */}
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <Input
+                  placeholder="筛选查询码 / ASIN / 标题…"
+                  value={filterText}
+                  onChange={(e) => setFilterText(e.target.value)}
+                  className="h-8 w-[240px]"
+                />
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                  <Checkbox checked={onlyFailed} onCheckedChange={(v) => setOnlyFailed(v === true)} />
+                  只看失败
+                </label>
+                {(filterText || onlyFailed) && (
+                  <span className="text-xs text-muted-foreground">
+                    显示 {visibleRows.length} / {rows.length} 行
+                  </span>
+                )}
+              </div>
+              {visibleRows.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">没有匹配的行</p>
+              ) : (
             <div className="max-h-[480px] overflow-auto rounded-md border">
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
-                    <TableHead className="whitespace-nowrap">查询码</TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none whitespace-nowrap"
+                      onClick={() => toggleSort('code')}
+                    >
+                      查询码{sortIndicator('code')}
+                    </TableHead>
                     <TableHead className="whitespace-nowrap">状态</TableHead>
                     <TableHead className="w-12 whitespace-nowrap">图片</TableHead>
                     <TableHead className="whitespace-nowrap">ASIN</TableHead>
@@ -412,12 +452,17 @@ export function RevCalPage() {
                     ) : (
                       <TableHead className="whitespace-nowrap">Dimensions du produit</TableHead>
                     )}
-                    <TableHead className="text-right whitespace-nowrap">Prix</TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none text-right whitespace-nowrap"
+                      onClick={() => toggleSort('price')}
+                    >
+                      Prix{sortIndicator('price')}
+                    </TableHead>
                     <TableHead className="whitespace-nowrap">错误信息</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row) => (
+                  {visibleRows.map((row) => (
                     <TableRow key={row.key} className="hover:bg-muted/50">
                       <TableCell className="whitespace-nowrap font-mono text-xs">{row.code}</TableCell>
                       <TableCell className="whitespace-nowrap">
@@ -472,7 +517,7 @@ export function RevCalPage() {
                         </>
                       ) : (
                         <TableCell className="whitespace-nowrap text-xs">
-                          {row.product ? formatDimensionsOfficial(row.product) || '—' : '—'}
+                          {row.product ? row.product.dimensions_official || '—' : '—'}
                         </TableCell>
                       )}
                       <TableCell className="text-right whitespace-nowrap text-sm font-medium">
@@ -489,6 +534,8 @@ export function RevCalPage() {
                 </TableBody>
               </Table>
             </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

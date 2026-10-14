@@ -1,4 +1,4 @@
-use crate::models::revcal::{RevCalProduct, RevCalQueryResult};
+use crate::models::revcal::{format_dimensions_official, RevCalProduct, RevCalQueryResult};
 use anyhow::Context;
 use calamine::{open_workbook, DataType, Reader, Xlsx};
 use rust_xlsxwriter::{Format, Workbook};
@@ -155,55 +155,6 @@ fn write_opt_num(
     Ok(())
 }
 
-/// 合并模式下的单位文案（法语，与官方页面一致；未知单位原样返回）
-fn unit_fr<'a>(unit: &'a Option<String>) -> &'a str {
-    match unit.as_deref() {
-        Some("centimeters") => "centimètres",
-        Some("kilograms") => "kilogrammes",
-        Some("inches") => "pouces",
-        Some("pounds") => "livres",
-        Some("grams") => "grammes",
-        Some("millimeters") => "millimètres",
-        Some(other) => other,
-        None => "",
-    }
-}
-
-/// 官方合并格式：`20,2 X 30,3 X 35 centimètres 4,85 kilogrammes`
-/// （逗号小数、" X " 分隔、法语单位；数据缺失时返回空字符串）
-pub fn format_dimensions_official(p: &RevCalProduct) -> String {
-    let dims = match (p.length, p.width, p.height) {
-        (Some(l), Some(w), Some(h)) => format!(
-            "{} X {} X {} {}",
-            fr_num(l),
-            fr_num(w),
-            fr_num(h),
-            unit_fr(&p.dimension_unit)
-        ),
-        _ => String::new(),
-    };
-    let weight = match p.weight {
-        Some(wt) => format!("{} {}", fr_num(wt), unit_fr(&p.weight_unit)),
-        None => String::new(),
-    };
-    match (dims.is_empty(), weight.is_empty()) {
-        (false, false) => format!("{} {}", dims, weight),
-        (false, true) => dims,
-        (true, false) => weight,
-        (true, true) => String::new(),
-    }
-}
-
-/// 法语数字格式：最多 2 位小数，小数点用逗号
-fn fr_num(n: f64) -> String {
-    let rounded = (n * 100.0).round() / 100.0;
-    let mut s = rounded.to_string();
-    if let Some(pos) = s.find('.') {
-        s.replace_range(pos..pos + 1, ",");
-    }
-    s
-}
-
 /// 从 Excel 第一列读取查询码（跳过首行表头，过滤空白行）
 pub fn read_codes(input_path: &str) -> anyhow::Result<Vec<String>> {
     let mut workbook: Xlsx<_> =
@@ -234,7 +185,7 @@ pub fn read_codes(input_path: &str) -> anyhow::Result<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::revcal::{RevCalProduct, RevCalQueryResult};
+    use crate::models::revcal::{format_dimensions_official, RevCalProduct, RevCalQueryResult};
     use calamine::{open_workbook, Reader, Xlsx};
 
     fn product(asin: &str, price: f64) -> RevCalProduct {
@@ -258,6 +209,7 @@ mod tests {
             reviews_count: None,
             rating: None,
             offer_count: None,
+            dimensions_official: String::new(),
         }
     }
 

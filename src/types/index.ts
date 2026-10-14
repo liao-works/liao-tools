@@ -254,6 +254,8 @@ export interface RevCalProduct {
   reviews_count: number | null;
   rating: string | null;
   offer_count: number | null;
+  /** 官方合并格式尺寸串（Rust 侧生成） */
+  dimensions_official: string;
 }
 
 /** 单个查询码的结果 */
