@@ -17,8 +17,10 @@ function prepareSignedRelease(root, options) {
   const cargo = fs.readFileSync(path.join(root, 'src-tauri/Cargo.toml'), 'utf8');
   const lib = fs.readFileSync(path.join(root, 'src-tauri/src/lib.rs'), 'utf8');
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  // Do not accept a comment mentioning the plugin as evidence of registration.
+  const executableRust = lib.split('\n').map(line => line.replace(/\/\/.*$/, '')).join('\n');
   if (!/^\s*tauri-plugin-updater\s*=/m.test(cargo) ||
-      !lib.includes('tauri_plugin_updater::') ||
+      !/tauri_plugin_updater::Builder::new\(\)\.build\(\)/.test(executableRust) ||
       !pkg.dependencies?.['@tauri-apps/plugin-updater']) {
     throw new Error('Official signed Tauri updater plugin must be fully registered before signed releases');
   }

@@ -42,7 +42,8 @@ test('fully configured signed build emits updater config without leaking secrets
   const env = fixture();
   try {
     fs.appendFileSync(path.join(env.root, 'src-tauri/Cargo.toml'), 'tauri-plugin-updater = "2"\n');
-    fs.appendFileSync(path.join(env.root, 'src-tauri/src/lib.rs'), '\n// tauri_plugin_updater::Builder\n');
+    fs.appendFileSync(path.join(env.root, 'src-tauri/src/lib.rs'),
+      '\napp.handle().plugin(tauri_plugin_updater::Builder::new().build());\n');
     fs.writeFileSync(path.join(env.root, 'package.json'),
       JSON.stringify({ dependencies: { '@tauri-apps/plugin-updater': '^2' } }));
     assert.equal(prepareSignedRelease(env.root, opts).signed, true);
@@ -52,5 +53,17 @@ test('fully configured signed build emits updater config without leaking secrets
     assert.equal(parsed.plugins.updater.pubkey, opts.pubkey);
     assert.equal(parsed.plugins.updater.windows.installMode, 'basicUi');
     assert(!config.includes(opts.privateKey));
+  } finally { env.close(); }
+});
+
+test('commented-out updater registration does not bypass release gate', () => {
+  const env = fixture();
+  try {
+    fs.appendFileSync(path.join(env.root, 'src-tauri/Cargo.toml'), 'tauri-plugin-updater = "2"\n');
+    fs.appendFileSync(path.join(env.root, 'src-tauri/src/lib.rs'),
+      '// app.handle().plugin(tauri_plugin_updater::Builder::new().build());\n');
+    fs.writeFileSync(path.join(env.root, 'package.json'),
+      JSON.stringify({ dependencies: { '@tauri-apps/plugin-updater': '^2' } }));
+    assert.throws(() => prepareSignedRelease(env.root, opts), /plugin must be fully registered/);
   } finally { env.close(); }
 });
