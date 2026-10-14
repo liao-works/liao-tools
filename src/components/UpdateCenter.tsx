@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import {
   checkForUpdates, downloadUpdate, installUpdate, listenToDownloadProgress,
-  loadUpdateSettings, saveUpdateSettings, updateLastCheckTime, restartAfterSignedInstall,
+  loadUpdateSettings, saveUpdateSettings, updateLastCheckTime, restartAfterSignedInstall, discardSignedUpdate,
   type UpdateInfo, type UpdateSettings, type DownloadProgress
 } from '@/lib/updater';
 
@@ -117,6 +117,15 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
       stop?.();
     }
   };
+  const discardDownloadedUpdate = async () => {
+    try {
+      await discardSignedUpdate();
+      await check();
+    } catch (err) {
+      setError(friendlyError(err));
+      setPhase('error');
+    }
+  };
   const handleInstall = async () => {
     if (!downloadPath || busy) return;
     setPhase('launching'); setError('');
@@ -175,6 +184,9 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
           </Button>}
           {downloadPath && phase !== 'launched' && <Button onClick={() => void handleInstall()} disabled={busy}>
             <PackageCheck className="mr-2 h-4 w-4"/>{signed ? '安装已签名更新' : '打开系统安装程序'}
+          </Button>
+          {signed && phase === 'ready' && <Button variant="ghost" onClick={() => void discardDownloadedUpdate()}>
+            放弃当前下载并重新检查
           </Button>}
           <Button variant="ghost" onClick={openRelease}>
             官方发布页面 <ExternalLink className="ml-2 h-4 w-4"/>

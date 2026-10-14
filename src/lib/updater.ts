@@ -203,6 +203,15 @@ export async function installUpdate(filePath: string, silent = false): Promise<s
   return invoke<string>('install_update', { filePath, silent });
 }
 
+/** Explicit user action: abandon a downloaded signed update and release native handle. */
+export async function discardSignedUpdate(): Promise<void> {
+  if (!(await signedUpdaterAvailable())) return;
+  if (signedPhase === 'downloading' || signedPhase === 'installing') {
+    throw new Error('更新正在执行，不能中途释放安装会话。');
+  }
+  await clearPendingUpdate();
+}
+
 export async function restartAfterSignedInstall(): Promise<void> {
   if (!(await signedUpdaterAvailable())) throw new Error('当前不是签名更新渠道。');
   await relaunch();

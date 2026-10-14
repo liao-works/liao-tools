@@ -180,6 +180,20 @@ const BASE = 'http://127.0.0.1:1420';
       assert(!calls.some(call => call.command === 'check_for_updates' || call.command === 'download_update'),
         'updater must not choose the unsigned channel when signed mode inspection fails');
     });
+    await scenario('signed-download-discard-and-recheck', '/updates?mode=signed', async page => {
+      await page.getByRole('heading', { name: '发现可用的新版本' }).waitFor();
+      await page.getByRole('button', { name: '下载签名更新包' }).click();
+      await page.getByText('签名更新包已下载，等待安装验证').waitFor();
+      await page.getByRole('button', { name: '放弃当前下载并重新检查' }).click();
+      await page.getByRole('heading', { name: '发现可用的新版本' }).waitFor();
+      const calls = await page.evaluate(() => window.__liaoBridgeCalls);
+      assert(calls.filter(call => call.command === 'plugin:updater|check').length >= 2,
+        'explicit discard should permit a new signed update check');
+      assert(calls.some(call => call.command === 'plugin:resources|close'),
+        'explicit discard should close old signed updater handle');
+      assert(!calls.some(call => call.command === 'check_for_updates'),
+        'discard must not cause legacy unsigned fallback');
+    });
     await scenario('official-signed-update', '/updates?mode=signed', async page => {
       await page.getByRole('heading', { name: '发现可用的新版本' }).waitFor();
       await page.getByText('官方签名更新').first().waitFor();
