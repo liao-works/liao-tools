@@ -375,3 +375,35 @@ an external encrypted/versioned object store and secure key custody are
 still needed. An operator signature alone is not durable storage.
 
 See producer `docs/xi-signed-source-archive.md`.
+
+## Phase 16 — protected NI source archive in S3 (NOT desktop-rate distribution)
+
+The producer now has a review-only Amazon S3 vault adapter for a previously
+operator-signed XI managed checkpoint ZIP. It requires S3 versioning,
+SSE-KMS with an exact approved KMS key, COMPLIANCE Object Lock and
+content-addressed keys with conditional (`If-None-Match`) upload.
+
+After storage it verifies exact VersionId, bucket owner, file size, KMS
+and retention metadata, re-downloads the SAME pinned object version,
+checks its full SHA-256 and independently restores the operator Ed25519
+signed archive plus all original HMRC raw response/parent-chain proofs.
+A standalone CLI can repeat this recovery using a retained S3 version
+receipt even after 30-day GitHub Actions artifacts expire.
+
+**Do not claim deployment:** the real AWS role, bucket, KMS permissions
+and managed HMRC signing credentials have not been connected/tested in
+the current development phase. Mocked S3 recovery tests do not mean
+external backups are live. The managed-only workflow now uses GitHub
+OIDC temporary AWS credentials and requests 365 days Object Lock.
+
+The S3 version receipt must also be preserved externally, not only
+in expiring Actions artifact storage. Independent cross-region/account
+replication and restore drills are future operational acceptance.
+
+These artifacts remain `production_eligible=false`,
+`ni_other_verified=false`, `atomic_official_snapshot_verified=false`.
+They MUST NOT be imported as `tariffs.db` or used to populate
+`north_ireland_rate` / `other_rate` without separate NI tax business
+certification and consumer publication signature.
+
+Producer runbook: cursor-tax-tools/docs/xi-s3-immutable-vault.md
