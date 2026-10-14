@@ -2,6 +2,7 @@
 @import "./styles/tokens.css";
 @import "./styles/base.css";
 @import "./styles/workspace.css";
+@import "./styles/workbench-r5.css";
 
 /* ============================================
    TAILWIND THEME MAPPING
