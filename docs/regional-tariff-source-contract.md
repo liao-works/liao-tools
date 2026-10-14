@@ -201,3 +201,31 @@ the consumer's installed tariffs.db. NI Other business mapping and
 whole-XI managed coverage remain independently blocked.
 
 Producer specification: cursor-tax-tools/docs/dbt-version-readiness-gate.md
+
+## Phase 10: GB source-version diff — candidate evidence only
+
+The producer now has `gb_review_diff.py` to compare two independently
+verified, SHA-256-matched GB compact audit SQLite databases. It reports
+added/removed active-leaf commodity codes, gained/lost active 103/1011
+measure evidence, duty expressions, additional-code/condition changes,
+and unresolved gap/status differences. Geography 1080 remains explicitly
+non-GB context. A lost GB active candidate, removed commodity or changed
+active candidate results in a high-risk review gate.
+
+The manual `dbt-newest-replay-shadow.yml` now requests a prior verified
+GB source-proof Actions run ID. Only after official newest version
+metadata, complete source rows, and version-drift checks pass can it
+compare the new compact review SQLite to the trusted prior compact DB.
+High-risk source changes fail acceptance and preserve the audit report.
+
+A real previous-version `v4.0.1626` compact DB was successfully replayed
+against itself across 16,742 leaf codes and 16,376 active 103/1011 codes.
+This is a *structural self-check*, NOT a newer official-source comparison,
+current freshness certification, or proof of an applicable duty.
+
+Never import a compact review DB directly as `tariffs.db`, never overwrite
+`north_ireland_rate` from GB, and never treat a missing record as 0%.
+Official newest DBT release remains blocked until it exposes required
+tables; all consumer source updates remain documentation-only and Draft.
+
+Producer guide: cursor-tax-tools/docs/gb-version-diff-acceptance.md
