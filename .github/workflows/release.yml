@@ -163,7 +163,13 @@ jobs:
             const release = response.data;
             const assets = await github.paginate(github.rest.repos.listReleaseAssets,
               { owner, repo, release_id: release.id, per_page: 100 });
-            const status = checkRelease(tag, assets);
+            // Opt-in migration gate; the repository stays on the existing
+            // user-confirmed updater until trusted pubkey/plugin are configured.
+            const { checkSignedReleaseAssets } = require('./scripts/verify-release-assets.cjs');
+            const requireSigned = ${{ vars.REQUIRE_SIGNED_UPDATER == 'true' }};
+            const status = requireSigned
+              ? checkSignedReleaseAssets(tag, assets)
+              : checkRelease(tag, assets);
             if (!status.ok) {
               core.setFailed('Release verification failed: ' + status.issues.join(' | '));
               return;
