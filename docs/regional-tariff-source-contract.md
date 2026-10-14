@@ -69,3 +69,36 @@ Producer has now **validated an actual full GB DBT expanded-measure export**: v4
 An independent XI nomenclature source has passed a real first-two-chapter canary (863 rows, 516 active declarables). A five-code XI sample captured 287 original import-measure rows with no request errors. The XI Other rate business meaning, full XI coverage and authenticated production source remain **unverified**. The desktop reader **must not** migrate or fill north_ireland_rate from those samples.
 
 See producer docs/full-gb-xi-source-stage.md and PR #6 for provenance. Do not merge or enable automatic replacement of installed tariffs.db.
+
+
+## Phase 5 — NI origin selector vs third-country measures (2026-10-14)
+
+Upstream official HMRC frontend source confirms the desktop contract **must**
+differentiate these two entirely separate concepts:
+
+1. \`country_of_origin = "OTHER"\` is a **selector** for a Rest-of-World
+   origin on the NI route. The real ISO country is retained in
+   \`other_country_of_origin\` and passed to HMRC via
+   \`filter[geographical_area_id]\`; the word OTHER is **not** a 0% duty
+   or tariff measure.
+2. The official frontend's \`third_country_duties\` measure group includes
+   **both 103 and 105**. Selecting only 103/1011 cannot establish exact XI
+   display behavior or an applicable rate for arbitrary origins.
+
+Therefore the future desktop display should require an explicit origin before
+offering a country-specific NI duty, and must not collapse origin-OTHER,
+geography-1011, Channel-Islands-1080, measure-103 and measure-105 into
+one "Other rate" column. In absence of adequate applicability evidence,
+render \`review_required\` with an official source link rather than a number.
+
+Producer implemented
+\`src/target_duty/xi_acceptance.py\`: each raw XI JSON response's actual
+SHA-256 and imported measures are replay-verified. The October 14 real
+five-code canary replayed 287 measures without a source error but remained
+**incomplete: 2 of 97 official chapters; 5 of 516 sampled-chapter codes**.
+\`production_eligible=false\` and \`other_semantics_verified=false\`
+remain mandatory. Neither PR is authorized for production promotion.
+
+Official UI source:
+https://github.com/trade-tariff/trade-tariff-frontend/blob/main/app/models/duty_calculator/steps/import_details.rb
+https://github.com/trade-tariff/trade-tariff-frontend/blob/main/config/grouped_measure_types.yml
