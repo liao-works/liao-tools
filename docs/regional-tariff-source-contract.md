@@ -345,3 +345,33 @@ but is still awaiting an authorized live source run.
 No version in this chain is an importable desktop tariff snapshot;
 do not write any values into Other, north_ireland_rate, or tariffs.db.
 Official-source document: cursor-tax-tools/docs/xi-checkpoint-continuity.md
+
+## Phase 15 — signed portable NI *raw source* archives are NOT desktop tariff packs
+
+The producer can package a pinned original XI commodity catalogue, frozen
+source manifest, replay-verified raw-measure SQLite, merged evidence report
+and current+immediate-parent checkpoint chain in a fixed-member ZIP.
+
+Managed-full packages require an **operator Ed25519 signature**, verified
+at restore time against an independently trusted public key. Restore
+rejects member tampering, missing/extra data, path traversal, symlinks,
+unsigned managed archives and incomplete source replay. The signing
+private key never belongs in this repository or any app-installed file.
+
+A successful restore only proves the operator's signed raw source archive
+can be rechecked; it does NOT prove HMRC atomic source consistency,
+origin-specific NI `Other` duty, legal payable rate, or a customer data
+publication signature. Public XI canary archives are deliberately unsigned
+and CANNOT be treated as managed-full sources.
+
+All source archive receipts retain `production_eligible=false`,
+`ni_other_verified=false`, and `atomic_official_snapshot_verified=false`.
+**No desktop importer, `tariffs.db` migration, `north_ireland_rate` or
+`other_rate` update may consume these review artifacts** until separate
+legal/rate business certification and signed production packaging exist.
+
+GitHub Actions archive retention remains time limited (~30 days):
+an external encrypted/versioned object store and secure key custody are
+still needed. An operator signature alone is not durable storage.
+
+See producer `docs/xi-signed-source-archive.md`.
