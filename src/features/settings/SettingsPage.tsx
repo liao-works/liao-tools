@@ -1,24 +1,23 @@
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { Link } from 'react-router-dom';
 import { Settings2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Github, Mail, Globe, Check, Download } from 'lucide-react';
+import { Github, Check, Download, ArrowUpRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getVersion } from '@tauri-apps/api/app';
 import { useTheme } from '@/hooks/use-theme';
 import { useDarkMode, type DarkModeType } from '@/hooks/use-dark-mode';
 import { cn } from '@/lib/utils';
 import { ACCENT_PREVIEW } from '@/lib/themes';
-import { UpdateDialog } from '@/components/UpdateDialog';
 import { loadSettings, saveSettings, type AppSettings } from '@/lib/settings';
 import logo from '@/assets/logo-64.png';
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
-  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [appVersion, setAppVersion] = useState<string>('');
   const { currentTheme, themes, changeTheme } = useTheme();
   const { mode: darkMode, setDarkMode } = useDarkMode();
@@ -199,32 +198,17 @@ export function SettingsPage() {
             </p>
           </div>
 
-          <div className="flex gap-2 pt-4 border-t">
-            <Button variant="outline" size="sm" onClick={() => setUpdateDialogOpen(true)}>
-              <Download className="mr-2 h-4 w-4" />
-              检查更新
-            </Button>
-            <Button variant="outline" size="sm">
-              <Github className="mr-2 h-4 w-4" />
-              GitHub
-            </Button>
-            <Button variant="outline" size="sm">
-              <Mail className="mr-2 h-4 w-4" />
-              反馈
-            </Button>
-            <Button variant="outline" size="sm">
-              <Globe className="mr-2 h-4 w-4" />
-              官网
-            </Button>
+          <div className="lt-settings-actions">
+            <Link to="/updates" className="lt-settings-update-link">
+              <Download size={18}/><span><strong>应用更新中心</strong><small>检查新版本、设置提醒、验证和安装更新包</small></span>
+              <ArrowUpRight size={18}/>
+            </Link>
+            <a className="lt-settings-repo" href="https://github.com/liao-works/liao-tools"
+              target="_blank" rel="noreferrer"><Github size={17}/> 查看 GitHub 仓库</a>
           </div>
         </CardContent>
       </Card>
 
-      {/* 更新对话框 */}
-      <UpdateDialog
-        open={updateDialogOpen}
-        onOpenChange={setUpdateDialogOpen}
-      />
     </div>
   );
 }

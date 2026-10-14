@@ -1,10 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import {
   Home, Search, ShieldCheck, Package, FileSpreadsheet, Wrench,
-  CheckCheck, Settings, Database, Calculator, PanelLeftClose, PanelLeftOpen
+  CheckCheck, Settings, Database, Calculator, PanelLeftClose, PanelLeftOpen, RefreshCw
 } from 'lucide-react';
-import { useState } from 'react';
-import { UpdateDialog } from '@/components/UpdateDialog';
 
 interface SidebarProps { collapsed: boolean; onToggle: () => void; onNavigate?: () => void }
 
@@ -26,7 +24,6 @@ const groups = [
 ];
 
 export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
-  const [updateOpen, setUpdateOpen] = useState(false);
   return (
     <aside className={['lt-sidebar', collapsed ? 'lt-sidebar--collapsed' : ''].join(' ')} aria-label="主导航">
       <div className="lt-brand">
@@ -57,6 +54,9 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
           {!collapsed && <div className="lt-nav-label">管理</div>}
           <NavLink to="/tax?tab=update" onClick={onNavigate} className="lt-nav-item"
             title={collapsed ? '数据维护' : undefined}><Database size={18}/>{!collapsed && '数据维护'}</NavLink>
+          <NavLink to="/updates" onClick={onNavigate}
+            className={({ isActive }) => ['lt-nav-item', isActive ? 'is-active' : ''].join(' ')}
+            title={collapsed ? '应用更新' : undefined}><RefreshCw size={18}/>{!collapsed && '应用更新'}</NavLink>
           <NavLink to="/settings" onClick={onNavigate}
             className={({ isActive }) => ['lt-nav-item', isActive ? 'is-active' : ''].join(' ')}
             title={collapsed ? '偏好设置' : undefined}><Settings size={18}/>{!collapsed && '偏好设置'}</NavLink>
@@ -64,10 +64,9 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
       </nav>
       <div className="lt-sidebar-footer">
         {!collapsed && <div className="lt-footer-note"><span className="lt-footer-dot"/> 本地优先 · 桌面工具集</div>}
-        <button className="lt-footer-update" type="button" onClick={() => setUpdateOpen(true)}
-          title="检查应用更新"><span>↻</span>{!collapsed && '检查应用更新'}</button>
+        <NavLink className="lt-footer-update" to="/updates" onClick={onNavigate}
+          title="打开应用更新页面"><RefreshCw size={17}/>{!collapsed && '应用更新'}</NavLink>
       </div>
-      <UpdateDialog open={updateOpen} onOpenChange={setUpdateOpen}/>
     </aside>
   );
 }

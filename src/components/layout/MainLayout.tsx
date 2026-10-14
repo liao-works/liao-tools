@@ -4,7 +4,7 @@ import { Menu, Search, Moon, Sun } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { CommandPalette } from './CommandPalette';
 import { UpdateDialog } from '@/components/UpdateDialog';
-import { checkForUpdates, loadUpdateSettings, updateLastCheckTime } from '@/lib/updater';
+import { checkForUpdates, loadUpdateSettings, updateLastCheckTime, type UpdateInfo } from '@/lib/updater';
 import { useDarkMode } from '@/hooks/use-dark-mode';
 
 export function MainLayout() {
@@ -12,6 +12,7 @@ export function MainLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [autoUpdateOpen, setAutoUpdateOpen] = useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState<UpdateInfo | null>(null);
   const { isDark, toggleDarkMode } = useDarkMode();
   const navigate = useNavigate();
   const location = useLocation();
@@ -36,7 +37,7 @@ export function MainLayout() {
         if (elapsed < (cfg.check_interval_hours || 24)) return;
         const info = await checkForUpdates();
         await updateLastCheckTime();
-        if (info.has_update) setAutoUpdateOpen(true);
+        if (info.has_update) { setPendingUpdate(info); setAutoUpdateOpen(true); }
       } catch (error) { console.error('更新检查失败', error); }
     };
     const timer = window.setTimeout(() => { void check(); }, 3000);
@@ -66,7 +67,7 @@ export function MainLayout() {
         <main className="lt-content" id="main-content"><Outlet/></main>
       </div>
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)}/>
-      <UpdateDialog open={autoUpdateOpen} onOpenChange={setAutoUpdateOpen} autoCheck/>
+      <UpdateDialog open={autoUpdateOpen} onOpenChange={setAutoUpdateOpen} initialInfo={pendingUpdate} autoCheck/>
     </div>
   );
 }

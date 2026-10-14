@@ -10,6 +10,7 @@ import { UpsUpdPage } from './features/ups-dpd/UpsUpdPage';
 import { RevCalPage } from './features/revcal/RevCalPage';
 import { SystemToolsPage } from './features/system-tools/SystemToolsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
+import { UpdateCenter } from './components/UpdateCenter';
 import { TodoPage } from './features/todo/TodoPage';
 import { TodoWidget } from './features/todo/TodoWidget';
 import { Toaster } from './components/ui/toaster';
@@ -63,6 +64,7 @@ function App() {
           <Route path="revcal" element={<RevCalPage />} />
           <Route path="system-tools" element={<SystemToolsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="updates" element={<UpdateCenter />} />
         </Route>
       </Routes>
       <Toaster />
