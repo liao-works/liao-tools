@@ -22,22 +22,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
-/// Trusted signing mode is determined by the baked-in Tauri config,
-/// never by user-editable preferences, JavaScript flags or local storage.
-#[tauri::command]
-pub fn signed_updater_available(app: tauri::AppHandle) -> bool {
-    #[cfg(desktop)]
-    {
-        app.config().plugins.get("updater")
-            .and_then(|plugin| plugin.get("pubkey"))
-            .and_then(serde_json::Value::as_str)
-            .map(|pubkey| !pubkey.trim().is_empty())
-            .unwrap_or(false)
-    }
-    #[cfg(not(desktop))]
-    { false }
-}
-
 /// 应用状态
 pub struct AppState {
     pub db: Arc<Mutex<DatabaseManager>>,

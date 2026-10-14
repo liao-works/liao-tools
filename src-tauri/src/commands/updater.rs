@@ -8,6 +8,22 @@ use tauri::Emitter;
 use sha2::{Sha256, Digest};
 use std::io::Read;
 
+/// Trusted signing mode is determined by the baked-in Tauri config,
+/// never by user-editable preferences, JavaScript flags or local storage.
+#[tauri::command]
+pub fn signed_updater_available(app: tauri::AppHandle) -> bool {
+    #[cfg(desktop)]
+    {
+        app.config().plugins.0.get("updater")
+            .and_then(|plugin| plugin.get("pubkey"))
+            .and_then(serde_json::Value::as_str)
+            .map(|pubkey| !pubkey.trim().is_empty())
+            .unwrap_or(false)
+    }
+    #[cfg(not(desktop))]
+    { false }
+}
+
 // GitHub 仓库配置
 const GITHUB_REPO: &str = "liao-works/liao-tools";
 const GITHUB_API_URL: &str = "https://api.github.com/repos/liao-works/liao-tools/releases/latest";
