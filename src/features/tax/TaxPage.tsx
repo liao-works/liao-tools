@@ -14,7 +14,7 @@ export function TaxPage() {
     <div className="lt-feature space-y-6">
       <FeatureHeader eyebrow="TRADE / TARIFF" title="英国 / 北爱尔兰关税查询"
         description="输入商品编码，查询本地英国及北爱尔兰税率、反倾销和反补贴字段。结果附带来源与核验状态。"
-        icon={<Search size={35} strokeWidth={1.5}/>} illustrationSrc="/illustrations/tariff-hero.svg"/>
+        illustrationSrc="/illustrations/tariff-hero.svg"/>
       <Tabs value={tab} onValueChange={value => setParams(value === 'single' ? {} : { tab: value })} className="space-y-4">
         <TabsList>
           <TabsTrigger value="single">单码查询</TabsTrigger>
