@@ -168,6 +168,23 @@ fn validated_digest(asset: &GitHubAsset) -> Option<String> {
         Some(sha.to_ascii_lowercase())
     } else { None }
 }
+/// Authority for install authorization comes from freshly fetched official
+/// Release metadata. A locally writable SHA-256 sidecar alone is not trusted.
+fn matches_official_install(name: &str, sha: &str, size: u64, release: &UpdateInfo) -> bool {
+    if !release.has_update { return false; }
+    let url = match release.platform_specific_url.as_deref() {
+        Some(url) => url, None => return false
+    };
+    let extension = [".exe", ".msi", ".dmg", ".AppImage", ".deb"]
+        .iter().copied().find(|ext| url.ends_with(ext));
+    let expected_name = match extension {
+        Some(ext) => format!("liao-tools_{}{}", release.latest_version, ext),
+        None => return false,
+    };
+    name == expected_name
+        && release.checksum_sha256.as_deref() == Some(sha)
+        && release.file_size == Some(size)
+}
 fn file_sha256(path: &Path) -> Result<String, CommandError> {
     let mut file = File::open(path).map_err(|e| CommandError::new(format!("读取更新包失败: {}", e), "IO_ERROR"))?;
     let mut hasher = Sha256::new();
@@ -315,19 +332,10 @@ pub async fn install_update(file_path: String, silent: bool) -> Result<String, C
     // independent authority. Re-check official GitHub asset digest, size and
     // release-version-specific filename at INSTALL time, not only download time.
     let official = check_for_updates().await?;
-    let official_url = official.platform_specific_url.as_deref()
-        .ok_or_else(|| CommandError::new("官方 Release 缺少当前平台的安装包", "UNTRUSTED_RELEASE"))?;
-    let extension = [".exe", ".msi", ".dmg", ".AppImage", ".deb"]
-        .iter().copied().find(|ext| official_url.ends_with(ext))
-        .ok_or_else(|| CommandError::new("官方安装包格式不支持", "UNSUPPORTED_FORMAT"))?;
-    let expected_name = format!("liao-tools_{}{}", official.latest_version, extension);
     let current_name = target.file_name().and_then(|name| name.to_str()).unwrap_or("");
     let actual_size = fs::metadata(&target)
         .map_err(|e| CommandError::new(format!("读取安装包大小失败: {}", e), "IO_ERROR"))?.len();
-    if !official.has_update || current_name != expected_name
-        || official.checksum_sha256.as_deref() != Some(sha)
-        || official.file_size != Some(actual_size)
-    {
+    if !matches_official_install(current_name, sha, actual_size, &official) {
         return Err(CommandError::new(
             "安装包与当前 GitHub 官方 Release 的版本、大小或 SHA-256 不一致",
             "UNTRUSTED_RELEASE"
@@ -880,6 +888,33 @@ mod tests {
         assert!(validated_digest(&asset).is_none());
         asset.digest = Some(format!("sha1:{}", "f".repeat(64)));
         assert!(validated_digest(&asset).is_none());
+    }
+
+    #[test]
+    fn install_requires_fresh_official_release_identity() {
+        let digest = "b".repeat(64);
+        let mut latest = UpdateInfo {
+            current_version: "0.0.13".into(),
+            latest_version: "0.0.14".into(),
+            has_update: true,
+            download_url: "https://github.com/liao-works/liao-tools/releases/tag/v0.0.14".into(),
+            release_notes: "notes".into(),
+            published_at: "2026-10-14T00:00:00Z".into(),
+            platform_specific_url: Some(
+                "https://github.com/liao-works/liao-tools/releases/download/v0.0.14/liao-tools_0.0.14_x64-setup.exe".into()
+            ),
+            file_size: Some(200),
+            checksum_sha256: Some(digest.clone()),
+        };
+        assert!(matches_official_install("liao-tools_0.0.14.exe", &digest, 200, &latest));
+        assert!(!matches_official_install("liao-tools_0.0.13.exe", &digest, 200, &latest));
+        assert!(!matches_official_install("liao-tools_0.0.14.exe", &"c".repeat(64), 200, &latest));
+        assert!(!matches_official_install("liao-tools_0.0.14.exe", &digest, 201, &latest));
+        latest.has_update = false;
+        assert!(!matches_official_install("liao-tools_0.0.14.exe", &digest, 200, &latest));
+        latest.has_update = true;
+        latest.platform_specific_url = None;
+        assert!(!matches_official_install("liao-tools_0.0.14.exe", &digest, 200, &latest));
     }
 
     #[test]
