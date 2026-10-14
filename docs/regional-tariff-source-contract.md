@@ -300,3 +300,21 @@ a globally atomic XI snapshot; source/version consistency and NI
 `Other` applicability remain unverified. No review source data is
 eligible for direct insertion into `tariffs.db` or any consumer duty
 field. See producer docs/xi-cross-run-drift-guard.md.
+
+### Phase 13 audit evidence preservation
+
+NI old/new source drift now has a separate bounded, replay-only SQLite
+evidence file containing exact compressed original and newly retrieved
+HMRC XI commodity responses with response SHA-256 and discrepancy status.
+That SQLite is for manual audit and MUST NOT be accepted by the desktop
+importer as a rate database. Its existence neither establishes HMRC
+atomic source version continuity nor NI `Other` applicability.
+
+The standalone source collector now independently verifies a previous
+merged checkpoint **and its own existing local checkpoint** before
+skipping successful codes, even when bypassing the orchestrator.
+The drift guard blocks extending a multi-run source snapshot if any
+reviewed anchor changes or fails to load. On two real public XI
+examples the official source anchor responses were stable for the
+same historical as-of date, but 511 commodity sources were still
+missing in those two sample chapters. No production update authorized.
