@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Search, Moon, Sun } from 'lucide-react';
 import { Sidebar } from './Sidebar';
@@ -13,6 +13,7 @@ export function MainLayout() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [autoUpdateOpen, setAutoUpdateOpen] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState<UpdateInfo | null>(null);
+  const promptedVersion = useRef<string | null>(null);
   const { isDark, toggleDarkMode } = useDarkMode();
   const navigate = useNavigate();
   const location = useLocation();
@@ -29,19 +30,39 @@ export function MainLayout() {
     return () => window.removeEventListener('keydown', handler, true);
   }, []);
   useEffect(() => {
+    let active = true;
+    let checking = false;
     const check = async () => {
+      if (!active || checking) return;
+      checking = true;
       try {
         const cfg = await loadUpdateSettings();
-        if (!cfg.auto_check) return;
-        const elapsed = (Math.floor(Date.now()/1000) - cfg.last_check_time)/3600;
+        if (!active || !cfg.auto_check) return;
+        const elapsed = (Math.floor(Date.now() / 1000) - cfg.last_check_time) / 3600;
         if (elapsed < (cfg.check_interval_hours || 24)) return;
         const info = await checkForUpdates();
+        if (!active) return;
         await updateLastCheckTime();
-        if (info.has_update) { setPendingUpdate(info); setAutoUpdateOpen(true); }
-      } catch (error) { console.error('更新检查失败', error); }
+        if (info.has_update && promptedVersion.current !== info.latest_version) {
+          promptedVersion.current = info.latest_version;
+          setPendingUpdate(info);
+          setAutoUpdateOpen(true);
+        }
+      } catch (error) {
+        // Keep the previous successful check timestamp, allowing retry.
+        console.error('自动检查更新失败:', error);
+      } finally {
+        checking = false;
+      }
     };
-    const timer = window.setTimeout(() => { void check(); }, 3000);
-    return () => window.clearTimeout(timer);
+    const initial = window.setTimeout(() => { void check(); }, 3000);
+    // Also check while the application stays open, respecting persisted intervals.
+    const periodic = window.setInterval(() => { void check(); }, 60 * 60 * 1000);
+    return () => {
+      active = false;
+      window.clearTimeout(initial);
+      window.clearInterval(periodic);
+    };
   }, []);
 
   return (
