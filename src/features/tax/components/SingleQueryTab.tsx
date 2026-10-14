@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { Search, Loader2, Copy, ExternalLink, AlertCircle, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
@@ -11,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { taxApi } from '@/lib/api/tax';
 import { listen } from '@tauri-apps/api/event';
 import type { TaxTariff } from '@/types';
+import { TaxResultDetail } from './TaxResultDetail';
 
 interface UpdateLog {
   code: string;
@@ -53,6 +52,8 @@ function TariffOverview({ tariff }: { tariff: TaxTariff }) {
 export function SingleQueryTab() {
   const [code, setCode] = useState('');
   const [fuzzyMode, setFuzzyMode] = useState(false);
+  const [inputError, setInputError] = useState('');
+  const [requestError, setRequestError] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<TaxTariff[]>([]);
   const [searched, setSearched] = useState(false); // 标记是否已搜索
@@ -142,8 +143,13 @@ export function SingleQueryTab() {
   }, []);
 
   const handleSearch = async () => {
-    if (!code.trim()) return;
-
+    const normalized = code.replace(/[\\s-]/g, '');
+    if (!(fuzzyMode ? /^\\d{4,10}$/ : /^\\d{10}$/).test(normalized)) {
+      setInputError(fuzzyMode ? '模糊查询需要 4–10 位数字编码。' : '精确查询需要完整 10 位数字商品编码。');
+      return;
+    }
+    setInputError('');
+    setRequestError('');
     setLoading(true);
     setResults([]);
     setSearched(true); // 标记已搜索
@@ -158,6 +164,7 @@ export function SingleQueryTab() {
       }
     } catch (error) {
       console.error('查询失败:', error);
+      setRequestError('查询失败，请检查本地数据库或稍后重试。');
       toast({
         title: '查询失败',
         description: String(error),
@@ -228,7 +235,7 @@ export function SingleQueryTab() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="lt-tax-query space-y-4">
       {/* 数据检查提示 */}
       {hasData === false && (
         <Card className="border-warning bg-warning-subtle">
@@ -248,46 +255,49 @@ export function SingleQueryTab() {
         </Card>
       )}
 
-      {/* 搜索区域 */}
-      <Card>
+
+      <Card className="lt-tax-form">
         <CardHeader>
-          <CardTitle>税率查询</CardTitle>
-          <CardDescription>输入商品编码查询其税率信息</CardDescription>
+          <CardTitle>商品编码查询</CardTitle>
+          <CardDescription>同时查看英国和北爱尔兰税率及来源核验状态</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="请输入商品编码，如：0101210000"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              onKeyPress={handleKeyPress}
-              className="flex-1"
-            />
-            <Button onClick={handleSearch} disabled={loading || !code.trim() || hasData === false}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  查询中
-                </>
-              ) : (
-                <>
-                  <Search className="mr-2 h-4 w-4" />
-                  查询
-                </>
-              )}
+        <CardContent className="space-y-3">
+          <div className="lt-tax-form-fields">
+            <div className="lt-hs-field">
+              <label htmlFor="lt-hs-input">输入商品编码 <small>HS Code</small></label>
+              <div className="lt-hs-input-wrap">
+                <Search size={17} aria-hidden="true"/>
+                <Input id="lt-hs-input" inputMode="numeric" maxLength={24} value={code}
+                  placeholder={fuzzyMode ? '输入 4–10 位商品编码' : '例如：0101210000'}
+                  aria-invalid={!!inputError} aria-describedby={inputError ? 'lt-code-error' : 'lt-code-help'}
+                  onChange={e => {setCode(e.target.value);setInputError('');setRequestError('');setSearched(false);setResults([]);}}
+                  onKeyDown={handleKeyPress}/>
+                {code && <button type="button" aria-label="清空编码" title="清空编码"
+                  onClick={() => {setCode('');setInputError('');setRequestError('');setSearched(false);setResults([]);}}>
+                  <X size={16}/>
+                </button>}
+              </div>
+            </div>
+            <div className="lt-query-mode">
+              <span className="lt-query-mode-label">查询方式</span>
+              <div className="lt-query-mode-options" role="group" aria-label="查询方式">
+                <button type="button" className={!fuzzyMode ? 'is-active' : ''} aria-pressed={!fuzzyMode}
+                  onClick={() => {setFuzzyMode(false);setInputError('');setRequestError('');setSearched(false);setResults([]);}}>精确</button>
+                <button type="button" className={fuzzyMode ? 'is-active' : ''} aria-pressed={fuzzyMode}
+                  onClick={() => {setFuzzyMode(true);setInputError('');setRequestError('');setSearched(false);setResults([]);}}>模糊</button>
+              </div>
+            </div>
+            <Button className="lt-tax-run" onClick={handleSearch}
+              disabled={loading || !code.trim() || hasData === false}>
+              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>查询中…</>
+                : <><Search className="mr-2 h-4 w-4"/>开始查询</>}
             </Button>
           </div>
-
-          {/* 模糊匹配开关 */}
-          <div className="flex items-center space-x-2">
-            <Switch id="fuzzy-mode" checked={fuzzyMode} onCheckedChange={setFuzzyMode} />
-            <Label htmlFor="fuzzy-mode">
-              模糊匹配
-              <span className="ml-2 text-xs text-muted-foreground">
-                （启用后将搜索相似编码）
-              </span>
-            </Label>
-          </div>
+          <p className="lt-tax-hint" id="lt-code-help">{fuzzyMode
+            ? '模糊查询支持 4–10 位编码；相似结果仅供选码，不能直接作为税率依据。'
+            : '精确查询请输入 10 位商品编码，允许包含空格或连字符。'}</p>
+          {inputError && <p role="alert" id="lt-code-error" className="lt-tax-validation">{inputError}</p>}
+          {requestError && <p role="alert" className="lt-tax-validation">{requestError}</p>}
         </CardContent>
       </Card>
 
@@ -295,15 +305,19 @@ export function SingleQueryTab() {
       {results.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>查询结果</CardTitle>
+            <CardTitle>{results.length === 1 && !fuzzyMode ? `查询结果 · ${results[0].code}` : '查询结果'}</CardTitle>
             <CardDescription>
-              找到 {results.length} 条记录
-              {fuzzyMode && '（按相似度排序，仅供选码，不代表同一商品税率）'}
+              {results.length === 1 && !fuzzyMode && results[0].description ? results[0].description : `找到 ${results.length} 条记录`}
+              {fuzzyMode && '（相似编码仅供选择，不代表税率相同）'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {results.length === 1 && !fuzzyMode && <TariffOverview tariff={results[0]}/>}
-            <div className="lt-result-table"><Table>
+            {results.length === 1 && !fuzzyMode &&
+              <TaxResultDetail tariff={results[0]} onCopy={copyToClipboard}
+                onOpenSource={openUrl} onCompare={handleAutoUpdate}
+                comparing={updatingCode === results[0].code}/>}
+            {(fuzzyMode || results.length !== 1) && <div className="lt-result-table"><Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>商品编码</TableHead>
@@ -455,16 +469,17 @@ export function SingleQueryTab() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table></div>
+            </Table></div>}
           </CardContent>
         </Card>
       )}
 
       {/* 空状态 - 只在已搜索且无结果时显示 */}
-      {!loading && results.length === 0 && searched && (
+      {!loading && results.length === 0 && searched && !requestError && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-10">
-            <p className="text-muted-foreground">未找到匹配的税率信息</p>
+            <img src="/illustrations/empty-query.svg" alt="" aria-hidden="true" className="lt-tax-no-result-art"/>
+            <p className="font-medium text-foreground">没有匹配的本地税率记录</p>
             <p className="text-sm text-muted-foreground mt-2">
               请尝试{fuzzyMode ? '精确查询' : '模糊查询'}模式
             </p>
