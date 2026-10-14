@@ -22,7 +22,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - name: Prepare browser
-        run: pnpm dlx playwright install --with-deps chromium
+        run: |
+          npm install --prefix /tmp/liao-playwright --no-package-lock --no-save playwright
+          /tmp/liao-playwright/node_modules/.bin/playwright install --with-deps chromium
       - name: Launch UI preview
         shell: bash
         run: |
@@ -37,16 +39,18 @@ jobs:
       - name: Capture pages
         shell: bash
         run: |
-          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/ ui-screenshots/home-desktop.png
-          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/tax ui-screenshots/tariff-desktop.png
-          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/ ui-screenshots/home-compact.png
-          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/alta ui-screenshots/alta-desktop.png
-          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/alta?tab=batch ui-screenshots/alta-batch-desktop.png
-          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/excel ui-screenshots/excel-desktop.png
-          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/ups-dpd ui-screenshots/ups-dpd-desktop.png
-          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/revcal ui-screenshots/amazon-desktop.png
-          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/alta ui-screenshots/alta-compact.png
-          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/ups-dpd ui-screenshots/shipping-compact.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/ ui-screenshots/home-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/tax ui-screenshots/tariff-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/ ui-screenshots/home-compact.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/alta ui-screenshots/alta-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/alta?tab=batch ui-screenshots/alta-batch-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/excel ui-screenshots/excel-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/ups-dpd ui-screenshots/ups-dpd-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/revcal ui-screenshots/amazon-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/alta ui-screenshots/alta-compact.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/ups-dpd ui-screenshots/shipping-compact.png
+      - name: Mocked Tauri browser flows
+        run: node tests/ui-flow-smoke.cjs
       - name: Upload visual review images
         if: always()
         uses: actions/upload-artifact@v4
