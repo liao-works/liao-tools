@@ -505,8 +505,7 @@ fn install_windows_exe(path: &Path, silent: bool) -> Result<(), CommandError> {
         println!("静默安装完成");
     } else {
         // 交互式安装：不等待
-        std::process::Command::new("cmd")
-            .args(["/c", "start", "", &path.to_string_lossy()])
+        std::process::Command::new(path)
             .spawn()
             .map_err(|e| CommandError::new(
                 format!("启动安装程序失败: {}", e),

@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import {
   checkForUpdates, downloadUpdate, installUpdate, listenToDownloadProgress,
   loadUpdateSettings, saveUpdateSettings, updateLastCheckTime,
@@ -121,7 +122,18 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
       setPhase('error'); setError(friendlyError(err));
     }
   };
-  const openRelease = () => window.open(info?.download_url || RELEASES, '_blank', 'noopener,noreferrer');
+  const openRelease = async () => {
+    const url = info?.download_url || RELEASES;
+    if (!url.startsWith('https://github.com/liao-works/liao-tools/releases')) {
+      setError('更新来源地址异常，已拒绝打开。');
+      return;
+    }
+    try {
+      await openUrl(url);
+    } catch (err) {
+      setError(friendlyError(err));
+    }
+  };
 
   return <div className={embedded ? 'lt-update-center lt-update-center--embedded' : 'lt-update-center lt-feature'}>
     {!embedded && <header className="lt-update-page-head">

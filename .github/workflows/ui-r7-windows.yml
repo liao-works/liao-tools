@@ -5,6 +5,9 @@ on:
       - '.github/workflows/ui-r7-windows.yml'
       - 'src-tauri/**'
   workflow_dispatch:
+concurrency:
+  group: ui-windows-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   tauri-windows:
     runs-on: windows-latest
