@@ -55,7 +55,7 @@ jobs:
           fi
           # Tags must name a reviewed commit reachable from the protected
           # default branch. An unmerged feature tag must not create a release.
-          git fetch origin master --no-tags
+          git fetch origin refs/heads/master:refs/remotes/origin/master --no-tags
           if ! git merge-base --is-ancestor HEAD refs/remotes/origin/master; then
             echo "::error::This tag does not point to a commit reachable from master."
             exit 1
@@ -188,7 +188,7 @@ jobs:
             echo "::error::Only stable version tags can publish."
             exit 1
           fi
-          git fetch origin master --no-tags
+          git fetch origin refs/heads/master:refs/remotes/origin/master --no-tags
           if ! git merge-base --is-ancestor HEAD refs/remotes/origin/master; then
             echo "::error::Tag commit is not reachable from master; publication blocked."
             exit 1

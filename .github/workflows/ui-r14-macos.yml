@@ -1,0 +1,41 @@
+name: UI R14 · macOS Tauri Compile
+on:
+  pull_request:
+    paths:
+      - 'src-tauri/**'
+      - 'pnpm-lock.yaml'
+      - 'package.json'
+      - '.github/workflows/ui-r14-macos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: ui-macos-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tauri-macos:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install frontend (locked)
+        run: pnpm install --frozen-lockfile
+      - name: Build frontend
+        run: pnpm run build
+      - name: Compile native macOS Tauri app
+        run: cargo check --locked --manifest-path src-tauri/Cargo.toml
+      - name: Test native updater security and release matching
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib commands::updater::tests
