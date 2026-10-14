@@ -643,38 +643,43 @@ pub async fn check_for_updates() -> Result<UpdateInfo, CommandError> {
     println!("仓库: {}", GITHUB_REPO);
     println!("API 地址: {}", GITHUB_API_URL);
 
-    // 构建请求，如果有 Token 则添加认证头
-    let mut request = client.get(GITHUB_API_URL);
-    if let Some(token) = get_github_token() {
-        println!("使用 GitHub Token 进行认证");
-        request = request.header("Authorization", format!("Bearer {}", token));
-    }
-
-    let response = request
-        .send()
-        .await
-        .map_err(|e| CommandError::new(format!("获取版本信息失败: {}", e), "NETWORK_ERROR"))?;
+    // Retry only transient connectivity errors / 5xx. Rate limiting is not an
+    // authentication failure; never ask normal desktop users for a GitHub token.
+    let mut attempt = 0u8;
+    let response = loop {
+        let mut request = client.get(GITHUB_API_URL)
+            .header("Accept", "application/vnd.github+json");
+        if let Some(token) = get_github_token() {
+            request = request.header("Authorization", format!("Bearer {}", token));
+        }
+        match request.send().await {
+            Ok(response) if response.status().is_server_error() && attempt == 0 => {
+                attempt += 1;
+                tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+            }
+            Ok(response) => break response,
+            Err(error) if (error.is_timeout() || error.is_connect()) && attempt == 0 => {
+                attempt += 1;
+                tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+            }
+            Err(error) => return Err(CommandError::new(
+                format!("暂时无法连接 GitHub 更新服务: {}", error), "NETWORK_ERROR"
+            )),
+        }
+    };
 
     if !response.status().is_success() {
         let status = response.status();
-        let error_body = response.text().await.unwrap_or_else(|_| "无法读取错误信息".to_string());
-
-        if status.as_u16() == 404 {
-            return Err(CommandError::new(
-                format!("仓库 {} 未找到 Release，请确保已发布至少一个版本", GITHUB_REPO),
-                "NOT_FOUND"
-            ));
-        } else if status.as_u16() == 403 || status.as_u16() == 401 {
-            return Err(CommandError::new(
-                format!("访问私有仓库失败，请设置 GITHUB_TOKEN 环境变量。错误: {}", error_body),
-                "AUTH_ERROR"
-            ));
-        } else {
-            return Err(CommandError::new(
-                format!("GitHub API 返回错误状态: {} - {}", status, error_body),
-                "API_ERROR"
-            ));
-        }
+        return Err(match status.as_u16() {
+            404 => CommandError::new("暂未发布可用的正式版本", "NOT_FOUND"),
+            403 | 429 => CommandError::new(
+                "GitHub 更新服务访问频率受限，请稍后重试或打开官方发布页面",
+                "RATE_LIMIT"
+            ),
+            401 => CommandError::new("GitHub 更新服务认证失败", "AUTH_ERROR"),
+            500..=599 => CommandError::new("GitHub 更新服务暂时不可用，请稍后重试", "SERVER_ERROR"),
+            _ => CommandError::new(format!("GitHub 更新服务返回 HTTP {}", status), "API_ERROR"),
+        });
     }
 
     let release: GitHubRelease = response
