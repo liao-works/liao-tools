@@ -254,3 +254,26 @@ installed tariffs.db is authorized.
 
 See producer docs/xi-full-coverage-run-planning.md. This is a source
 contract update only, not desktop executable implementation.
+
+## Phase 12 — per-chapter NI source receipt and final review-only acceptance
+
+The producer has `xi_coverage_receipt.py`: an independently replayed,
+chapter-by-chapter receipt for managed XI source coverage. It counts
+every active declarable commodity from the original frozen XI catalogue,
+with separately reconciled successful, failed and missing source
+responses and examples for every chapter. A public partial canary
+can never pass a managed-full source gate.
+
+Even the successful `--strict` managed FULL-source receipt only proves
+captured raw import-measure source coverage. It **does not certify**
+NI `Other` tariff applicability, user-specific origin, conditions,
+additional codes, UKIMS or a payable tax calculation; an HMRC atomic
+snapshot is not established by multiple separately timed API calls.
+
+The managed manual workflow supports an audit-only final pass once all
+codes have already been collected and replayed; it does not refetch
+known-successful codes. Its artifact receipt is a QA document, not a
+signed desktop tariff pack. The existing `north_ireland_rate`,
+`other_rate` and installed tariffs.db MUST remain unchanged.
+
+Producer doc: cursor-tax-tools/docs/xi-chapter-coverage-receipt.md
