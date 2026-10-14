@@ -112,8 +112,9 @@ https://github.com/liao-works/cursor-tax-tools/actions/runs/38508653594
 One current official XI commodity \`0101210000\` returned 42 unfiltered
 import measures, but **6** when filtered by US origin and **6** when filtered
 by CN origin. Both country-specific filtered responses contained a type-103
-geography-1011 candidate whose directly resolved duty string was **empty**
-with a condition relationship. Never map that to 0% or to a confirmed
+geography-1011 candidate whose direct resolved string was empty, but
+whose linked official duty-expression base is **0.00 %** and which has
+multiple conditions. Never map it to a *payable* 0% or a confirmed
 \`north_ireland_rate\`.
 
 Producer offers \`xi_origin_compare.py\` for auditable filtered comparisons
