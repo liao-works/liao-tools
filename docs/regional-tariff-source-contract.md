@@ -61,3 +61,11 @@ Producer documentation: docs/region-measures-bulk-feasibility.md
 
 No front-end component, Tauri command or production update endpoint is
 changed by this contract note; it is an implementation hand-off only.
+
+## October 14 phase-4 source update (still NOT production-wired)
+
+Producer has now **validated an actual full GB DBT expanded-measure export**: v4.0.1626, 1,123,765 measure rows, 16,735 distinct codes, 16,376/16,376 focused 103/1011 code parity and seven explicitly missing special-purpose leaf codes. This supersedes the earlier *gap-only* prototype as available source evidence but still does not mean a certified payable GB duty.
+
+An independent XI nomenclature source has passed a real first-two-chapter canary (863 rows, 516 active declarables). A five-code XI sample captured 287 original import-measure rows with no request errors. The XI Other rate business meaning, full XI coverage and authenticated production source remain **unverified**. The desktop reader **must not** migrate or fill north_ireland_rate from those samples.
+
+See producer docs/full-gb-xi-source-stage.md and PR #6 for provenance. Do not merge or enable automatic replacement of installed tariffs.db.
