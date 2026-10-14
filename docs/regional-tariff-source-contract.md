@@ -102,3 +102,29 @@ remain mandatory. Neither PR is authorized for production promotion.
 Official UI source:
 https://github.com/trade-tariff/trade-tariff-frontend/blob/main/app/models/duty_calculator/steps/import_details.rb
 https://github.com/trade-tariff/trade-tariff-frontend/blob/main/config/grouped_measure_types.yml
+
+
+## Phase 6 — verified XI country-filter origin comparison
+
+Producer official public canary:
+https://github.com/liao-works/cursor-tax-tools/actions/runs/38508653594
+
+One current official XI commodity \`0101210000\` returned 42 unfiltered
+import measures, but **6** when filtered by US origin and **6** when filtered
+by CN origin. Both country-specific filtered responses contained a type-103
+geography-1011 candidate whose directly resolved duty string was **empty**
+with a condition relationship. Never map that to 0% or to a confirmed
+\`north_ireland_rate\`.
+
+Producer offers \`xi_origin_compare.py\` for auditable filtered comparisons
+and \`xi_merge.py\` for independently re-validated, atomic bounded shard
+assembly. This does not certify payable duty or authorize desktop updates.
+
+**Desktop safety decision:** keep the existing \`north_ireland_rate\`
+production field untouched, do not fill \`other_rate\` from country
+sentinels, and do not advertise the single legacy string as an
+origin-independent legal duty. Future region-aware queries must return
+an explicit requested origin, date, measure IDs/conditional states and
+a separate \`requires_review\` status where expressions are incomplete.
+
+See producer \`docs/xi-origin-and-batch-merge.md\`.
