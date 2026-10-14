@@ -184,7 +184,7 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
           </Button>}
           {downloadPath && phase !== 'launched' && <Button onClick={() => void handleInstall()} disabled={busy}>
             <PackageCheck className="mr-2 h-4 w-4"/>{signed ? '安装已签名更新' : '打开系统安装程序'}
-          </Button>
+          </Button>}
           {signed && phase === 'ready' && <Button variant="ghost" onClick={() => void discardDownloadedUpdate()}>
             放弃当前下载并重新检查
           </Button>}
