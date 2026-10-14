@@ -185,6 +185,9 @@ const BASE = 'http://127.0.0.1:1420';
       await page.getByRole('button', { name: '下载签名更新包' }).click();
       await page.getByText('签名更新包已下载，等待安装验证').waitFor();
       await page.getByRole('button', { name: '放弃当前下载并重新检查' }).click();
+      await page.waitForFunction(
+        () => window.__liaoBridgeCalls.filter(call => call.command === 'plugin:updater|check').length >= 2
+      );
       await page.getByRole('heading', { name: '发现可用的新版本' }).waitFor();
       const calls = await page.evaluate(() => window.__liaoBridgeCalls);
       assert(calls.filter(call => call.command === 'plugin:updater|check').length >= 2,
