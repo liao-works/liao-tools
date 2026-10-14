@@ -22,6 +22,22 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
+/// Trusted signing mode is determined by the baked-in Tauri config,
+/// never by user-editable preferences, JavaScript flags or local storage.
+#[tauri::command]
+pub fn signed_updater_available(app: tauri::AppHandle) -> bool {
+    #[cfg(desktop)]
+    {
+        app.config().plugins.get("updater")
+            .and_then(|plugin| plugin.get("pubkey"))
+            .and_then(serde_json::Value::as_str)
+            .map(|pubkey| !pubkey.trim().is_empty())
+            .unwrap_or(false)
+    }
+    #[cfg(not(desktop))]
+    { false }
+}
+
 /// 应用状态
 pub struct AppState {
     pub db: Arc<Mutex<DatabaseManager>>,
@@ -40,10 +56,18 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
+            // Enable signed installer operations only for binaries built with a
+            // trusted updater public key. Local/dev/legacy builds stay on the
+            // verified, user-confirmed GitHub Release flow.
+            if signed_updater_available(app.handle().clone()) {
+                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+                info!("Tauri signed updater enabled");
+            }
             info!("初始化应用...");
 
             // 获取应用数据目录
@@ -136,6 +160,7 @@ pub fn run() {
             reset_to_default_template,
             // Updater commands
             check_for_updates,
+            signed_updater_available,
             load_update_settings,
             save_update_settings,
             update_last_check_time,
