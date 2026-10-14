@@ -150,8 +150,10 @@ const BASE = 'http://127.0.0.1:1420';
     });
     await scenario('secure-update-center', '/updates', async page => {
       await page.getByRole('heading', { name: '发现可用的新版本' }).waitFor();
+      await page.screenshot({ path: 'ui-screenshots/updates-new-version-mocked.png', fullPage: true });
       await page.getByRole('button', { name: '下载并验证更新' }).click();
       await page.getByText('下载完成，完整性校验通过').waitFor();
+      await page.screenshot({ path: 'ui-screenshots/updates-verified-mocked.png', fullPage: true });
       const calls = await page.evaluate(() => window.__liaoBridgeCalls);
       assert(calls.some(call => call.command === 'download_update' &&
         call.payload.checksumSha256 === 'a'.repeat(64)), 'download must supply official digest');
