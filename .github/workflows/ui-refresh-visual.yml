@@ -41,11 +41,17 @@ jobs:
           pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/tax ui-screenshots/tariff-desktop.png
           pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/ ui-screenshots/home-compact.png
           pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/alta ui-screenshots/alta-desktop.png
+          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/alta?tab=batch ui-screenshots/alta-batch-desktop.png
+          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/excel ui-screenshots/excel-desktop.png
+          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/ups-dpd ui-screenshots/ups-dpd-desktop.png
+          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/revcal ui-screenshots/amazon-desktop.png
+          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/alta ui-screenshots/alta-compact.png
+          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/ups-dpd ui-screenshots/shipping-compact.png
       - name: Upload visual review images
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: liao-ui-r5-screenshots
+          name: liao-ui-r6-screenshots
           path: ui-screenshots/*.png
           if-no-files-found: warn
           retention-days: 14
