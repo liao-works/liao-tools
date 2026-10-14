@@ -1,5 +1,4 @@
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
-import { FileSpreadsheet } from 'lucide-react';
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';

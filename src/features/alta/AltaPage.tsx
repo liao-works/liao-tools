@@ -1,5 +1,4 @@
 import { useSearchParams } from 'react-router-dom';
-import { ShieldCheck } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
 import { QueryTab } from './components/QueryTab';
