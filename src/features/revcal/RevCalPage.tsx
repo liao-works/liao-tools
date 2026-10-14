@@ -259,7 +259,7 @@ export function RevCalPage() {
 
   return (
     <div className="lt-feature space-y-6">
-      <FeatureHeader eyebrow="PRODUCT / AMAZON" title="Amazon 商品查询" description="查询商品尺寸、重量、价格与商品信息。支持单码、多站点和 Excel 批量导出；结果来自第三方公开接口。" icon={<Calculator size={35} strokeWidth={1.5}/>}/>
+      <FeatureHeader eyebrow="PRODUCT / AMAZON" title="Amazon 商品查询" description="查询商品尺寸、重量、价格与商品信息。支持单码、多站点和 Excel 批量导出；结果来自第三方公开接口。" illustrationSrc="/illustrations/product-lookup.svg"/>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* 单码查询 */}

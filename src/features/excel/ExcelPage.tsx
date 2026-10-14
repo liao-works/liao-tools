@@ -105,7 +105,7 @@ export function ExcelPage() {
 
   return (
     <div className="lt-feature space-y-6">
-      <FeatureHeader eyebrow="FILES / SPREADSHEETS" title="Excel 数据拆分" description="处理海铁或空运工作簿的合并单元格、重量分配及图片，保留原有模板和列配置。" icon={<FileSpreadsheet size={35} strokeWidth={1.5}/>}/>
+      <FeatureHeader eyebrow="FILES / SPREADSHEETS" title="Excel 数据拆分" description="处理海铁或空运工作簿的合并单元格、重量分配及图片，保留原有模板和列配置。" illustrationSrc="/illustrations/file-workflow.svg"/>
 
       <Tabs defaultValue="process" className="w-full">
         <TabsList>

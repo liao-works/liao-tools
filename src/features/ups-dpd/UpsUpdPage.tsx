@@ -208,7 +208,7 @@ export function UpsUpdPage() {
 
   return (
     <div className="lt-feature space-y-6">
-      <FeatureHeader eyebrow="SHIPPING / TEMPLATES" title="UPS / DPD 模板处理" description="选择主数据文件和可选明细表，使用内置或自定义模板生成物流总结单与预报文件。" icon={<Package size={35} strokeWidth={1.5}/>}/>
+      <FeatureHeader eyebrow="SHIPPING / TEMPLATES" title="UPS / DPD 模板处理" description="选择主数据文件和可选明细表，使用内置或自定义模板生成物流总结单与预报文件。" illustrationSrc="/illustrations/file-workflow.svg"/>
 
       <Tabs defaultValue="process" className="w-full">
         <TabsList>
