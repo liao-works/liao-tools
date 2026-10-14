@@ -6,7 +6,7 @@ const os=require('node:os');
 const path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const {verifyReleaseVersion,normalizeReleaseResponse}=require('../scripts/release-version-gate.cjs');
-const release=(tag_name,options={})=>({tag_name,draft:false,prerelease:false,...options});
+const release=(tag_name,options={})=>({tag_name,draft:false,prerelease:false,assets:[],...options});
 
 test('accepts a newer stable version in nested or flat GitHub API data',()=>{
  assert.equal(verifyReleaseVersion('v0.0.14',[[release('v0.0.13')]]).ok,true);
