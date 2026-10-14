@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 
 export interface UpdateInfo {
   current_version: string;
@@ -8,125 +8,37 @@ export interface UpdateInfo {
   download_url: string;
   release_notes: string;
   published_at: string;
-  platform_specific_url?: string;
-  file_size?: number;
+  platform_specific_url?: string | null;
+  file_size?: number | null;
+  checksum_sha256?: string | null;
 }
-
 export interface UpdateSettings {
   auto_check: boolean;
   last_check_time: number;
   check_interval_hours: number;
 }
-
 export interface DownloadProgress {
   downloaded: number;
   total: number;
   percentage: number;
 }
-
-export interface PlatformInfo {
-  platform: string;
-  arch: string;
-  os_family: string;
-}
-
-/**
- * 安装完成事件
- */
 export interface InstallCompleteEvent {
   success: boolean;
   message: string;
   needs_restart: boolean;
 }
 
-/**
- * 检查更新
- */
-export async function checkForUpdates(): Promise<UpdateInfo> {
-  return await invoke('check_for_updates');
-}
-
-/**
- * 加载更新设置
- */
-export async function loadUpdateSettings(): Promise<UpdateSettings> {
-  return await invoke('load_update_settings');
-}
-
-/**
- * 保存更新设置
- */
-export async function saveUpdateSettings(settings: UpdateSettings): Promise<void> {
-  await invoke('save_update_settings', { settings });
-}
-
-/**
- * 更新最后检查时间
- */
-export async function updateLastCheckTime(): Promise<void> {
-  await invoke('update_last_check_time');
-}
-
-/**
- * 获取当前版本
- */
-export async function getCurrentVersion(): Promise<string> {
-  return await invoke('get_current_version');
-}
-
-/**
- * 获取平台信息
- */
-export async function getPlatformInfo(): Promise<PlatformInfo> {
-  return await invoke('get_platform_info');
-}
-
-/**
- * 下载更新
- */
-export async function downloadUpdate(url: string, version: string): Promise<string> {
-  return await invoke('download_update', { url, version });
-}
-
-/**
- * 安装更新
- */
-export async function installUpdate(filePath: string, silent: boolean = true): Promise<string> {
-  return await invoke('install_update', { filePath, silent });
-}
-
-/**
- * 监听下载进度
- */
-export async function listenToDownloadProgress(
-  callback: (progress: DownloadProgress) => void
-): Promise<UnlistenFn> {
-  return await listen<DownloadProgress>('download-progress', (event) => {
-    callback(event.payload);
-  });
-}
-
-/**
- * 监听安装完成事件
- */
-export async function listenToInstallComplete(
-  callback: (event: InstallCompleteEvent) => void
-): Promise<UnlistenFn> {
-  return await listen<InstallCompleteEvent>('install-complete', (event) => {
-    callback(event.payload);
-  });
-}
-
-/**
- * 重启应用
- */
-export async function restartApp(): Promise<void> {
-  return await invoke('restart_app');
-}
-
-/**
- * 退出应用
- */
-export async function quitApp(): Promise<void> {
-  return await invoke('quit_app');
-}
+export const checkForUpdates = () => invoke<UpdateInfo>('check_for_updates');
+export const loadUpdateSettings = () => invoke<UpdateSettings>('load_update_settings');
+export const saveUpdateSettings = (settings: UpdateSettings) =>
+  invoke<void>('save_update_settings', { settings });
+export const updateLastCheckTime = () => invoke<void>('update_last_check_time');
+export const getCurrentVersion = () => invoke<string>('get_current_version');
+export const downloadUpdate = (url: string, version: string, checksumSha256: string) =>
+  invoke<string>('download_update', { url, version, checksumSha256 });
+export const installUpdate = (filePath: string, silent = false) =>
+  invoke<string>('install_update', { filePath, silent });
+export const listenToDownloadProgress = (callback: (value: DownloadProgress) => void): Promise<UnlistenFn> =>
+  listen<DownloadProgress>('download-progress', event => callback(event.payload));
+export const restartApp = () => invoke<void>('restart_app');
+export const quitApp = () => invoke<void>('quit_app');
