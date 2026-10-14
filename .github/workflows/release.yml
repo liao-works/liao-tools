@@ -162,6 +162,35 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - name: Consolidate the complete signed updater manifest
+        if: vars.REQUIRE_SIGNED_UPDATER == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          mkdir -p "${RUNNER_TEMP}/updater-signatures" "${RUNNER_TEMP}/downloaded-manifest"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.sig' --dir "${RUNNER_TEMP}/updater-signatures"
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/$TAG" \
+            --jq '.assets' > "${RUNNER_TEMP}/release-assets.json"
+          node scripts/build-signed-updater-manifest.cjs "$TAG" \
+            "${RUNNER_TEMP}/release-assets.json" "${RUNNER_TEMP}/updater-signatures" \
+            "${RUNNER_TEMP}/latest.json"
+          # Merge all architectures only AFTER every matrix job completed.
+          # A matrix job may have uploaded an incomplete latest.json.
+          gh release upload "$TAG" "${RUNNER_TEMP}/latest.json" \
+            --clobber --repo "$GITHUB_REPOSITORY"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'latest.json' --dir "${RUNNER_TEMP}/downloaded-manifest"
+          cmp "${RUNNER_TEMP}/latest.json" "${RUNNER_TEMP}/downloaded-manifest/latest.json"
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/$TAG" \
+            --jq '.assets' > "${RUNNER_TEMP}/published-assets.json"
+          node scripts/verify-signed-release-manifest.cjs "$TAG" \
+            "${RUNNER_TEMP}/published-assets.json" "${RUNNER_TEMP}/updater-signatures" \
+            "${RUNNER_TEMP}/downloaded-manifest/latest.json"
+
       - name: Verify and publish only a complete release
         uses: actions/github-script@v7
         with:
