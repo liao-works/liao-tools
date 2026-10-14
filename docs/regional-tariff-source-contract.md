@@ -318,3 +318,30 @@ reviewed anchor changes or fails to load. On two real public XI
 examples the official source anchor responses were stable for the
 same historical as-of date, but 511 commodity sources were still
 missing in those two sample chapters. No production update authorized.
+
+## Phase 14 — source-only XI checkpoint chain (not signed tariff data)
+
+Every managed XI shard's merged raw commodity database now produces an
+independently replayed checkpoint continuity receipt. It records hashes
+of the exact frozen catalogue, previous cumulative checkpoint and
+previous receipt, new merged SQLite, and source audit manifest.
+Previously successful raw responses must remain unchanged between
+batches, and previously failed requests may only be replaced by verified
+successes; deleted or altered history blocks acceptance.
+
+CI also checks that a forged root report or divergent receipt cannot
+silently replace earlier evidence. All source-only records retain
+production_eligible=false, ni_other_verified=false,
+atomic_official_snapshot_verified=false and
+chain_authenticated_or_signed=false. A hash chain by itself is NOT
+a digital signature or proof of official HMRC transaction atomicity.
+
+The first real public two-chapter canary produced a verified partial
+source-only root with five successful commodity responses and 511
+uncollected codes. It is NOT an authenticated managed 97-chapter
+production dataset. Managed later-run continuity has fixture tests
+but is still awaiting an authorized live source run.
+
+No version in this chain is an importable desktop tariff snapshot;
+do not write any values into Other, north_ireland_rate, or tariffs.db.
+Official-source document: cursor-tax-tools/docs/xi-checkpoint-continuity.md
