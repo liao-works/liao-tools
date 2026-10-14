@@ -27,9 +27,9 @@ jobs:
         shell: bash
         run: |
           mkdir -p ui-screenshots
-          pnpm dev -- --host 127.0.0.1 > /tmp/liao-vite.log 2>&1 &
+          pnpm exec vite --host 127.0.0.1 --port 1420 > /tmp/liao-vite.log 2>&1 &
           for i in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:5173/ > /dev/null; then exit 0; fi
+            if curl --fail --silent http://127.0.0.1:1420/ > /dev/null; then exit 0; fi
             sleep 1
           done
           cat /tmp/liao-vite.log
@@ -37,10 +37,10 @@ jobs:
       - name: Capture pages
         shell: bash
         run: |
-          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:5173/ ui-screenshots/home-desktop.png
-          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:5173/tax ui-screenshots/tariff-desktop.png
-          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:5173/ ui-screenshots/home-compact.png
-          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:5173/alta ui-screenshots/alta-desktop.png
+          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/ ui-screenshots/home-desktop.png
+          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/tax ui-screenshots/tariff-desktop.png
+          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/ ui-screenshots/home-compact.png
+          pnpm dlx playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/alta ui-screenshots/alta-desktop.png
       - name: Upload visual review images
         if: always()
         uses: actions/upload-artifact@v4
