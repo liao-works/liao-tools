@@ -16,7 +16,7 @@ import {
 
 interface Props { initialInfo?: UpdateInfo | null; embedded?: boolean; }
 
-function sizeLabel(bytes?: number): string {
+function sizeLabel(bytes?: number | null): string {
   if (bytes == null || bytes <= 0) return '未知';
   if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / 1048576).toFixed(1)} MB`;
