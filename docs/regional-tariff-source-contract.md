@@ -129,3 +129,19 @@ an explicit requested origin, date, measure IDs/conditional states and
 a separate \`requires_review\` status where expressions are incomplete.
 
 See producer \`docs/xi-origin-and-batch-merge.md\`.
+
+## Phase 7 — XI frozen-source batches (no desktop import)
+
+Producer now supports exact-byte SHA-256 pinning of a managed XI full
+catalogue and repeatable indexed source shards. It can reuse the same
+catalogue and last verified checkpoint across approved manual runs, skip
+previously successful codes, retry source failures, and replay every
+merged record before accepting a cumulative audit. Workflow and operator
+runbook: cursor-tax-tools/.github/workflows/xi-managed-coverage.yml and
+cursor-tax-tools/docs/xi-frozen-managed-runbook.md.
+
+The optional GitHub Actions cross-run artifacts expire after 30 days and
+managed XI API credentials have not yet been exercised for a 97-chapter
+full import. Do not infer NI Other or update north_ireland_rate/other_rate
+from a mere successful raw-source checkpoint. No signed customer-facing
+release is authorized by this stage.
