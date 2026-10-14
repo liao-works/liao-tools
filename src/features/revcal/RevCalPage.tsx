@@ -1,3 +1,5 @@
+import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { Calculator } from 'lucide-react';
 import { useState } from 'react';
 import { Calculator, Download, FileSpreadsheet, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -257,13 +259,8 @@ export function RevCalPage() {
   const foundCount = results.filter((r) => r.products.length > 0).length;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Amazon 收益计算器</h2>
-        <p className="text-muted-foreground">
-          通过 Amazon 收益计算器公开接口查询商品尺寸与价格，支持批量查询与 Excel 导出
-        </p>
-      </div>
+    <div className="lt-feature space-y-6">
+      <FeatureHeader eyebrow="PRODUCT / AMAZON" title="Amazon 商品查询" description="查询商品尺寸、重量、价格与商品信息。支持单码、多站点和 Excel 批量导出；结果来自第三方公开接口。" icon={<Calculator size={35} strokeWidth={1.5}/>}/>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* 单码查询 */}

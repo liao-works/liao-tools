@@ -1,3 +1,5 @@
+import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { Package } from 'lucide-react';
 import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { Button } from '@/components/ui/button';
@@ -206,13 +208,8 @@ export function UpsUpdPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">UPS/DPD 数据处理</h2>
-        <p className="text-muted-foreground">
-          支持 UPS 总结单和 DPD 数据预报模板填充
-        </p>
-      </div>
+    <div className="lt-feature space-y-6">
+      <FeatureHeader eyebrow="SHIPPING / TEMPLATES" title="UPS / DPD 模板处理" description="选择主数据文件和可选明细表，使用内置或自定义模板生成物流总结单与预报文件。" icon={<Package size={35} strokeWidth={1.5}/>}/>
 
       <Tabs defaultValue="process" className="w-full">
         <TabsList>

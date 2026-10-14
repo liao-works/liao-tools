@@ -1,3 +1,5 @@
+import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { Settings2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -42,11 +44,8 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">设置</h2>
-        <p className="text-muted-foreground">管理应用偏好设置和配置</p>
-      </div>
+    <div className="lt-feature space-y-6">
+      <FeatureHeader eyebrow="PREFERENCES" title="偏好设置" description="管理桌面应用外观、数据更新偏好和版本信息。设置保留在本机。" icon={<Settings2 size={35} strokeWidth={1.5}/>}/>
 
       {/* 主题设置 */}
       <Card>

@@ -1,3 +1,5 @@
+import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { FileSpreadsheet } from 'lucide-react';
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -102,13 +104,8 @@ export function ExcelPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Excel 数据拆分工具</h2>
-        <p className="text-muted-foreground">
-          支持海铁/空运数据的合并单元格拆分处理
-        </p>
-      </div>
+    <div className="lt-feature space-y-6">
+      <FeatureHeader eyebrow="FILES / SPREADSHEETS" title="Excel 数据拆分" description="处理海铁或空运工作簿的合并单元格、重量分配及图片，保留原有模板和列配置。" icon={<FileSpreadsheet size={35} strokeWidth={1.5}/>}/>
 
       <Tabs defaultValue="process" className="w-full">
         <TabsList>

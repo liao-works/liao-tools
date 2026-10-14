@@ -193,7 +193,7 @@ export function TodoPage() {
   }, [activeTaskId, filter, newTaskTitle, showSettings, visibleTasks]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card shadow-sm">
+    <div className="lt-todo flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card shadow-sm">
       <div className="border-b border-border p-4">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -201,7 +201,7 @@ export function TodoPage() {
               <CheckCircle2 className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">Todo List</h1>
+              <h1 className="text-xl font-bold text-foreground">Todo 清单</h1>
               <p className="text-sm text-muted-foreground">
                 {pendingCount} 待办 · {completedCount} 已完成
               </p>
