@@ -176,3 +176,28 @@ replay must not imply a passing current-freshness gate or justify release.
 An explicit sign-off on regional duty applicability, source freshness,
 condition evaluation and signing is required before desktop integration.
 NI Other, VAT and quota balances are not delivered by this shadow.
+
+## Phase 9: official DBT newest version readiness gate
+
+Do not rely on the DBT commodities-report /versions/latest alias to
+establish freshness. The producer's official dataset version inventory
+returned 1,947 versions on 2026-10-14; newest **v4.0.1627** is later
+than independently verified **v4.0.1626** but its official table listing
+is EMPTY. The previous pin's table inventory and CSVW schema work.
+
+Online GB catalogue and focused 103/1011 commands now resolve latest
+through exact version discovery, table inventory and CSVW columns.
+Until the new official version is fully published and all rows are
+replayed successfully, freshness_proven=false, publish_eligible=false.
+Any UI or updater must expose this as SOURCE NOT READY, never silently
+promote a prior pin as current and never replace production tariffs.db.
+
+Once DBT finishes publication, the operator-only
+dbt-newest-replay-shadow.yml replays same-version GB catalogue, focused
+baseline and full DBT measures, derives a compact review source, checks
+the full candidate count and verifies the official version did not drift
+during capture. Its outputs remain review-only and incompatible with
+the consumer's installed tariffs.db. NI Other business mapping and
+whole-XI managed coverage remain independently blocked.
+
+Producer specification: cursor-tax-tools/docs/dbt-version-readiness-gate.md
