@@ -5,6 +5,9 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   release:
     permissions:
@@ -15,7 +18,6 @@ jobs:
         include:
           - platform: "macos-latest"
             args: "--target aarch64-apple-darwin"
-            generate-changelog: true
           - platform: "macos-latest"
             args: "--target x86_64-apple-darwin"
           - platform: "macos-latest"
@@ -38,6 +40,14 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf pkg-config libsoup-3.0-dev javascriptcoregtk-4.1 libjavascriptcoregtk-4.1-dev
           # Tauri 2 可能需要 libnm-dev
           sudo apt-get install -y libnm-dev xdg-utils
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Only stable vMAJOR.MINOR.PATCH tags may publish a release."
+            exit 1
+          fi
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
@@ -108,17 +118,8 @@ jobs:
           # 使用 Node.js 脚本生成 CHANGELOG 并提取 release notes
           node scripts/generate-changelog.cjs $VERSION
 
-          # 只在第一个平台（macOS ARM64）提交 CHANGELOG 更新
-          if [ "${{ matrix.generate-changelog }}" == "true" ]; then
-            echo "📤 提交 CHANGELOG 更新..."
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add CHANGELOG.md package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
-            git diff --staged --quiet || git commit -m "docs: 更新 CHANGELOG 和版本号 [skip ci]"
-            git push origin HEAD:master
-          else
-            echo "⏭️  跳过提交（由第一个平台处理）"
-          fi
+          # 发布期间只生成当前 job 的内容；不要绕开 PR 审核自动 push master。
+          echo "CHANGELOG prepared locally; default branch remains unchanged."
 
           # 保存 notes 到 output（所有平台都需要）
           # 使用 RUNNER_TEMP 获取跨平台临时目录
@@ -141,6 +142,37 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "Liao Tools ${{ github.ref_name }}"
           releaseBody: ${{ steps.changelog.outputs.NOTES }}
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+  verify-and-publish:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and publish only a complete release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { checkRelease } = require('./scripts/verify-release-assets.cjs');
+            const tag = context.ref.replace('refs/tags/', '');
+            const { owner, repo } = context.repo;
+            const response = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+            const release = response.data;
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets,
+              { owner, repo, release_id: release.id, per_page: 100 });
+            const status = checkRelease(tag, assets);
+            if (!status.ok) {
+              core.setFailed('Release verification failed: ' + status.issues.join(' | '));
+              return;
+            }
+            if (!release.draft) {
+              core.setFailed('Release became public before verification; refusing to mark success');
+              return;
+            }
+            await github.rest.repos.updateRelease({
+              owner, repo, release_id: release.id, draft: false, prerelease: false
+            });
+            core.info('Verified all release packages, SHA-256 digests and official URLs; release published');
