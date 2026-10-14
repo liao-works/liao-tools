@@ -10,6 +10,8 @@ on:
       - '.github/workflows/release.yml'
       - 'scripts/verify-release-assets.cjs'
       - 'tests/verify-release-assets.test.cjs'
+      - 'scripts/build-signed-updater-manifest.cjs'
+      - 'tests/build-signed-updater-manifest.test.cjs'
   workflow_dispatch:
 jobs:
   frontend:
@@ -26,5 +28,5 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: node --experimental-strip-types --test tests/hs-code.test.mjs
-      - run: node --test tests/verify-release-assets.test.cjs
+      - run: node --test tests/verify-release-assets.test.cjs tests/build-signed-updater-manifest.test.cjs
       - run: pnpm run build
