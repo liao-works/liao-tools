@@ -10,6 +10,7 @@ import { taxApi } from '@/lib/api/tax';
 import { listen } from '@tauri-apps/api/event';
 import type { TaxTariff } from '@/types';
 import { TaxResultDetail } from './TaxResultDetail';
+import { Link } from 'react-router-dom';
 
 interface UpdateLog {
   code: string;
@@ -247,8 +248,9 @@ export function SingleQueryTab() {
                   数据库为空
                 </h3>
                 <p className="text-sm text-warning-fg mt-1">
-                  请先在「数据更新」标签页下载税率数据后再进行查询
+                  请先下载本地税率数据库，再进行精确或模糊查询。
                 </p>
+                <Link to="/tax?tab=update" className="lt-tax-install-link">前往数据更新 →</Link>
               </div>
             </div>
           </CardContent>

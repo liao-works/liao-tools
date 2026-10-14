@@ -42,7 +42,7 @@ export function HomePage() {
     <section className="lt-hero lt-hero--editorial" aria-labelledby="welcome-title">
       <div className="lt-hero-copy">
         <span className="lt-kicker">WELCOME TO LIAO TOOLS</span>
-        <h1 id="welcome-title">让跨境贸易数据处理<span>更简单</span></h1>
+        <h1 id="welcome-title"><span className="lt-hero-title-lead">让跨境贸易</span><span className="lt-hero-title-middle">数据处理</span><span className="lt-hero-title-emphasis">更简单</span></h1>
         <p>从关税查询到 Excel 数据处理，从商品信息到物流核对。让常用工具更顺手，专注完成当前工作。</p>
         <div className="lt-hero-actions">
           <Link className="lt-primary-link" to="/tax"><Search size={17}/> 开始查询 <ArrowRight size={16}/></Link>

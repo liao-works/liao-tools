@@ -34,3 +34,13 @@
 @media(max-width:1200px){.lt-tools-grid--balanced .lt-tool-tile,.lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4){grid-column:span 6}.lt-hero--editorial .lt-hero-copy{max-width:56%}.lt-hero--editorial .lt-hero-art{width:55%}}
 @media(max-width:830px){.lt-hero--editorial .lt-hero-copy{max-width:66%}}
 @media(max-width:620px){.lt-tools-grid--balanced .lt-tool-tile,.lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4){grid-column:span 12;min-height:82px}.lt-hero--editorial{min-height:330px;padding:22px}.lt-hero--editorial .lt-hero-copy{max-width:100%}.lt-hero--editorial h1{font-size:27px;max-width:380px}.lt-hero--editorial p{max-width:350px}.lt-hero--editorial .lt-hero-art{width:70%;height:49%;right:-14%;bottom:-9%;opacity:.36}.lt-hero--editorial .lt-hero-actions{position:relative;z-index:2}.lt-section-count{display:none}}
+
+/* Purposeful heading wraps instead of splitting a Chinese phrase mid-word. */
+.lt-hero--editorial h1 .lt-hero-title-lead,
+.lt-hero--editorial h1 .lt-hero-title-middle{color:var(--foreground-emphasis)}
+.lt-hero--editorial h1 .lt-hero-title-emphasis{color:var(--primary-fg)}
+@media(max-width:620px){
+  .lt-hero--editorial h1 .lt-hero-title-lead{display:block}
+  .lt-hero--editorial h1 .lt-hero-title-middle,
+  .lt-hero--editorial h1 .lt-hero-title-emphasis{display:inline}
+}
