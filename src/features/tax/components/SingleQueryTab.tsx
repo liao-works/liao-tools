@@ -25,6 +25,31 @@ interface UpdateProgress {
   stage: string;
 }
 
+
+function TariffOverview({ tariff }: { tariff: TaxTariff }) {
+  const statusLabel = (status?: string | null) =>
+    status === 'verified' ? '来源已核验' :
+    status === 'conditional' ? '存在条件 · 需复核' :
+    status === 'stale' ? '旧缓存 · 未核验' : '来源未经核验';
+  const cards = [
+    {label:'英国 (GB) 进口税率',rate:tariff.rate || '—',status:statusLabel(tariff.uk_rate_status),tone:tariff.uk_rate_status === 'verified' ? 'ok' : 'review'},
+    {label:'北爱尔兰 (NI) 进口税率',rate:tariff.north_ireland_rate || tariff.northIrelandRate || '—',status:statusLabel(tariff.ni_rate_status),tone:tariff.ni_rate_status === 'verified' ? 'ok' : 'review'},
+    {label:'反倾销税率',rate:tariff.anti_dumping_rate || '—',status:tariff.anti_dumping_rate ? '本地有记录' : '本地未提供',tone:'neutral'},
+    {label:'反补贴税率',rate:tariff.countervailing_rate || '—',status:tariff.countervailing_rate ? '本地有记录' : '本地未提供',tone:'neutral'}
+  ];
+  return <>
+    <div className="lt-rate-grid">
+      {cards.map(item => <div className="lt-rate-card" key={item.label}>
+        <span className="lt-rate-label">{item.label}</span>
+        <strong>{item.rate}</strong>
+        <span className={['lt-rate-state','lt-rate-state--'+item.tone].join(' ')}>{item.status}</span>
+      </div>)}
+    </div>
+    {(tariff.uk_rate_status !== 'verified' || tariff.ni_rate_status !== 'verified') &&
+      <div className="lt-rate-caution">当前查询包含未完全核验的税率或条件项。请核对相应官方来源，不要仅凭此结果进行申报。</div>}
+  </>;
+}
+
 export function SingleQueryTab() {
   const [code, setCode] = useState('');
   const [fuzzyMode, setFuzzyMode] = useState(false);
@@ -277,7 +302,8 @@ export function SingleQueryTab() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
+            {results.length === 1 && !fuzzyMode && <TariffOverview tariff={results[0]}/>}
+            <div className="lt-result-table"><Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>商品编码</TableHead>
@@ -429,7 +455,7 @@ export function SingleQueryTab() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table></div>
           </CardContent>
         </Card>
       )}

@@ -96,8 +96,8 @@ function SortableToolCard({ tool, onEdit, onDelete, onToggle }: SortableToolCard
         </div>
 
         {/* 操作按钮 */}
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button
+        <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          {tool.type === 'custom' && <Button
             variant="ghost"
             size="icon"
             onClick={() => onToggle(tool)}
@@ -108,15 +108,15 @@ function SortableToolCard({ tool, onEdit, onDelete, onToggle }: SortableToolCard
             ) : (
               <PowerOff className="h-4 w-4" />
             )}
-          </Button>
-          <Button
+          </Button>}}
+          {tool.type === 'custom' && <Button
             variant="ghost"
             size="icon"
             onClick={() => onEdit(tool)}
             title="编辑"
           >
             <Edit className="h-4 w-4" />
-          </Button>
+          </Button>}
           {tool.type === 'custom' && (
             <Button
               variant="ghost"

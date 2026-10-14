@@ -390,7 +390,11 @@ export function SystemToolsPage() {
 
       {/* 编辑对话框 */}
       <ToolEditDialog
-        tool={selectedTool as UserTool | null}
+        tool={selectedTool?.type === 'custom' ? {
+          ...selectedTool,
+          id: Number(selectedTool.id.replace('custom_', '')),
+          executablePath: selectedTool.executablePath || '',
+        } as UserTool : null}
         open={editDialogOpen}
         onSave={handleAddTool}
         onCancel={() => { setEditDialogOpen(false); setSelectedTool(null); }}

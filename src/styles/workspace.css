@@ -156,3 +156,17 @@
   .lt-feature-header img,.lt-feature-symbol {display:none!important}
 }
 @media (prefers-reduced-motion:reduce) {.lt-app *, .lt-app *::before, .lt-app *::after {transition-duration:.01ms!important;animation-duration:.01ms!important}}
+
+/* Result reading hierarchy; don't equate missing data with a zero duty. */
+.lt-rate-grid {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin-bottom:16px}
+.lt-rate-card {display:flex;flex-direction:column;gap:10px;min-width:0;padding:17px 16px;border:1px solid var(--border);border-radius:12px;background:var(--card)}
+.lt-rate-card strong {font-size:25px;line-height:1.2;color:var(--foreground-emphasis);font-variant-numeric:tabular-nums}
+.lt-rate-label {font-size:12px;line-height:1.4;color:var(--muted-foreground);font-weight:650}
+.lt-rate-state {font-size:11px;border-radius:6px;padding:4px 7px;width:max-content;max-width:100%}
+.lt-rate-state--ok {background:var(--success-subtle);color:var(--success-subtle-fg)}
+.lt-rate-state--review {background:var(--warning-subtle);color:var(--warning-subtle-fg)}
+.lt-rate-state--neutral {background:var(--muted);color:var(--muted-foreground)}
+.lt-rate-caution {background:var(--warning-subtle);border:1px solid var(--warning-subtle);padding:12px 15px;border-radius:9px;color:var(--warning-subtle-fg);font-size:12px;line-height:1.6;margin-bottom:15px}
+.lt-result-table {width:100%;max-width:100%;overflow-x:auto}
+@media(max-width:1160px){.lt-rate-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.lt-rate-grid{grid-template-columns:1fr 1fr}.lt-rate-card{padding:13px 10px}.lt-rate-card strong{font-size:20px}}
