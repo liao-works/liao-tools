@@ -40,7 +40,7 @@ pub struct UpdateSettings {
     pub check_interval_hours: u64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DownloadProgress {
     pub downloaded: u64,
     pub total: u64,
@@ -677,11 +677,11 @@ pub async fn check_for_updates() -> Result<UpdateInfo, CommandError> {
         download_url: release.html_url,
         release_notes: release.body.unwrap_or("暂无更新说明".to_string()),
         published_at: release.published_at,
-        platform_specific_url,
-        file_size,
         checksum_sha256: platform_specific_url.as_ref()
             .and_then(|url| release.assets.iter().find(|asset| &asset.browser_download_url == url))
             .and_then(validated_digest),
+        platform_specific_url,
+        file_size,
     })
 }
 
