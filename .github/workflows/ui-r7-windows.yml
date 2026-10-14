@@ -31,3 +31,5 @@ jobs:
         run: pnpm run build
       - name: Check actual Windows Tauri Rust target
         run: cargo check --locked --manifest-path src-tauri/Cargo.toml
+      - name: Test updater security and release compatibility
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib commands::updater::tests
