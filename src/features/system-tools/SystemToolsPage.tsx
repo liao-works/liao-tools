@@ -381,8 +381,9 @@ export function SystemToolsPage() {
       {filteredTools.length === 0 && viewMode === 'grid' && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Search className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">未找到匹配的工具</p>
+            <img src="/illustrations/tools-empty.svg" className="lt-tools-empty-art" alt="" aria-hidden="true"/>
+            <strong className="text-sm">没有找到对应的工具</strong>
+            <p className="text-xs text-muted-foreground mt-2">更换关键词，或通过“添加工具”配置你的常用程序。</p>
           </CardContent>
         </Card>
       )}

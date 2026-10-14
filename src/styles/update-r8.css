@@ -54,3 +54,13 @@
 .lt-feature input:focus-visible,.lt-feature button:focus-visible{outline-offset:2px}
 @media(max-width:940px){.lt-update-grid{grid-template-columns:1fr}.lt-update-summary{max-width:80%}.lt-update-hero>img{opacity:.43}}
 @media(max-width:610px){.lt-update-hero{padding:20px;min-height:300px}.lt-update-summary{max-width:100%}.lt-update-summary h2{font-size:21px}.lt-update-hero>img{width:64%;height:48%;right:-16%;bottom:-25px;opacity:.18}.lt-update-modal{padding:11px}.lt-update-version-pills{gap:6px}.lt-update-setting-row{flex-wrap:wrap}}
+
+/* All-page finishing pass: compact tools and accessible TODO empty states. */
+.lt-todo{overflow:hidden;min-height:530px}
+.lt-todo>.border-b:first-child{background:linear-gradient(112deg,var(--card),var(--lt-warm))}
+.lt-todo input:focus-visible,.lt-todo select:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+.lt-todo button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.lt-todo-empty-art,.lt-tools-empty-art{width:170px;height:118px;object-fit:contain;margin-bottom:10px}
+.lt-todo .group button{opacity:1}
+@media(min-width:880px){.lt-todo .group button{opacity:.55}.lt-todo .group:hover button,.lt-todo .group:focus-within button{opacity:1}}
+@media(max-width:650px){.lt-todo>.border-b:first-child{padding:13px}.lt-todo>.border-b:first-child>.mb-4{gap:8px}.lt-todo>.border-b:first-child .flex.gap-2{flex-wrap:wrap}}

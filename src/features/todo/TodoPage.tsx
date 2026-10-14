@@ -120,11 +120,10 @@ export function TodoPage() {
 
     if (showSettings) return;
 
-    if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-      event.preventDefault();
-      cycleFilter(event.shiftKey ? -1 : 1);
-      return;
-    }
+    // Preserve native Tab/Shift+Tab focus navigation for keyboard and screen-reader users.
+    if (event.key === 'Tab') return;
+    const inInteractiveControl = target?.closest('button, a, [role="dialog"], [role="combobox"], [role="listbox"]');
+    if (inInteractiveControl) return;
 
     if (
       (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
@@ -132,8 +131,7 @@ export function TodoPage() {
       !event.metaKey &&
       !event.altKey
     ) {
-      if (isTextInput && target === inputRef.current && newTaskTitle.trim()) return;
-      if (isTextInput && target !== inputRef.current) return;
+      if (isTextInput) return;
 
       event.preventDefault();
       cycleFilter(event.key === 'ArrowRight' ? 1 : -1);
@@ -141,8 +139,7 @@ export function TodoPage() {
     }
 
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      if (isTextInput && target === inputRef.current && newTaskTitle.trim()) return;
-      if (isTextInput && target !== inputRef.current) return;
+      if (isTextInput) return;
 
       event.preventDefault();
       moveActiveTask(event.key === 'ArrowDown' ? 1 : -1);
@@ -232,9 +229,11 @@ export function TodoPage() {
             value={newTaskTitle}
             onChange={(event) => setNewTaskTitle(event.target.value)}
             placeholder="添加新任务..."
+            aria-label="新任务名称"
             className="flex-1 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
           />
           <select
+            aria-label="任务优先级"
             value={newTaskPriority}
             onChange={(event) => setNewTaskPriority(event.target.value as TodoPriority)}
             className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
@@ -243,7 +242,7 @@ export function TodoPage() {
             <option value="medium">中</option>
             <option value="high">高</option>
           </select>
-          <Button onClick={() => void handleAddTask()} disabled={!newTaskTitle.trim()}>
+          <Button onClick={() => void handleAddTask()} disabled={!newTaskTitle.trim()} aria-label="添加任务">
             <Plus className="h-4 w-4" />
           </Button>
         </div>
@@ -295,8 +294,9 @@ export function TodoPage() {
           </div>
         ) : filteredTasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-4 py-16">
-            <Circle className="mb-4 h-12 w-12 text-muted-foreground/50" />
-            <p className="text-muted-foreground">暂无任务</p>
+            <img src="/illustrations/todo-empty.svg" className="lt-todo-empty-art" alt="" aria-hidden="true"/>
+            <strong className="text-sm text-foreground">当前列表还没有任务</strong>
+            <p className="text-xs text-muted-foreground mt-2">在上方添加待办任务，之后可以通过优先级和状态筛选。</p>
           </div>
         ) : (
           <div className="space-y-4 p-4">
