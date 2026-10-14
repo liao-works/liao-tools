@@ -138,6 +138,9 @@ export async function downloadUpdate(
   onProgress?: (progress: DownloadProgress) => void,
 ): Promise<string> {
   if (await signedUpdaterAvailable()) {
+    // A recheck started milliseconds before download must finish its native
+    // resource swap before this operation obtains the updater handle.
+    if (activeCheck) await activeCheck;
     if (!pendingUpdate || pendingSignedVersion !== version || url !== SIGNED_TOKEN) {
       throw new Error('签名更新会话已失效，请重新检查版本。');
     }
@@ -176,6 +179,7 @@ export async function downloadUpdate(
 /** Installation always requires a separate deliberate user action. */
 export async function installUpdate(filePath: string, silent = false): Promise<string> {
   if (await signedUpdaterAvailable()) {
+    if (activeCheck) await activeCheck;
     if (silent) throw new Error('不允许无人确认的静默更新。');
     if (filePath !== SIGNED_TOKEN || !pendingUpdate) {
       throw new Error('签名安装会话已失效，请重新检查更新。');

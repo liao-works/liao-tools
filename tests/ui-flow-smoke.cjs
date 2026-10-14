@@ -30,7 +30,11 @@ const BASE = 'http://127.0.0.1:1420';
             case 'signed_updater_available':
               if (window.location.search.includes('mode=unknown')) return null;
               return window.location.search.includes('mode=signed');
-            case 'plugin:updater|check': return {
+            case 'plugin:updater|check':
+              if (window.location.search.includes('mode=signedrace')) {
+                await new Promise(resolve => setTimeout(resolve, 90));
+              }
+              return {
               rid: 41, currentVersion: '0.0.13', version: '0.0.14',
               date: '2026-10-14T10:00:00Z', body: '签名更新测试', rawJson: {}
             };
@@ -179,6 +183,23 @@ const BASE = 'http://127.0.0.1:1420';
       const calls = await page.evaluate(() => window.__liaoBridgeCalls);
       assert(!calls.some(call => call.command === 'check_for_updates' || call.command === 'download_update'),
         'updater must not choose the unsigned channel when signed mode inspection fails');
+    });
+    await scenario('signed-recheck-overlap-download', '/updates?mode=signedrace', async page => {
+      await page.getByRole('heading', { name: '发现可用的新版本' }).waitFor();
+      const result = await page.evaluate(async () => {
+        const module = await import('/src/lib/updater.ts');
+        const checking = module.checkForUpdates();
+        const downloading = module.downloadUpdate('tauri-signed-update', '0.0.14');
+        const [checked, downloaded] = await Promise.all([checking, downloading]);
+        return { checkedVersion: checked.latest_version, downloaded };
+      });
+      assert.equal(result.checkedVersion, '0.0.14');
+      assert.equal(result.downloaded, 'tauri-signed-update');
+      const calls = await page.evaluate(() => window.__liaoBridgeCalls);
+      assert(calls.filter(call => call.command === 'plugin:updater|check').length >= 2);
+      assert(calls.some(call => call.command === 'plugin:updater|download'));
+      assert(!calls.some(call => call.command === 'download_update'),
+        'overlapping checks must never downgrade to unsigned downloader');
     });
     await scenario('signed-download-discard-and-recheck', '/updates?mode=signed', async page => {
       await page.getByRole('heading', { name: '发现可用的新版本' }).waitFor();
