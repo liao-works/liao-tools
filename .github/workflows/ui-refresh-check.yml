@@ -7,6 +7,9 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/ui-refresh-check.yml'
+      - '.github/workflows/release.yml'
+      - 'scripts/verify-release-assets.cjs'
+      - 'tests/verify-release-assets.test.cjs'
   workflow_dispatch:
 jobs:
   frontend:
@@ -23,4 +26,5 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: node --experimental-strip-types --test tests/hs-code.test.mjs
+      - run: node --test tests/verify-release-assets.test.cjs
       - run: pnpm run build
