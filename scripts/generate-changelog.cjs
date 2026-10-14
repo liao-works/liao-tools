@@ -25,8 +25,8 @@ try {
     fs.readFileSync('CHANGELOG.md', 'utf-8').trim().length === 0;
 
   const cmd = isFirstRelease
-    ? 'npx conventional-changelog -p angular -i CHANGELOG.md -s -r 0 --first-release'
-    : 'npx conventional-changelog -p angular -i CHANGELOG.md -s -r 0';
+    ? 'npx --no-install conventional-changelog -p angular -i CHANGELOG.md -s -r 0 --first-release'
+    : 'npx --no-install conventional-changelog -p angular -i CHANGELOG.md -s -r 0';
 
   try {
     execSync(cmd, { stdio: 'inherit' });
