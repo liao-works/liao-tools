@@ -438,3 +438,28 @@ contract, NOT executable desktop code or a certified tariff release.
 
 Producer implementation and acceptance:
 cursor-tax-tools/docs/data-first-gb-xi-readiness.md
+
+### Verified GB v4.0.1627 source-ledger classification (actual full replay)
+
+The COMPLETE, independently rechecked source CSV has exactly **16,742**
+one-row-per-official-active-leaf commodities with **zero missing ledger
+rows**. Exact candidate expression groups:
+
+- 14,458 single percentage expression candidates (still NOT payable duty)
+- 1,734 compound / specific-unit expression candidates
+- 182 multiple active measure candidates requiring selection logic
+- 2 condition / additional-code candidates
+- 359 target-103/1011 gaps with 1080 non-GB context only
+- 7 goods with no official expanded-measures source row
+
+The original DBT `#NA` null sentinel can be nested inside JSON arrays
+(e.g. `["#NA"]`). The producer now parses these recursively so null
+conditions are not incorrectly counted as restrictions. Exact effective
+measure expressions remain verbatim, and the consumer MUST NOT
+collapse compound rates to a single percentage or interpret
+`payable_rate=null` as 0%. All candidate output remains review-only.
+
+An independent actual CI run confirms matching SQLite SHA, all unique
+16,742 code rows, unchanged GB v4.0.1626->1627 source measures and
+correct classification:
+https://github.com/liao-works/cursor-tax-tools/actions/runs/38540798878
