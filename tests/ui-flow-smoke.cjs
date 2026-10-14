@@ -27,6 +27,14 @@ const BASE = 'http://127.0.0.1:1420';
           switch (command) {
             case 'plugin:event|listen': return 1;
             case 'plugin:event|unlisten': return null;
+            case 'signed_updater_available': return window.location.search.includes('mode=signed');
+            case 'plugin:updater|check': return {
+              rid: 41, currentVersion: '0.0.13', version: '0.0.14',
+              date: '2026-10-14T10:00:00Z', body: '签名更新测试', rawJson: {}
+            };
+            case 'plugin:updater|download': return null;
+            case 'plugin:updater|install': return null;
+            case 'plugin:resources|close': return null;
             case 'plugin:dialog|open': return 'C:/fixtures/source.xlsx';
             case 'plugin:dialog|save': return 'C:/fixtures/template.xlsx';
             case 'load_update_settings':
@@ -162,6 +170,24 @@ const BASE = 'http://127.0.0.1:1420';
       const finalCalls = await page.evaluate(() => window.__liaoBridgeCalls);
       assert(finalCalls.some(call => call.command === 'install_update' && call.payload.silent === false),
         'update should never silently install without consent');
+    });
+    await scenario('official-signed-update', '/updates?mode=signed', async page => {
+      await page.getByRole('heading', { name: '发现可用的新版本' }).waitFor();
+      await page.getByText('官方签名更新').first().waitFor();
+      const startCalls = await page.evaluate(() => window.__liaoBridgeCalls);
+      assert(startCalls.some(call => call.command === 'plugin:updater|check'),
+        'trusted signed channel must use official updater check');
+      assert(!startCalls.some(call => call.command === 'check_for_updates'),
+        'trusted signed channel must not silently downgrade to unsigned legacy updater');
+      await page.getByRole('button', { name: '下载签名更新包' }).click();
+      await page.getByText('签名更新包已下载并验证').waitFor();
+      await page.getByRole('button', { name: '安装已签名更新' }).click();
+      await page.getByText('签名更新安装已执行').waitFor();
+      const calls = await page.evaluate(() => window.__liaoBridgeCalls);
+      assert(calls.some(call => call.command === 'plugin:updater|download'), 'signed download must use native updater');
+      assert(calls.some(call => call.command === 'plugin:updater|install'), 'signed install must use native updater');
+      assert(!calls.some(call => call.command === 'install_update' || call.command === 'download_update'),
+        'signed release must never call unsigned installer backend');
     });
     console.log('PASS all ' + passed + ' mocked native-bridge browser scenarios');
   } finally {
