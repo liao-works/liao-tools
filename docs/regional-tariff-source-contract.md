@@ -407,3 +407,34 @@ They MUST NOT be imported as `tariffs.db` or used to populate
 certification and consumer publication signature.
 
 Producer runbook: cursor-tax-tools/docs/xi-s3-immutable-vault.md
+
+## Data-first GB v4.0.1627 completeness and consumer query contract
+
+GB upstream source v4.0.1627 has now been **actually downloaded** and
+compared to v4.0.1626 at the same 2026-10-14 as-of. Full expanded source
+has 1,123,765 measures, 16,742 active leaf goods, 16,376 type-103
+geography-1011 active target candidate codes and 16,560 103/1011
+candidate evidence records across dates. The previous/current diff
+found ZERO source candidate changes, losses or active leaf additions.
+
+BUT 359 active leaf goods have only non-GB geography-1080 context in
+the target review and 7 special goods lack any expanded measures;
+these 366 are explicitly unresolved. No inference of `0%` is allowed.
+
+Producer `gb_source_ledger.py` outputs a **complete one-row-per-active
+commodity CSV**, preserves compound duty expressions, conditions,
+exclusions, additional codes, start/end dates and statuses, and offers
+read-only JSON lookup for an exact 10-digit commodity code. Every
+result has no certified payable rate, preserves the raw evidence, and
+never substitutes the Channel Islands 1080 geography for GB 1011.
+
+**Desktop consumer must not import this as a production `tariffs.db`:**
+before exposing the rates as payable, resolve 366 unknowns and
+origin-/condition-specific duty applicability; separately verify
+NI full managed coverage and legacy UI Other semantics. Until then
+existing installed data remains unchanged and unknown must be shown
+as unknown, not silently mapped to 0%. This is an ingestion and QA
+contract, NOT executable desktop code or a certified tariff release.
+
+Producer implementation and acceptance:
+cursor-tax-tools/docs/data-first-gb-xi-readiness.md
