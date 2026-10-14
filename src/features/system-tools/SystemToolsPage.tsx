@@ -16,7 +16,6 @@ import {
   LaunchToolResult,
   RecentProgram,
   ToolCategory,
-  UserTool,
   CreateUserToolRequest,
   UpdateUserToolRequest,
 } from '@/types';
