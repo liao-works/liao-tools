@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Upload, Download, Loader2 } from 'lucide-react';
+import { Upload, Download, Loader2, FileSpreadsheet, CheckCircle2, ShieldAlert, AlertTriangle, X, FileCheck2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -26,6 +26,7 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
   const [matchLength, setMatchLength] = useState<number | undefined>(6);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<AltaBatchResult | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
   const [showResultFileDialog, setShowResultFileDialog] = useState(false);
   const [showTemplateFileDialog, setShowTemplateFileDialog] = useState(false);
   const [templateFilePath, setTemplateFilePath] = useState<string>('');
@@ -44,6 +45,7 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
       if (selected && typeof selected === 'string') {
         setFilePath(selected);
         setResult(null);
+        setErrorMessage('');
       }
     } catch (error) {
       console.error('选择文件失败:', error);
@@ -60,6 +62,7 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
 
     setProcessing(true);
     setResult(null);
+    setErrorMessage('');
 
     try {
       const data = await altaApi.batchProcess(filePath, matchLength);
@@ -76,6 +79,7 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
       });
     } catch (error: any) {
       console.error('处理失败:', error);
+      setErrorMessage(error?.message || '处理失败，请检查文件格式和本地数据库。');
 
       // 检查是否是数据库为空的错误
       if (error.code === 'DATABASE_EMPTY') {
@@ -138,105 +142,84 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
 
   return (
     <div className="space-y-4">
-      {/* 模板下载 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>第一步：下载Excel模板</CardTitle>
-          <CardDescription>下载模板文件，按格式填写HS编码</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={handleDownloadTemplate}>
-            <Download className="mr-2 h-4 w-4" />
-            下载模板
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* 文件选择 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>第二步：选择填写好的Excel文件</CardTitle>
-          <CardDescription>支持.xlsx和.xls格式</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Button
-              variant="outline"
-              onClick={handleSelectFile}
-              disabled={processing}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              选择文件
-            </Button>
-            {filePath && (
-              <p className="mt-2 text-sm text-muted-foreground">
-                已选择: {filePath.split(/[/\\]/).pop()}
-              </p>
-            )}
-          </div>
-
-          {/* 匹配位数选择 */}
-          <div className="space-y-2">
-            <Label>匹配位数</Label>
-            <div className="flex gap-2">
-              {MATCH_OPTIONS.map((option) => (
-                <Button
-                  key={option.value || 'full'}
-                  variant={matchLength === option.value ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setMatchLength(option.value)}
-                  disabled={processing}
-                >
-                  {option.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* 处理按钮 */}
-          <Button onClick={handleProcess} disabled={!filePath || processing} className="w-full">
-            {processing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                处理中...
-              </>
-            ) : (
-              '开始处理'
-            )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* 结果统计 */}
-      {result && (
-        <Card>
+      <div className="lt-process-steps" aria-label="批量检查步骤">
+        <div><span className="lt-step-index">01</span><strong>准备模板</strong><small>按列填写 HS Code</small></div>
+        <div><span className="lt-step-index">02</span><strong>选择文件</strong><small>支持 .xls / .xlsx</small></div>
+        <div><span className="lt-step-index">03</span><strong>筛查并导出</strong><small>保留禁运与例外信息</small></div>
+      </div>
+      <div className="lt-operation-grid">
+        <Card className="lt-operation-primary">
           <CardHeader>
-            <CardTitle>处理结果</CardTitle>
-            <CardDescription>批量处理完成</CardDescription>
+            <div className="lt-operation-heading"><span className="lt-step-index">01</span>
+              <div><CardTitle>准备并上传编码文件</CardTitle><CardDescription>使用标准模板填写编码，或直接选择已准备好的 Excel 文件。</CardDescription></div>
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">总计</p>
-                <p className="text-2xl font-bold">{result.total}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">禁运</p>
-                <p className="text-2xl font-bold text-destructive">{result.forbidden}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">未命中</p>
-                <p className="text-2xl font-bold text-success-fg">{result.safe}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">无效</p>
-                <p className="text-2xl font-bold text-warning-fg">{result.invalid}</p>
+          <CardContent className="space-y-5">
+            <div className="lt-operation-template">
+              <div><strong><FileSpreadsheet size={17}/> 标准 Excel 模板</strong>
+                <p>不确定列结构时，请先下载模板并填写 HS Code。</p></div>
+              <Button variant="outline" onClick={handleDownloadTemplate}><Download className="mr-2 h-4 w-4"/>下载模板</Button>
+            </div>
+            <div className="lt-operation-file-select">
+              <label>本地工作簿 <span>必选</span></label>
+              <div className="lt-operation-drop">
+                <span className="lt-operation-file-symbol"><FileSpreadsheet size={25}/></span>
+                <div className="lt-operation-file-details">
+                  <strong>{filePath ? getFileName(filePath) : '选择包含商品编码的 Excel 文件'}</strong>
+                  <small>{filePath ? filePath : '支持 .xlsx / .xls · 文件在本地处理'}</small>
+                </div>
+                <Button variant="outline" onClick={handleSelectFile} disabled={processing}><Upload className="mr-2 h-4 w-4"/>{filePath ? '更换' : '选择文件'}</Button>
+                {filePath && <button type="button" title="移除文件" aria-label="移除文件" className="lt-operation-clear"
+                  disabled={processing} onClick={() => {setFilePath('');setResult(null);setErrorMessage('');}}><X size={16}/></button>}
               </div>
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">“未命中”仅表示未在当前禁运数据中匹配到条目，不代表已完成所有合规审查。</p>
+            <div className="lt-operation-field">
+              <Label>匹配位数</Label>
+              <div className="lt-operation-choices">
+                {MATCH_OPTIONS.map(option => <button type="button" key={option.value || 'full'}
+                  className={matchLength === option.value ? 'is-selected' : ''}
+                  disabled={processing} aria-pressed={matchLength === option.value}
+                  onClick={() => {setMatchLength(option.value);setResult(null);}}>
+                  {option.label}</button>)}
+              </div>
+              <p>匹配位数越短，命中范围可能越广；最终应核对限制条目和例外。</p>
+            </div>
+            <Button className="lt-operation-run" onClick={handleProcess} disabled={!filePath || processing}>
+              {processing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>正在检查本地数据…</>
+                : <><ShieldAlert className="mr-2 h-4 w-4"/>开始批量筛查</>}
+            </Button>
+            {errorMessage && <p className="lt-operation-error" role="alert">{errorMessage}</p>}
           </CardContent>
         </Card>
-      )}
+        <aside className="lt-operation-side">
+          <div className="lt-operation-side-card">
+            <span className="lt-kicker">SCREENING NOTES</span>
+            <h3>结果如何理解？</h3>
+            <p>命中意味着需要逐条确认限制内容及例外条款。未命中只代表此版本数据库未匹配到对应编码，并不等于货物全面合规。</p>
+            <div className="lt-operation-note"><ShieldAlert size={17}/> 需要复核：命中禁运记录及含例外条目</div>
+            <div className="lt-operation-note"><FileCheck2 size={17}/> 文件导出：由本地批处理命令生成</div>
+          </div>
+        </aside>
+      </div>
+      {result && <Card className="lt-operation-result">
+        <CardHeader>
+          <div className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-success-fg"/>
+            <div><CardTitle>批量筛查完成</CardTitle><CardDescription>按当前匹配位数产生的本地结果</CardDescription></div></div>
+        </CardHeader>
+        <CardContent>
+          <div className="lt-operation-stats">
+            <div><span>总条数</span><strong>{result.total}</strong></div>
+            <div><span>命中禁运</span><strong className="text-destructive">{result.forbidden}</strong></div>
+            <div><span>未命中</span><strong>{result.safe}</strong></div>
+            <div><span>无效编码</span><strong>{result.invalid}</strong></div>
+          </div>
+          <p className="lt-operation-result-note"><AlertTriangle size={16}/> 未命中并不代表全面合规，请根据导出的原始条目核查限制与例外。</p>
+          {result.output_path && <div className="lt-operation-output"><FileSpreadsheet size={19}/>
+            <div><strong>{getFileName(result.output_path)}</strong><span title={result.output_path}>{result.output_path}</span></div>
+            <Button variant="outline" onClick={() => setShowResultFileDialog(true)}>查看结果</Button>
+          </div>}
+        </CardContent>
+      </Card>}
 
       {/* 模板文件打开对话框 */}
       <FileOpenDialog

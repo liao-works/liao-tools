@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Loader2, AlertCircle, ShieldAlert, CheckCircle2, X, FileSearch2 } from 'lucide-react';
+import { Search, Loader2, AlertCircle, ShieldAlert, CheckCircle2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,11 +14,9 @@ import { useToast } from '@/hooks/use-toast';
  */
 function parseRawText(rawText: string | null | undefined): { main: string[]; exceptions: string[] } {
   if (!rawText) {
-    console.log('parseRawText: raw_text 为空');
     return { main: [], exceptions: [] };
   }
 
-  console.log('parseRawText 输入:', rawText);
 
   // 检查是否有例外标记（俄语或中文）
   const hasException = rawText.includes('за исключением') ||
@@ -28,7 +26,6 @@ function parseRawText(rawText: string | null | undefined): { main: string[]; exc
   if (!hasException) {
     // 没有例外，所有编码都是主编码
     const codes = rawText.match(/\d{4,10}/g) || [];
-    console.log('parseRawText: 无例外，编码:', codes);
     return { main: codes, exceptions: [] };
   }
 
@@ -36,13 +33,10 @@ function parseRawText(rawText: string | null | undefined): { main: string[]; exc
   const exceptionPart = rawText.split(/за исключением|кроме/)[1] || '';
   const mainPart = rawText.split(/за исключением|кроме/)[0] || '';
 
-  console.log('主编码部分:', mainPart);
-  console.log('例外编码部分:', exceptionPart);
 
   const exceptions = exceptionPart.match(/\d{4,10}/g) || [];
   const main = mainPart.match(/\d{4,10}/g) || [];
 
-  console.log('解析结果 - 主编码:', main, '例外编码:', exceptions);
 
   return { main, exceptions };
 }
@@ -202,7 +196,7 @@ export function QueryTab({ onSwitchToManage }: QueryTabProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className={`lt-alta-verdict ${result.status === 'forbidden' ? 'lt-alta-verdict--hit' : 'lt-alta-verdict--clear'}`}>
+              <div className={`lt-alta-verdict ${result.description === '无效的HS编码' || result.description.startsWith('编码长度不足') ? 'lt-alta-verdict--invalid' : result.status === 'forbidden' ? 'lt-alta-verdict--hit' : 'lt-alta-verdict--clear'}`}>
                 <span className="lt-alta-verdict-icon">
                   {result.status === 'forbidden' ? <ShieldAlert size={24}/> : <CheckCircle2 size={24}/>}
                 </span>
