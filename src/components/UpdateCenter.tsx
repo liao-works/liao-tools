@@ -191,8 +191,8 @@ export function UpdateCenter({ initialInfo = null, embedded = false }: Props) {
           : '下载完成后自动核验 SHA-256，校验失败不会进入安装。'}</p>
     </div>}
     {phase === 'ready' && <div className="lt-update-status lt-update-status--good" role="status">
-      <ShieldCheck size={20}/><div><strong>{signed ? '签名更新包已下载并验证' : '下载完成，完整性校验通过'}</strong>
-        <p>{signed ? '更新包已由 Tauri 官方 updater 验证，可确认安装。' : '安装包已验证，现在可以打开系统安装程序。升级完成后可能需要重新启动应用。'}</p>
+      <ShieldCheck size={20}/><div><strong>{signed ? '签名更新包已下载，等待安装验证' : '下载完成，完整性校验通过'}</strong>
+        <p>{signed ? '下载完成。点击安装后由 Tauri 官方 updater 验证受信任签名，验证失败将拒绝安装。' : '安装包已验证，现在可以打开系统安装程序。升级完成后可能需要重新启动应用。'}</p>
       </div></div>}
     {phase === 'launched' && <div className="lt-update-status lt-update-status--good" role="status">
       <CheckCircle2 size={20}/><div><strong>{signed ? '签名更新安装已执行' : '安装包已打开'}</strong>

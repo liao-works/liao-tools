@@ -190,7 +190,7 @@ const BASE = 'http://127.0.0.1:1420';
       assert(!startCalls.some(call => call.command === 'check_for_updates'),
         'trusted signed channel must not silently downgrade to unsigned legacy updater');
       await page.getByRole('button', { name: '下载签名更新包' }).click();
-      await page.getByText('签名更新包已下载并验证').waitFor();
+      await page.getByText('签名更新包已下载，等待安装验证').waitFor();
       await page.screenshot({ path: 'ui-screenshots/updates-signed-verified-mocked.png', fullPage: true });
       await page.getByRole('button', { name: '安装已签名更新' }).click();
       await page.getByText('签名更新安装已执行').waitFor();
