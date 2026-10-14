@@ -111,40 +111,40 @@ pub fn get_platform_info_impl() -> PlatformInfo {
 fn get_platform_download_url(assets: &[GitHubAsset]) -> Result<Option<String>, CommandError> {
     let platform_info = get_platform_info_impl();
     
-    // 根据平台和架构选择合适的安装包
-    let target_patterns = match platform_info.os_family.as_str() {
-        "windows" => {
-            if platform_info.arch.contains("x86_64") || platform_info.arch.contains("amd64") {
-                vec!["x64_setup.exe", "x64.msi", "setup.exe", ".exe"]
-            } else {
-                vec![".exe", ".msi"]
-            }
+    // 严格匹配当前操作系统和架构，不允许以泛化的 .exe 等格式回退。
+    let arch = platform_info.arch.as_str();
+    let mut matching: Vec<&GitHubAsset> = assets.iter().filter(|asset| {
+        let name = asset.name.to_ascii_lowercase();
+        match platform_info.os_family.as_str() {
+            "windows" if arch == "x86_64" =>
+                (name.ends_with(".exe") || name.ends_with(".msi"))
+                    && (name.contains("x64") || name.contains("x86_64") || name.contains("amd64"))
+                    && !name.contains("arm64"),
+            "windows" if arch == "aarch64" =>
+                (name.ends_with(".exe") || name.ends_with(".msi"))
+                    && (name.contains("arm64") || name.contains("aarch64")),
+            "macos" if arch == "aarch64" =>
+                name.ends_with(".dmg")
+                    && (name.contains("aarch64") || name.contains("arm64") || name.contains("universal")),
+            "macos" if arch == "x86_64" =>
+                name.ends_with(".dmg")
+                    && (name.contains("x86_64") || name.contains("x64") || name.contains("universal")),
+            "linux" if arch == "x86_64" =>
+                (name.ends_with(".appimage") || name.ends_with(".deb"))
+                    && (name.contains("amd64") || name.contains("x86_64")),
+            _ => false,
         }
-        "macos" => {
-            if platform_info.arch.contains("aarch64") || platform_info.arch.contains("arm64") {
-                vec!["aarch64.dmg", "arm64.dmg", "universal.dmg", ".dmg"]
-            } else {
-                vec!["x86_64.dmg", ".dmg", ".app.tar.gz"]
-            }
-        }
-        "linux" => {
-            if platform_info.arch.contains("x86_64") || platform_info.arch.contains("amd64") {
-                vec!["amd64.AppImage", "x86_64.AppImage", ".AppImage", ".deb", ".rpm"]
-            } else {
-                vec![".AppImage", ".deb", ".rpm"]
-            }
-        }
-        _ => return Ok(None),
-    };
-
-    // 按优先级查找匹配的文件
-    for pattern in target_patterns {
-        for asset in assets {
-            if asset.name.contains(pattern) {
-                println!("找到平台特定文件: {}", asset.name);
-                return Ok(Some(asset.browser_download_url.clone()));
-            }
-        }
+    }).collect();
+    matching.sort_by_key(|asset| {
+        let name = asset.name.to_ascii_lowercase();
+        if name.ends_with(".exe") { 0 }
+        else if name.ends_with(".msi") { 1 }
+        else if name.ends_with(".dmg") { 2 }
+        else if name.ends_with(".appimage") { 3 }
+        else { 4 }
+    });
+    if let Some(asset) = matching.first() {
+        return Ok(Some(asset.browser_download_url.clone()));
     }
 
     Ok(None)
