@@ -279,6 +279,12 @@ pub async fn download_update(
 /// 安装更新
 #[tauri::command]
 pub async fn install_update(file_path: String, silent: bool, app: tauri::AppHandle) -> Result<String, CommandError> {
+    if silent {
+        return Err(CommandError::new(
+            "当前版本不支持无人值守静默安装，请使用系统安装程序完成升级",
+            "SILENT_UPDATE_DISABLED"
+        ));
+    }
     println!("开始安装更新: {}", file_path);
     println!("静默模式: {}", silent);
 
@@ -692,27 +698,20 @@ pub fn get_platform_info() -> PlatformInfo {
 
 /// 比较两个语义化版本 (例如 "1.2.3" vs "1.2.2")
 fn compare_versions(latest: &str, current: &str) -> bool {
-    let parse_version = |v: &str| -> Vec<u32> {
-        v.split('.')
-            .filter_map(|s| s.parse::<u32>().ok())
-            .collect()
-    };
-
-    let latest_parts = parse_version(latest);
-    let current_parts = parse_version(current);
-
-    for i in 0..latest_parts.len().max(current_parts.len()) {
-        let latest_part = latest_parts.get(i).unwrap_or(&0);
-        let current_part = current_parts.get(i).unwrap_or(&0);
-
-        if latest_part > current_part {
-            return true;
-        } else if latest_part < current_part {
-            return false;
-        }
+    fn parse(value: &str) -> Option<[u32; 3]> {
+        let v = value.strip_prefix('v').unwrap_or(value);
+        if v.contains('-') || v.contains('+') { return None; }
+        let mut values = v.split('.');
+        let major = values.next()?.parse().ok()?;
+        let minor = values.next()?.parse().ok()?;
+        let patch = values.next()?.parse().ok()?;
+        if values.next().is_some() { return None; }
+        Some([major, minor, patch])
     }
-
-    false
+    match (parse(latest), parse(current)) {
+        (Some(latest), Some(current)) => latest > current,
+        _ => false,
+    }
 }
 
 /// 检查是否应该自动检查更新
@@ -825,6 +824,9 @@ mod tests {
         assert!(compare_versions("2.0.0", "1.9.9"));
         assert!(!compare_versions("1.2.2", "1.2.3"));
         assert!(!compare_versions("1.2.3", "1.2.3"));
+        assert!(compare_versions("v1.2.4", "1.2.3"));
+        assert!(!compare_versions("1.2.invalid", "1.2.3"));
+        assert!(!compare_versions("1.2.4-beta", "1.2.3"));
     }
 
     #[test]
