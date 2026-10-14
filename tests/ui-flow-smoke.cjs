@@ -174,6 +174,7 @@ const BASE = 'http://127.0.0.1:1420';
     await scenario('official-signed-update', '/updates?mode=signed', async page => {
       await page.getByRole('heading', { name: '发现可用的新版本' }).waitFor();
       await page.getByText('官方签名更新').first().waitFor();
+      await page.screenshot({ path: 'ui-screenshots/updates-signed-new-version-mocked.png', fullPage: true });
       const startCalls = await page.evaluate(() => window.__liaoBridgeCalls);
       assert(startCalls.some(call => call.command === 'plugin:updater|check'),
         'trusted signed channel must use official updater check');
@@ -181,6 +182,7 @@ const BASE = 'http://127.0.0.1:1420';
         'trusted signed channel must not silently downgrade to unsigned legacy updater');
       await page.getByRole('button', { name: '下载签名更新包' }).click();
       await page.getByText('签名更新包已下载并验证').waitFor();
+      await page.screenshot({ path: 'ui-screenshots/updates-signed-verified-mocked.png', fullPage: true });
       await page.getByRole('button', { name: '安装已签名更新' }).click();
       await page.getByText('签名更新安装已执行').waitFor();
       const calls = await page.evaluate(() => window.__liaoBridgeCalls);
