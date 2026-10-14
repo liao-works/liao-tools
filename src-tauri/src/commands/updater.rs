@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use std::io::{Write, BufWriter};
 use crate::commands::error::CommandError;
 use tauri::Emitter;
+use sha2::{Sha256, Digest};
+use std::io::Read;
 
 // GitHub 仓库配置
 const GITHUB_REPO: &str = "liao-works/liao-tools";
@@ -27,6 +29,7 @@ pub struct UpdateInfo {
     pub published_at: String,
     pub platform_specific_url: Option<String>,
     pub file_size: Option<u64>,
+    pub checksum_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,6 +82,8 @@ struct GitHubAsset {
     name: String,
     browser_download_url: String,
     size: u64,
+    #[serde(default)]
+    digest: Option<String>,
 }
 
 /// 获取当前平台信息
@@ -153,6 +158,23 @@ fn get_file_size(assets: &[GitHubAsset], url: &str) -> Option<u64> {
         .map(|asset| asset.size)
 }
 
+fn validated_digest(asset: &GitHubAsset) -> Option<String> {
+    let sha = asset.digest.as_deref()?.strip_prefix("sha256:")?;
+    if sha.len() == 64 && sha.bytes().all(|b| b.is_ascii_hexdigit()) {
+        Some(sha.to_ascii_lowercase())
+    } else { None }
+}
+fn file_sha256(path: &Path) -> Result<String, CommandError> {
+    let mut file = File::open(path).map_err(|e| CommandError::new(format!("读取更新包失败: {}", e), "IO_ERROR"))?;
+    let mut hasher = Sha256::new();
+    let mut buf = [0u8; 65536];
+    loop {
+        let n = file.read(&mut buf).map_err(|e| CommandError::new(format!("读取更新包失败: {}", e), "IO_ERROR"))?;
+        if n == 0 { break; }
+        hasher.update(&buf[..n]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
 /// 获取临时下载目录
 fn get_download_dir() -> Result<PathBuf, CommandError> {
     let temp_dir = std::env::temp_dir();
@@ -169,123 +191,89 @@ fn get_download_dir() -> Result<PathBuf, CommandError> {
     Ok(download_dir)
 }
 
-/// 下载更新
+/// 下载前与官方 Release 核对，边下载边校验 SHA-256，拒绝不可信文件。
 #[tauri::command]
-pub async fn download_update(url: String, version: String, app: tauri::AppHandle) -> Result<String, CommandError> {
-    println!("开始下载更新: {}", url);
-    println!("版本: {}", version);
-    
-    let client = reqwest::Client::builder()
-        .user_agent("liao-tools")
-        .timeout(std::time::Duration::from_secs(300))
-        .build()
-        .map_err(|e| CommandError::new(format!("创建 HTTP 客户端失败: {}", e), "NETWORK_ERROR"))?;
-
-    // 发送请求
-    let response = client
-        .get(&url)
-        .send()
-        .await
+pub async fn download_update(
+    url: String, version: String, checksum_sha256: String, app: tauri::AppHandle
+) -> Result<String, CommandError> {
+    if version.is_empty() || version.len() > 64
+        || !version.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-') {
+        return Err(CommandError::new("更新版本号非法", "INVALID_VERSION"));
+    }
+    if !url.starts_with("https://github.com/liao-works/liao-tools/releases/download/") {
+        return Err(CommandError::new("仅接受官方 GitHub Release 安装包", "UNTRUSTED_URL"));
+    }
+    let sha = checksum_sha256.to_ascii_lowercase();
+    if sha.len() != 64 || !sha.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(CommandError::new("未提供合法的 SHA-256", "INTEGRITY_REQUIRED"));
+    }
+    let latest = check_for_updates().await?;
+    if !latest.has_update || latest.latest_version != version
+        || latest.platform_specific_url.as_deref() != Some(url.as_str())
+        || latest.checksum_sha256.as_deref() != Some(sha.as_str()) {
+        return Err(CommandError::new("文件与官方最新版本或 SHA-256 不匹配", "UNTRUSTED_RELEASE"));
+    }
+    let extension = if cfg!(target_os = "windows") {
+        if url.ends_with(".exe") { ".exe" } else if url.ends_with(".msi") { ".msi" }
+        else { return Err(CommandError::new("不支持的 Windows 文件", "UNSUPPORTED_FORMAT")); }
+    } else if cfg!(target_os = "macos") {
+        if url.ends_with(".dmg") { ".dmg" }
+        else { return Err(CommandError::new("需要 DMG 文件", "UNSUPPORTED_FORMAT")); }
+    } else if cfg!(target_os = "linux") {
+        if url.ends_with(".AppImage") { ".AppImage" } else if url.ends_with(".deb") { ".deb" }
+        else { return Err(CommandError::new("不支持的 Linux 文件", "UNSUPPORTED_FORMAT")); }
+    } else { return Err(CommandError::new("不支持的系统", "UNSUPPORTED_OS")); };
+    let expected_size = latest.file_size.ok_or_else(||
+        CommandError::new("官方未公布安装包大小", "INTEGRITY_REQUIRED"))?;
+    if expected_size == 0 { return Err(CommandError::new("安装包大小无效", "INTEGRITY_REQUIRED")); }
+    let dir = get_download_dir()?;
+    let path = dir.join(format!("liao-tools_{}{}", version, extension));
+    let part = dir.join(format!("liao-tools_{}{}.part", version, extension));
+    let meta = dir.join(format!("liao-tools_{}{}.sha256", version, extension));
+    let _ = fs::remove_file(&part);
+    let _ = fs::remove_file(&meta);
+    let client = reqwest::Client::builder().user_agent("liao-tools")
+        .timeout(std::time::Duration::from_secs(300)).build()
+        .map_err(|e| CommandError::new(format!("创建网络客户端失败: {}", e), "NETWORK_ERROR"))?;
+    let response = client.get(&url).send().await
         .map_err(|e| CommandError::new(format!("下载请求失败: {}", e), "NETWORK_ERROR"))?;
-
     if !response.status().is_success() {
-        return Err(CommandError::new(
-            format!("下载失败，HTTP 状态: {}", response.status()),
-            "DOWNLOAD_ERROR"
-        ));
+        return Err(CommandError::new(format!("下载失败: {}", response.status()), "DOWNLOAD_ERROR"));
     }
-
-    let total_size = response
-        .content_length()
-        .ok_or_else(|| CommandError::new("无法获取文件大小", "DOWNLOAD_ERROR"))?;
-
-    println!("文件大小: {} 字节", total_size);
-
-    // 确定文件扩展名
-    let extension = if url.contains(".dmg") {
-        ".dmg"
-    } else if url.contains(".exe") {
-        ".exe"
-    } else if url.contains(".AppImage") {
-        ".AppImage"
-    } else if url.contains(".deb") {
-        ".deb"
-    } else if url.contains(".msi") {
-        ".msi"
-    } else if url.contains(".tar.gz") {
-        ".tar.gz"
-    } else {
-        ""
-    };
-
-    // 构建文件名
-    let filename = format!("liao-tools_{}{}", version, extension);
-    let download_dir = get_download_dir()?;
-    let file_path = download_dir.join(&filename);
-
-    // 删除旧文件
-    if file_path.exists() {
-        fs::remove_file(&file_path)
-            .map_err(|e| CommandError::new(
-                format!("删除旧文件失败: {}", e),
-                "IO_ERROR"
-            ))?;
-    }
-
-    // 创建文件并写入
-    let file = File::create(&file_path)
-        .map_err(|e| CommandError::new(
-            format!("创建文件失败: {}", e),
-            "IO_ERROR"
-        ))?;
-
-    let mut writer = BufWriter::new(file);
-    let mut downloaded: u64 = 0;
-    let mut stream = response.bytes_stream();
-
+    let mut writer = BufWriter::new(File::create(&part)
+        .map_err(|e| CommandError::new(format!("无法写入: {}", e), "IO_ERROR"))?);
+    let mut hasher = Sha256::new();
+    let mut downloaded = 0u64;
     use futures_util::StreamExt;
-    
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk
-            .map_err(|e| CommandError::new(
-                format!("下载流错误: {}", e),
-                "DOWNLOAD_ERROR"
-            ))?;
-
-        writer.write_all(&chunk)
-            .map_err(|e| CommandError::new(
-                format!("写入文件失败: {}", e),
-                "IO_ERROR"
-            ))?;
-
-        downloaded += chunk.len() as u64;
-
-        // 发送进度
-        let percentage = (downloaded as f64 / total_size as f64) * 100.0;
-        let progress = DownloadProgress {
-            downloaded,
-            total: total_size,
-            percentage,
-        };
-
-        app.emit("download-progress", &progress)
-            .map_err(|e| CommandError::new(
-                format!("发送进度失败: {}", e),
-                "EMIT_ERROR"
-            ))?;
-
-        println!("下载进度: {:.1}% ({}/{})", percentage, downloaded, total_size);
+    let mut stream = response.bytes_stream();
+    let transfer: Result<(), CommandError> = async {
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| CommandError::new(format!("下载中断: {}", e), "DOWNLOAD_ERROR"))?;
+            downloaded += chunk.len() as u64;
+            if downloaded > expected_size { return Err(CommandError::new("文件超出预期大小", "INTEGRITY_ERROR")); }
+            hasher.update(&chunk);
+            writer.write_all(&chunk)
+                .map_err(|e| CommandError::new(format!("写入失败: {}", e), "IO_ERROR"))?;
+            let _ = app.emit("download-progress", DownloadProgress {
+                downloaded, total: expected_size, percentage: downloaded as f64 / expected_size as f64 * 100.0
+            });
+        }
+        writer.flush().map_err(|e| CommandError::new(format!("保存失败: {}", e), "IO_ERROR"))?;
+        Ok(())
+    }.await;
+    drop(writer);
+    if let Err(error) = transfer {
+        let _ = fs::remove_file(&part);
+        return Err(error);
     }
-
-    writer.flush()
-        .map_err(|e| CommandError::new(
-            format!("刷新缓冲区失败: {}", e),
-            "IO_ERROR"
-        ))?;
-
-    println!("下载完成: {}", file_path.display());
-
-    Ok(file_path.to_string_lossy().to_string())
+    if downloaded != expected_size || format!("{:x}", hasher.finalize()) != sha {
+        let _ = fs::remove_file(&part);
+        return Err(CommandError::new("SHA-256 或文件大小校验失败", "INTEGRITY_ERROR"));
+    }
+    if path.exists() { fs::remove_file(&path).map_err(|e| CommandError::new(format!("删除旧文件失败: {}", e), "IO_ERROR"))?; }
+    fs::rename(&part, &path).map_err(|e| CommandError::new(format!("保存安装包失败: {}", e), "IO_ERROR"))?;
+    fs::write(&meta, sha).map_err(|e| CommandError::new(format!("保存验证记录失败: {}", e), "IO_ERROR"))?;
+    Ok(path.to_string_lossy().to_string())
 }
 
 /// 安装更新
@@ -294,7 +282,23 @@ pub async fn install_update(file_path: String, silent: bool, app: tauri::AppHand
     println!("开始安装更新: {}", file_path);
     println!("静默模式: {}", silent);
 
-    let path = Path::new(&file_path);
+    // 只接受本应用安全下载目录中的已校验安装包；防止任意路径执行。
+    let dir = get_download_dir()?.canonicalize()
+        .map_err(|e| CommandError::new(format!("更新目录不可用: {}", e), "IO_ERROR"))?;
+    let target = Path::new(&file_path).canonicalize()
+        .map_err(|e| CommandError::new(format!("更新包不可用: {}", e), "FILE_NOT_FOUND"))?;
+    if target.parent() != Some(dir.as_path())
+        || !target.file_name().and_then(|s| s.to_str()).unwrap_or("").starts_with("liao-tools_") {
+        return Err(CommandError::new("拒绝执行非可信来源的文件", "UNTRUSTED_FILE"));
+    }
+    let proof = dir.join(format!("{}.sha256", target.file_name().unwrap().to_string_lossy()));
+    let sha = fs::read_to_string(proof)
+        .map_err(|_| CommandError::new("缺少安装包完整性验证凭据", "INTEGRITY_REQUIRED"))?;
+    let sha = sha.trim();
+    if sha.len() != 64 || !sha.bytes().all(|b| b.is_ascii_hexdigit()) || file_sha256(&target)? != sha {
+        return Err(CommandError::new("安装包校验失败，已拒绝执行", "INTEGRITY_ERROR"));
+    }
+    let path = target.as_path();
 
     if !path.exists() {
         return Err(CommandError::new(
@@ -675,6 +679,9 @@ pub async fn check_for_updates() -> Result<UpdateInfo, CommandError> {
         published_at: release.published_at,
         platform_specific_url,
         file_size,
+        checksum_sha256: platform_specific_url.as_ref()
+            .and_then(|url| release.assets.iter().find(|asset| &asset.browser_download_url == url))
+            .and_then(validated_digest),
     })
 }
 
@@ -720,7 +727,7 @@ pub fn should_check_for_updates(settings: &UpdateSettings) -> bool {
         .unwrap()
         .as_secs();
 
-    let elapsed_hours = (now - settings.last_check_time) / 3600;
+    let elapsed_hours = now.saturating_sub(settings.last_check_time) / 3600;
     let interval = if settings.check_interval_hours > 0 {
         settings.check_interval_hours
     } else {
