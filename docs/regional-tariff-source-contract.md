@@ -229,3 +229,28 @@ Official newest DBT release remains blocked until it exposes required
 tables; all consumer source updates remain documentation-only and Draft.
 
 Producer guide: cursor-tax-tools/docs/gb-version-diff-acceptance.md
+
+## Phase 11 — NI complete-source gap planning (review only)
+
+The XI producer now chooses the next bounded HMRC commodity batch from the
+**first uncollected or failed XI code**, using the exact frozen official
+XI catalogue. Prior successful responses are independently SHA-256
+replayed before the planner skips any commodity. Source errors remain
+eligible for retries, so manual batch advance cannot silently certify
+incomplete NI coverage. The managed operator workflow defaults to
+start_index=auto; explicit numeric override is only for review use.
+
+NI goods nomenclature now rejects invalid effective dates and
+paginated chapter responses instead of silently classifying unknown
+codes as inactive or treating partial pages as complete. XI commodity
+JSON:API pagination and mismatched relationship counts are rejected.
+
+Verified public canary: 2 chapters, 863 records, 516 active declarable
+codes, 5 source responses independently replayed, **511 missing** in
+the sample. The planner returned start_index=5, not a full-source claim.
+Managed 97-chapter coverage and final origin-specific NI Other duty
+remain NOT verified. No change to north_ireland_rate, other_rate, or
+installed tariffs.db is authorized.
+
+See producer docs/xi-full-coverage-run-planning.md. This is a source
+contract update only, not desktop executable implementation.
