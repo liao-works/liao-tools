@@ -4,7 +4,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { ProcessConfigPanel } from './components/ProcessConfigPanel';
 import { ProcessLogPanel } from './components/ProcessLogPanel';
 import { FileOpenDialog } from '@/components/common/FileOpenDialog';

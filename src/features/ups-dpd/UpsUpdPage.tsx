@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileOpenDialog } from '@/components/common/FileOpenDialog';
 import { useToast } from '@/hooks/use-toast';
