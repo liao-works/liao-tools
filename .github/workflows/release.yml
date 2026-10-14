@@ -154,6 +154,10 @@ jobs:
           releaseBody: ${{ steps.changelog.outputs.NOTES }}
           releaseDraft: true
           prerelease: false
+          # Never allow matrix workers to race replacing latest.json. Only the
+          # after-matrix publish job can assemble and upload the complete one.
+          uploadUpdaterJson: false
+          uploadUpdaterSignatures: true
           args: ${{ matrix.args }}
   verify-and-publish:
     needs: release
