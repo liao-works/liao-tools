@@ -207,10 +207,15 @@ export function QueryTab({ onSwitchToManage }: QueryTabProps) {
                       : 'bg-success-subtle text-success-subtle-fg'
                   }`}
                 >
-                  {result.status === 'forbidden' ? '🚫 禁运' : '✅ 正常'}
+                  {result.description === '无效的HS编码' || result.description.startsWith('编码长度不足')
+                  ? '⚠ 编码无效' : result.status === 'forbidden' ? '命中禁运条目' : '未命中禁运条目'}
                 </span>
               </div>
 
+              <p className="text-xs text-muted-foreground">
+                此结果仅反映当前 Alta 数据库的编码匹配情况；存在例外时应核对原始条目。
+                “未命中”不代表货物在所有贸易限制下均可出口。
+              </p>
               {/* 描述 */}
               <div>
                 <span className="text-sm font-medium">商品描述：</span>

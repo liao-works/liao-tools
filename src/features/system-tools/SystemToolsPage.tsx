@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Search, Grid3x3 } from 'lucide-react';
+import { Search, Grid3x3, Wrench, List, Plus } from 'lucide-react';
+import { FeatureHeader } from '@/components/layout/FeatureHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -294,37 +295,20 @@ export function SystemToolsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* 页面标题 */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">系统工具</h2>
-          <p className="text-muted-foreground">快速启动系统工具和自定义程序</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={viewMode === 'grid' ? 'default' : 'outline'}
-            onClick={() => setViewMode('grid')}
-            title="网格视图"
-          >
-            <Grid3x3 className="h-4 w-4 mr-2" />
-            网格
-          </Button>
-          {/* 暂时隐藏管理模式和添加工具按钮
-          <Button
-            variant={viewMode === 'manage' ? 'default' : 'outline'}
-            onClick={() => setViewMode('manage')}
-            title="管理模式"
-          >
-            <List className="h-4 w-4 mr-2" />
-            管理
-          </Button>
-          <Button onClick={() => { setSelectedTool(null); setEditDialogOpen(true); }}>
-            <Plus className="h-4 w-4 mr-2" />
-            添加工具
-          </Button>
-          */}
-        </div>
+    <div className="lt-feature space-y-6">
+      <FeatureHeader eyebrow="UTILITIES / LAUNCHER" title="系统工具"
+        description="搜索并启动系统程序，也可以管理常用的自定义程序与快捷键。"
+        icon={<Wrench size={35} strokeWidth={1.5}/>}/>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button variant={viewMode === 'grid' ? 'default' : 'outline'} onClick={() => setViewMode('grid')}>
+          <Grid3x3 className="mr-2 h-4 w-4"/>快速启动
+        </Button>
+        <Button variant={viewMode === 'manage' ? 'default' : 'outline'} onClick={() => setViewMode('manage')}>
+          <List className="mr-2 h-4 w-4"/>管理工具
+        </Button>
+        <Button onClick={() => { setSelectedTool(null); setEditDialogOpen(true); }}>
+          <Plus className="mr-2 h-4 w-4"/>添加工具
+        </Button>
       </div>
 
       {/* 最近使用 */}

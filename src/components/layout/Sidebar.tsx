@@ -44,7 +44,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
           <div className="lt-nav-group" key={group.label}>
             {!collapsed && <div className="lt-nav-label">{group.label}</div>}
             {group.items.map(item => (
-              <NavLink key={item.href} to={item.href} end={'end' in item ? item.end : false}
+              <NavLink key={item.href} to={item.href} end={item.href === '/'}
                 onClick={onNavigate} title={collapsed ? item.label : undefined}
                 className={({ isActive }) => ['lt-nav-item', isActive ? 'is-active' : ''].join(' ')}>
                 <item.icon size={18} strokeWidth={1.8} aria-hidden="true"/>

@@ -225,7 +225,7 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
                 <p className="text-2xl font-bold text-destructive">{result.forbidden}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">正常</p>
+                <p className="text-sm text-muted-foreground">未命中</p>
                 <p className="text-2xl font-bold text-success-fg">{result.safe}</p>
               </div>
               <div className="space-y-1">
@@ -233,6 +233,7 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
                 <p className="text-2xl font-bold text-warning-fg">{result.invalid}</p>
               </div>
             </div>
+            <p className="mt-4 text-xs text-muted-foreground">“未命中”仅表示未在当前禁运数据中匹配到条目，不代表已完成所有合规审查。</p>
           </CardContent>
         </Card>
       )}
