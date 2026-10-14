@@ -134,10 +134,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
 
+      - name: Fail-closed signed updater preflight
+        shell: bash
+        env:
+          REQUIRE_SIGNED_UPDATER: ${{ vars.REQUIRE_SIGNED_UPDATER }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+        run: node scripts/prepare-signed-release.cjs
+
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ vars.REQUIRE_SIGNED_UPDATER == 'true' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ vars.REQUIRE_SIGNED_UPDATER == 'true' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Liao Tools ${{ github.ref_name }}"
