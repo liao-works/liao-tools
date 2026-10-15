@@ -25,6 +25,7 @@ export function TodoPage() {
     error,
     initialized,
     loadTasks,
+    reloadTasks,
     setError,
     filter,
     setFilter,
@@ -271,6 +272,11 @@ export function TodoPage() {
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-destructive" />
             <p className="text-sm text-destructive">{error}</p>
+            {error.startsWith('读取任务失败') || error.startsWith('重新读取任务失败') ? (
+              <Button size="sm" variant="outline" onClick={() => void reloadTasks()} disabled={isLoading}>
+                重试读取
+              </Button>
+            ) : null}
             <button
               onClick={() => setError(null)}
               aria-label="关闭错误提示"
