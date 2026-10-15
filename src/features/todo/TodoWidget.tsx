@@ -15,13 +15,16 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-import type { ThemeColors, TodoConfig, TodoPriority, TodoStatus, TodoTask } from './types';
+import type { ThemeColors, TodoConfig, TodoPriority, TodoStatus, TodoTask, TodoStoreData } from './types';
 import { DEFAULT_CONFIG, PRIORITY_COLORS, PRIORITY_LABELS, WIDGET_THEMES } from './types';
 import { groupTasksByCreatedDate } from './utils/taskGroups';
 
 export function TodoWidget() {
   const [tasks, setTasks] = useState<TodoTask[]>([]);
   const [config, setConfig] = useState<TodoConfig | null>(null);
+  const [revision, setRevision] = useState(0);
+  const savingRef = useRef(false);
+  const needsSyncRef = useRef(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [newTaskPriority, setNewTaskPriority] = useState<TodoPriority>('medium');
@@ -102,23 +105,28 @@ export function TodoWidget() {
     return isDesktopMode ? `rgba(${r}, ${g}, ${b}, ${opacity})` : `rgb(${r}, ${g}, ${b})`;
   };
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const data = await invoke<{ tasks: TodoTask[]; config: TodoConfig }>('load_sticky_notes');
-        if (!data) return;
-        setTasks(data.tasks || []);
-        if (data.config?.widget) {
-          setConfig(data.config);
-          setIsPinned(data.config.widget.isPinned);
-          setIsDesktopMode(data.config.widget.isDesktopMode);
-        }
-      } catch (err) {
-        console.error('加载数据失败:', err);
+  const syncFromRust = async () => {
+    try {
+      const data = await invoke<TodoStoreData>('load_sticky_notes');
+      if (!data) return;
+      if (savingRef.current) {
+        needsSyncRef.current = true;
+        return;
       }
-    };
+      setTasks(data.tasks || []);
+      setRevision(data.revision ?? 0);
+      if (data.config?.widget) {
+        setConfig(data.config);
+        setIsPinned(data.config.widget.isPinned);
+        setIsDesktopMode(data.config.widget.isDesktopMode);
+      }
+    } catch (err) {
+      setSaveError('同步任务失败：' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
 
-    void loadData();
+  useEffect(() => {
+    void syncFromRust();
   }, []);
 
   useEffect(() => {
@@ -126,21 +134,6 @@ export function TodoWidget() {
     let unlistenData: (() => void) | undefined;
     let unlistenMoved: (() => void) | undefined;
     let unlistenResized: (() => void) | undefined;
-
-    const loadData = async () => {
-      try {
-        const data = await invoke<{ tasks: TodoTask[]; config: TodoConfig }>('load_sticky_notes');
-        if (!data) return;
-        setTasks(data.tasks || []);
-        if (data.config?.widget) {
-          setConfig(data.config);
-          setIsPinned(data.config.widget.isPinned);
-          setIsDesktopMode(data.config.widget.isDesktopMode);
-        }
-      } catch (err) {
-        console.error('同步数据失败:', err);
-      }
-    };
 
     let alive = true;
     const register = async (promise: Promise<() => void>, save: (dispose: () => void) => void) => {
@@ -159,7 +152,7 @@ export function TodoWidget() {
       focusInput();
     }), (dispose) => { unlistenFocus = dispose; });
     void register(listen('sticky-notes-data-updated', () => {
-      void loadData();
+      void syncFromRust();
     }), (dispose) => { unlistenData = dispose; });
     void register(appWindow.onMoved(() => {
       scheduleSaveWidgetLayout();
@@ -181,24 +174,38 @@ export function TodoWidget() {
   }, []);
 
   const saveData = async (updatedTasks: TodoTask[], updatedConfig?: TodoConfig | null) => {
+    if (savingRef.current) return false;
+    savingRef.current = true;
     try {
-      await invoke('save_sticky_notes', {
+      const nextRevision = await invoke<number>('save_sticky_notes', {
         data: {
           tasks: updatedTasks,
-          config: updatedConfig || config,
+          config: updatedConfig || config || DEFAULT_CONFIG,
           version: 1,
-        },
+          revision,
+        } satisfies TodoStoreData,
       });
+      setRevision(nextRevision);
       setSaveError(null);
+      return true;
     } catch (err) {
-      setSaveError('保存失败：' + (err instanceof Error ? err.message : String(err)));
-      console.error('保存失败:', err);
-      throw err;
+      const message = err instanceof Error ? err.message : String(err);
+      setSaveError('保存失败：' + message);
+      if (message.includes('待办数据已在其他窗口更新')) {
+        needsSyncRef.current = true;
+      }
+      return false;
+    } finally {
+      savingRef.current = false;
+      if (needsSyncRef.current) {
+        needsSyncRef.current = false;
+        void syncFromRust();
+      }
     }
   };
 
   const handleAddTask = async () => {
-    if (!newTaskTitle.trim()) return;
+    if (!newTaskTitle.trim() || savingRef.current) return;
 
     const now = Date.now();
     const newTask: TodoTask = {
@@ -210,17 +217,15 @@ export function TodoWidget() {
     };
 
     const updatedTasks = [newTask, ...tasks];
-    try {
-      await saveData(updatedTasks);
+    if (await saveData(updatedTasks)) {
       setTasks(updatedTasks);
       setNewTaskTitle('');
       setNewTaskPriority('medium');
-    } catch {
-      // Keep the title, so the user can retry without creating a phantom task.
     }
   };
 
   const toggleTask = async (id: string) => {
+    if (savingRef.current) return;
     const updatedTasks = tasks.map((task) =>
       task.id === id
         ? {
@@ -230,22 +235,13 @@ export function TodoWidget() {
           }
         : task
     );
-    try {
-      await saveData(updatedTasks);
-      setTasks(updatedTasks);
-    } catch {
-      // The task is unchanged until persistence has succeeded.
-    }
+    if (await saveData(updatedTasks)) setTasks(updatedTasks);
   };
 
   const deleteTask = async (id: string) => {
+    if (savingRef.current) return;
     const updatedTasks = tasks.filter((task) => task.id !== id);
-    try {
-      await saveData(updatedTasks);
-      setTasks(updatedTasks);
-    } catch {
-      // Failed deletes must not disappear from the visible list.
-    }
+    if (await saveData(updatedTasks)) setTasks(updatedTasks);
   };
 
   const startEditingTask = (task: TodoTask) => {
@@ -260,7 +256,7 @@ export function TodoWidget() {
   };
 
   const saveEditingTask = async () => {
-    if (!editingTaskId) return;
+    if (!editingTaskId || savingRef.current) return;
 
     const nextTitle = editingTaskTitle.trim();
     if (!nextTitle) {
@@ -288,12 +284,9 @@ export function TodoWidget() {
         : task
     );
 
-    try {
-      await saveData(updatedTasks);
+    if (await saveData(updatedTasks)) {
       setTasks(updatedTasks);
       cancelEditingTask();
-    } catch {
-      // Leave the editor and typed value in place for retry.
     }
   };
 
@@ -336,6 +329,7 @@ export function TodoWidget() {
   };
 
   const togglePin = async () => {
+    if (savingRef.current) return;
     const newPinned = !isPinned;
     const nextDesktopMode = newPinned ? false : isDesktopMode;
     const liveLayout = await readCurrentWidgetLayout();
@@ -369,7 +363,9 @@ export function TodoWidget() {
           isDesktopMode: nextDesktopMode,
         }),
       });
-      await saveData(tasks, nextConfig);
+      if (!(await saveData(tasks, nextConfig))) {
+        throw new Error('置顶设置未持久化');
+      }
     } catch (err) {
       setIsPinned(!newPinned);
       setIsDesktopMode(isDesktopMode);
@@ -409,6 +405,7 @@ export function TodoWidget() {
   };
 
   const toggleDesktopMode = async () => {
+    if (savingRef.current) return;
     const newDesktopMode = !isDesktopMode;
     const nextPinned = newDesktopMode ? false : isPinned;
     const liveLayout = await readCurrentWidgetLayout();
@@ -441,7 +438,9 @@ export function TodoWidget() {
           isPinned: nextPinned,
         }),
       });
-      await saveData(tasks, nextConfig);
+      if (!(await saveData(tasks, nextConfig))) {
+        throw new Error('桌面模式设置未持久化');
+      }
     } catch (err) {
       setIsDesktopMode(!newDesktopMode);
       setIsPinned(isPinned);
@@ -451,6 +450,7 @@ export function TodoWidget() {
   };
 
   const closeWindow = async () => {
+    if (savingRef.current) return;
     try {
       if (persistTimerRef.current !== null) {
         window.clearTimeout(persistTimerRef.current);
@@ -467,7 +467,7 @@ export function TodoWidget() {
       };
 
       setConfig(nextConfig);
-      await saveData(tasks, nextConfig);
+      if (!(await saveData(tasks, nextConfig))) return;
       await saveWidgetLayout(liveLayout);
       await invoke('attach_note_window', {
         noteId: 'todo-widget',
