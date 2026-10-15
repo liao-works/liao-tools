@@ -142,30 +142,34 @@ export function TodoWidget() {
       }
     };
 
-    const registerListeners = async () => {
-      const appWindow = getCurrentWindow();
-
-      unlistenFocus = await listen('todo-widget-focus-input', () => {
-        setFilter('pending');
-        focusInput();
-      });
-
-      unlistenData = await listen('sticky-notes-data-updated', () => {
-        void loadData();
-      });
-
-      unlistenMoved = await appWindow.onMoved(() => {
-        scheduleSaveWidgetLayout();
-      });
-
-      unlistenResized = await appWindow.onResized(() => {
-        scheduleSaveWidgetLayout();
-      });
+    let alive = true;
+    const register = async (promise: Promise<() => void>, save: (dispose: () => void) => void) => {
+      try {
+        const dispose = await promise;
+        if (alive) save(dispose);
+        else dispose();
+      } catch (error) {
+        console.error('待办小组件事件监听失败:', error);
+      }
     };
 
-    void registerListeners();
+    const appWindow = getCurrentWindow();
+    void register(listen('todo-widget-focus-input', () => {
+      setFilter('pending');
+      focusInput();
+    }), (dispose) => { unlistenFocus = dispose; });
+    void register(listen('sticky-notes-data-updated', () => {
+      void loadData();
+    }), (dispose) => { unlistenData = dispose; });
+    void register(appWindow.onMoved(() => {
+      scheduleSaveWidgetLayout();
+    }), (dispose) => { unlistenMoved = dispose; });
+    void register(appWindow.onResized(() => {
+      scheduleSaveWidgetLayout();
+    }), (dispose) => { unlistenResized = dispose; });
 
     return () => {
+      alive = false;
       unlistenFocus?.();
       unlistenData?.();
       unlistenMoved?.();
