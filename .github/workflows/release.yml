@@ -219,6 +219,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
@@ -242,6 +243,29 @@ jobs:
           node scripts/verify-signed-release-manifest.cjs "$TAG" \
             "${RUNNER_TEMP}/published-assets.json" "${RUNNER_TEMP}/updater-signatures" \
             "${RUNNER_TEMP}/downloaded-manifest/latest.json"
+          # A manifest that contains matching signature *text* is still not
+          # proof it was signed by the public key baked into installed apps.
+          # Download exactly the three selected updater packages and verify
+          # every package cryptographically with Minisign before publication.
+          sudo apt-get update -qq
+          sudo apt-get install -y minisign
+          mkdir -p "${RUNNER_TEMP}/signed-bundles"
+          mapfile -t BUNDLES < <(node - "${RUNNER_TEMP}/downloaded-manifest/latest.json" <<'NODE'
+          const fs = require('node:fs');
+          const manifest = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          for (const platform of Object.values(manifest.platforms)) {
+            process.stdout.write(decodeURIComponent(new URL(platform.url).pathname.split('/').pop()) + '\n');
+          }
+          NODE
+          )
+          for package in "${BUNDLES[@]}"; do
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern "$package" --dir "${RUNNER_TEMP}/signed-bundles"
+          done
+          node scripts/verify-signed-release-cryptography.cjs "$TAG" \
+            "${RUNNER_TEMP}/downloaded-manifest/latest.json" \
+            "${RUNNER_TEMP}/signed-bundles"
+
 
       - name: Verify and publish only a complete release
         uses: actions/github-script@v7

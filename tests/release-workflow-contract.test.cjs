@@ -37,3 +37,11 @@ test('publishing requires strictly increasing stable versions before and after b
   assert(yml.indexOf('node scripts/release-version-gate.cjs') < yml.indexOf('uses: tauri-apps/tauri-action@v0'));
   assert(yml.lastIndexOf('node scripts/release-version-gate.cjs') < yml.indexOf('await github.rest.repos.updateRelease'));
 });
+
+test('cryptographic verification is mandatory before draft release becomes public', () => {
+  assert.match(yml, /sudo apt-get install -y minisign/);
+  assert.match(yml, /node scripts\/verify-signed-release-cryptography\.cjs/);
+  assert.match(yml, /TAURI_UPDATER_PUBLIC_KEY:\s*\$\{\{ vars\.TAURI_UPDATER_PUBLIC_KEY \}\}/);
+  assert(yml.indexOf('node scripts/verify-signed-release-cryptography.cjs') <
+    yml.indexOf('await github.rest.repos.updateRelease'));
+});

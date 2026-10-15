@@ -11,8 +11,14 @@ function prepareSignedRelease(root, options) {
   if (typeof options.privateKey !== 'string' || !options.privateKey.trim()) {
     throw new Error('TAURI_SIGNING_PRIVATE_KEY secret is required');
   }
-  if (typeof options.pubkey !== 'string' || options.pubkey.trim().length < 40) {
-    throw new Error('TAURI_UPDATER_PUBLIC_KEY repository variable is missing or invalid');
+  if (typeof options.pubkey !== 'string' || !options.pubkey.trim()) {
+    throw new Error('TAURI_UPDATER_PUBLIC_KEY repository variable is missing');
+  }
+  const { decodePublicKey } = require('./verify-signed-release-cryptography.cjs');
+  try {
+    decodePublicKey(options.pubkey.trim());
+  } catch (_) {
+    throw new Error('TAURI_UPDATER_PUBLIC_KEY must be a canonical base64-encoded Tauri Minisign public key');
   }
   const cargo = fs.readFileSync(path.join(root, 'src-tauri/Cargo.toml'), 'utf8');
   const lib = fs.readFileSync(path.join(root, 'src-tauri/src/lib.rs'), 'utf8');

@@ -16,7 +16,12 @@ function fixture() {
   fs.writeFileSync(cfg, JSON.stringify({ bundle: { active: true }, app: {} }));
   return { root, cfg, close: () => fs.rmSync(root, { recursive: true, force: true }) };
 }
-const opts = { enabled: true, privateKey: 'DUMMY_TEST_KEY', pubkey: 'R'.repeat(64) };
+// This public key is syntactically valid but intentionally synthetic;
+ // no secret signing material is used in configuration unit tests.
+const ephemeralPublic = Buffer.concat([Buffer.from('Ed'), Buffer.alloc(40, 17)]).toString('base64');
+const pubkey = Buffer.from('untrusted comment: minisign public key: TEST\\n'
+  .replace('\\n', '\n') + ephemeralPublic + '\n').toString('base64');
+const opts = { enabled: true, privateKey: 'DUMMY_TEST_KEY', pubkey };
 test('unconfigured signed mode leaves existing app config untouched', () => {
   const env = fixture();
   try {
@@ -65,5 +70,16 @@ test('commented-out updater registration does not bypass release gate', () => {
     fs.writeFileSync(path.join(env.root, 'package.json'),
       JSON.stringify({ dependencies: { '@tauri-apps/plugin-updater': '^2' } }));
     assert.throws(() => prepareSignedRelease(env.root, opts), /plugin must be fully registered/);
+  } finally { env.close(); }
+});
+
+test('malformed base64 or wrong minisign pubkey bytes fail closed before build', () => {
+  const env = fixture();
+  try {
+    assert.throws(() => prepareSignedRelease(env.root,
+      { ...opts, pubkey: 'R'.repeat(64) }), /canonical base64-encoded Tauri Minisign/);
+    assert.throws(() => prepareSignedRelease(env.root,
+      { ...opts, pubkey: Buffer.from('not a minisign pubkey').toString('base64') }),
+      /canonical base64-encoded Tauri Minisign/);
   } finally { env.close(); }
 });

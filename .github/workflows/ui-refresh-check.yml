@@ -20,6 +20,8 @@ on:
       - 'tests/signed-release-cli-rehearsal.test.cjs'
       - 'scripts/release-version-gate.cjs'
       - 'tests/release-version-gate.test.cjs'
+      - 'scripts/verify-signed-release-cryptography.cjs'
+      - 'tests/verify-signed-release-cryptography.test.cjs'
   workflow_dispatch:
 jobs:
   frontend:
@@ -40,4 +42,7 @@ jobs:
       - run: node --test tests/release-workflow-contract.test.cjs
       - run: node --test tests/signed-release-cli-rehearsal.test.cjs
       - run: node --test tests/release-version-gate.test.cjs
+      - name: Install Minisign for real ephemeral Ed25519 signature checks
+        run: sudo apt-get update -qq && sudo apt-get install -y minisign
+      - run: node --test tests/verify-signed-release-cryptography.test.cjs
       - run: pnpm run build
