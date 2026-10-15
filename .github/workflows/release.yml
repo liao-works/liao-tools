@@ -1,146 +1,163 @@
 name: Release
+
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
+    branches:
+      - master
+    paths:
+      - 'package.json'
+      - 'src-tauri/Cargo.toml'
+      - 'src-tauri/tauri.conf.json'
   workflow_dispatch:
 
 jobs:
+  prepare-tag:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify synchronized versions, create tag, dispatch multi-platform release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          node <<'NODE'
+          const fs = require('fs');
+          const version = require('./package.json').version;
+          const config = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+          const manifest = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
+          const lock = fs.readFileSync('src-tauri/Cargo.lock', 'utf8');
+          const ownPackage = lock.split('[[package]]').find(block => /name = "liao-tools"/.test(block));
+          if (config.version !== version || !manifest.includes('version = "' + version + '"') ||
+              !ownPackage || !ownPackage.includes('version = "' + version + '"')) {
+            throw new Error('Release version mismatch across package/config/Cargo manifest/lock');
+          }
+          NODE
+          if git show-ref --tags --verify --quiet "refs/tags/${TAG}"; then
+            echo "::error::Tag ${TAG} already exists; refusing to publish over it"
+            exit 1
+          fi
+          git -c user.name='github-actions[bot]' -c user.email='github-actions[bot]@users.noreply.github.com' tag -a "${TAG}" -m "Liao Tools ${TAG}" "${GITHUB_SHA}"
+          git push origin "refs/tags/${TAG}"
+          gh workflow run release.yml --ref "${TAG}"
+          echo "Triggered multi-platform release for ${TAG}"
+
   release:
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-latest"
-            args: "--target aarch64-apple-darwin"
-            generate-changelog: true
-          - platform: "macos-latest"
-            args: "--target x86_64-apple-darwin"
-          - platform: "macos-latest"
-            args: "--target universal-apple-darwin"
-          - platform: "windows-latest"
-            args: ""
-
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+          - platform: macos-latest
+            args: --target universal-apple-darwin
+          - platform: windows-latest
+            args: ''
     runs-on: ${{ matrix.platform }}
-
     steps:
-      - name: Checkout repository
+      - name: Checkout tagged source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Install dependencies (Linux)
-        if: startsWith(matrix.platform, 'ubuntu')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf pkg-config libsoup-3.0-dev javascriptcoregtk-4.1 libjavascriptcoregtk-4.1-dev
-          # Tauri 2 可能需要 libnm-dev
-          sudo apt-get install -y libnm-dev xdg-utils
-
-      - name: Rust setup
+      - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          # Install both targets for macOS to allow cross-compilation and universal build
-          # And install Linux ARM target if needed
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || (contains(matrix.args, 'aarch64') && 'aarch64-unknown-linux-gnu' || '') }}
-
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
-
       - name: Node.js setup
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
-
+          cache: pnpm
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Get version from tag
-        id: get_version
+      - name: Validate tagged version and read committed release notes
+        id: notes
         shell: bash
         run: |
-          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
-          echo "Tag: $GITHUB_REF_NAME -> Version: ${GITHUB_REF_NAME#v}"
-
-      - name: Update version in config files
-        shell: bash
-        run: |
-          VERSION="${{ steps.get_version.outputs.VERSION }}"
-
-          # Update package.json
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json'));
-            pkg.version = '$VERSION';
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
-
-          cd src-tauri
-          # Update Cargo.toml
-          sed -i.bak "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
-          rm -f Cargo.toml.bak
-          # Update tauri.conf.json
-          node -e "
-            const fs = require('fs');
-            const config = JSON.parse(fs.readFileSync('tauri.conf.json'));
-            config.version = '$VERSION';
-            fs.writeFileSync('tauri.conf.json', JSON.stringify(config, null, 2));
-          "
-          echo "Updated version to $VERSION"
-          echo "--- package.json ---"
-          head -5 ../package.json
-          echo "--- Cargo.toml ---"
-          head -5 Cargo.toml
-          echo "--- tauri.conf.json ---"
-          head -5 tauri.conf.json
-
-      - name: Generate CHANGELOG
-        id: changelog
-        shell: bash
-        run: |
-          VERSION="${{ steps.get_version.outputs.VERSION }}"
-
-          # 使用 Node.js 脚本生成 CHANGELOG 并提取 release notes
-          node scripts/generate-changelog.cjs $VERSION
-
-          # 只在第一个平台（macOS ARM64）提交 CHANGELOG 更新
-          if [ "${{ matrix.generate-changelog }}" == "true" ]; then
-            echo "📤 提交 CHANGELOG 更新..."
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add CHANGELOG.md package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
-            git diff --staged --quiet || git commit -m "docs: 更新 CHANGELOG 和版本号 [skip ci]"
-            git push origin HEAD:master
-          else
-            echo "⏭️  跳过提交（由第一个平台处理）"
-          fi
-
-          # 保存 notes 到 output（所有平台都需要）
-          # 使用 RUNNER_TEMP 获取跨平台临时目录
-          NOTES_FILE="${RUNNER_TEMP}/release_notes.txt"
-          # 使用随机 delimiter 避免内容冲突
-          DELIMITER="RELEASE_NOTES_$(date +%s)"
-          echo "NOTES<<${DELIMITER}" >> $GITHUB_OUTPUT
-          cat "$NOTES_FILE" >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_OUTPUT
-          echo "${DELIMITER}" >> $GITHUB_OUTPUT
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-
-      - name: Build the app
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const version = process.env.GITHUB_REF_NAME.replace(/^v/, '');
+          const pkg = require('./package.json');
+          const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));
+          const toml = fs.readFileSync('src-tauri/Cargo.toml','utf8');
+          const lock = fs.readFileSync('src-tauri/Cargo.lock','utf8');
+          const ownPackage = lock.split('[[package]]').find(block => /name = "liao-tools"/.test(block));
+          if (pkg.version !== version || tauri.version !== version ||
+              !toml.includes('version = "' + version + '"') ||
+              !ownPackage || !ownPackage.includes('version = "' + version + '"')) {
+            throw new Error('Tag does not match checked-in versions');
+          }
+          const changelog = fs.readFileSync('CHANGELOG.md','utf8');
+          const heading = '## [' + version + ']';
+          const start = changelog.indexOf(heading);
+          if (start < 0) throw new Error('Release notes are missing for ' + version);
+          const next = changelog.indexOf('\n## [', start + heading.length);
+          const notes = changelog.slice(start, next < 0 ? undefined : next).trim();
+          fs.writeFileSync(path.join(process.env.RUNNER_TEMP, 'release_notes.txt'), notes + '\n');
+          NODE
+          {
+            echo 'NOTES<<LIAO_RELEASE_NOTES'
+            cat "${RUNNER_TEMP}/release_notes.txt"
+            echo 'LIAO_RELEASE_NOTES'
+          } >> "${GITHUB_OUTPUT}"
+      - name: Build and attach release installers
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Liao Tools ${{ github.ref_name }}"
-          releaseBody: ${{ steps.changelog.outputs.NOTES }}
-          releaseDraft: false
+          releaseBody: ${{ steps.notes.outputs.NOTES }}
+          releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check multi-platform installer assets and publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          ASSETS=$(gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[].name')
+          for required in \
+            "liao-tools_${VERSION}_x64-setup.exe" \
+            "liao-tools_${VERSION}_x64_en-US.msi" \
+            "liao-tools_${VERSION}_aarch64.dmg" \
+            "liao-tools_${VERSION}_x64.dmg" \
+            "liao-tools_${VERSION}_universal.dmg"; do
+            if ! grep -Fxq "${required}" <<< "${ASSETS}"; then
+              echo "::error::Missing release installer: ${required}"
+              exit 1
+            fi
+          done
+          gh release edit "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --draft=false
+          echo "Published ${GITHUB_REF_NAME} with Windows and macOS installers"
