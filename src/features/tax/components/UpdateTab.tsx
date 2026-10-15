@@ -15,6 +15,7 @@ export function UpdateTab() {
   const [versionInfo, setVersionInfo] = useState<TaxVersionInfo | null>(null);
   const [localVersion, setLocalVersion] = useState<TaxVersionInfo['local'] | null>(null);
   const [offlineCheck, setOfflineCheck] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -52,10 +53,12 @@ export function UpdateTab() {
     setChecking(true);
     setLogs([]);
     addLog('开始检查更新...');
-    // Show local snapshot independently of connectivity or remote metadata.
+    // Local metadata is independent of the online update check.
     try {
       setLocalVersion(await taxApi.getLocalVersion());
+      setLocalError(null);
     } catch (error) {
+      setLocalError(String(error));
       addLog(`本地版本读取失败: ${String(error)}`);
     }
 
@@ -68,7 +71,7 @@ export function UpdateTab() {
       
       if (data.has_update) {
         addLog(`发现新版本: ${data.remote.version}`);
-        addLog(`新增记录: ${data.remote.records - data.local.records} 条`);
+        addLog(`记录总量变化: ${data.remote.records - data.local.records} 条（不是新增记录数）`);
         // 更新前预览（来自服务端 data_changes）
         if (data.data_changes?.summary) {
           const s = data.data_changes.summary;
@@ -109,7 +112,7 @@ export function UpdateTab() {
     addLog('开始下载更新...');
 
     try {
-      await taxApi.downloadUpdate((downloaded, total) => {
+      const installed = await taxApi.downloadUpdate((downloaded, total) => {
         setDownloadedBytes(downloaded);
         setTotalBytes(total);
         const percentage = total > 0 ? (downloaded / total) * 100 : 0;
@@ -120,16 +123,20 @@ export function UpdateTab() {
         }
       });
       
-      addLog('下载完成');
-      addLog('数据库已更新！');
-      
+      if (!installed) throw new Error('更新命令未确认安装成功，本地税率数据未判定为已更新');
+      addLog('税率更新命令已确认成功');
+      setVersionInfo(null); // Previous remote comparison is no longer valid after installation.
+      try {
+        setLocalVersion(await taxApi.getLocalVersion());
+        setLocalError(null);
+      } catch (error) {
+        setLocalError(String(error));
+        addLog(`更新后本地版本读取失败：${String(error)}`);
+      }
       toast({
-        title: '更新成功',
-        description: '税率数据库已更新到最新版本',
+        title: '税率数据更新已完成',
+        description: '请查看本地版本；需要最新远程对比可再次点击检查更新。',
       });
-      
-      // 重新检查版本信息
-      await handleCheckUpdate();
     } catch (error) {
       const errorMsg = String(error);
       addLog(`更新失败: ${errorMsg}`);
@@ -254,14 +261,23 @@ export function UpdateTab() {
       .catch(() => setHasTrustedSigner(false));
   }, []);
 
-  // 组件加载时自动检查更新
+  // Only read local metadata on entry. Remote checks are explicit, not duplicated on every visit.
   useEffect(() => {
-    handleCheckUpdate();
+    let active = true;
+    taxApi.getLocalVersion()
+      .then((info) => { if (active) setLocalVersion(info); })
+      .catch((error) => { if (active) setLocalError(String(error)); });
+    return () => { active = false; };
   }, []);
 
   return (
     <div className="space-y-4">
       {/* 版本对比 */}
+      {localError && (
+        <div role="alert" className="rounded-xl border border-danger bg-danger-subtle p-4 text-sm text-danger-fg">
+          本地版本读取失败：{localError}
+        </div>
+      )}
       {(localVersion || versionInfo) && (
         <div className="grid md:grid-cols-2 gap-4">
           {/* 本地版本 */}
@@ -336,7 +352,7 @@ export function UpdateTab() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
-            <Button onClick={handleCheckUpdate} disabled={checking} className="flex-1">
+            <Button onClick={handleCheckUpdate} disabled={checking || downloading} className="flex-1">
               {checking ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -351,7 +367,7 @@ export function UpdateTab() {
             </Button>
             <Button
               onClick={handleDownloadUpdate}
-              disabled={!versionInfo?.has_update || downloading || offlineCheck}
+              disabled={!versionInfo?.has_update || downloading || checking || offlineCheck}
               variant={versionInfo?.has_update ? 'default' : 'secondary'}
               className="flex-1"
             >
@@ -393,6 +409,11 @@ export function UpdateTab() {
         </CardContent>
       </Card>
 
+      <details className="rounded-xl border border-border bg-card">
+        <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-foreground-emphasis focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          审核与影子预览（高级操作 · 不写入正式税率库）
+        </summary>
+        <div className="space-y-4 border-t border-border p-4">
       {/* XI Other candidates are *review evidence*, never tax rates to import. */}
       <Card>
         <CardHeader>
@@ -547,6 +568,9 @@ export function UpdateTab() {
           </CardContent>
         </Card>
       )}
+
+        </div>
+      </details>
 
       {/* 更新日志 */}
       {versionInfo?.changelog && versionInfo.changelog.length > 0 && (
