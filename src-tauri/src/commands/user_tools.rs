@@ -21,6 +21,7 @@ pub struct DisplayTool {
     pub enabled: bool,
     pub command: Option<String>,
     pub executable_path: Option<String>,
+    pub working_directory: Option<String>,
     pub args: Option<Vec<String>>,
     pub arguments: Option<String>,
     pub hotkey: Option<String>,
@@ -111,6 +112,7 @@ pub fn get_all_tools() -> Result<Vec<DisplayTool>, CommandError> {
                 enabled: tool.enabled,
                 command: Some(tool.command),
                 executable_path: None,
+                working_directory: None,
                 args: tool.args,
                 arguments: None,
                 hotkey: tool.hotkey,
@@ -143,7 +145,7 @@ pub fn get_all_tools() -> Result<Vec<DisplayTool>, CommandError> {
                 "SELECT id, name, description, icon, executable_path, arguments,
                         working_directory, category, \"order\", hotkey, enabled, platform
                  FROM user_tools
-                 WHERE platform = ?1 AND enabled = 1
+                 WHERE platform = ?1
                  ORDER BY \"order\" ASC",
             ) {
                 Ok(s) => s,
@@ -168,6 +170,7 @@ pub fn get_all_tools() -> Result<Vec<DisplayTool>, CommandError> {
                     enabled: enabled_raw == 1,
                     command: None,
                     executable_path: Some(row.get(4)?),
+                    working_directory: row.get::<_, Option<String>>(6)?,
                     args: None,
                     arguments: row.get::<_, Option<String>>(5)?,
                     hotkey: row.get::<_, Option<String>>(9)?,
