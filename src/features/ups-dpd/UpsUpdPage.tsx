@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
+import { FileSpreadsheet, FileText, Loader2, Play, RotateCcw, Settings2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileOpenDialog } from '@/components/common/FileOpenDialog';
+import { FileOperationFeedback, type FileOperationState } from '@/components/workflow/FileOperationFeedback';
 import { useToast } from '@/hooks/use-toast';
 import { getFileName } from '@/lib/file-opener';
-import { FileText, Play, Settings, X, Package } from 'lucide-react';
 import {
   type TemplateType,
   type ProcessRequest,
@@ -19,459 +18,276 @@ import {
   type TemplateConfig,
 } from '@/lib/api/ups-dpd';
 
+type ConfigState =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'ready'; ups: TemplateConfig; dpd: TemplateConfig }
+  | { kind: 'error'; message: string };
+
 export function UpsUpdPage() {
   const [templateType, setTemplateType] = useState<TemplateType>('ups');
   const [mainFile, setMainFile] = useState<string | null>(null);
   const [detailFile, setDetailFile] = useState<string | null>(null);
-  const [processing, setProcessing] = useState(false);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [showFileDialog, setShowFileDialog] = useState(false);
-  const [outputFilePath, setOutputFilePath] = useState<string>('');
-
-  // 模板配置状态
-  const [upsConfig, setUpsConfig] = useState<TemplateConfig | null>(null);
-  const [dpdConfig, setDpdConfig] = useState<TemplateConfig | null>(null);
-
+  const [operation, setOperation] = useState<FileOperationState>({ kind: 'idle' });
+  const [tab, setTab] = useState('process');
+  const [configs, setConfigs] = useState<ConfigState>({ kind: 'idle' });
+  const [configBusy, setConfigBusy] = useState<TemplateType | null>(null);
   const { toast } = useToast();
+  const busy = operation.kind === 'running';
 
-  // 加载模板配置
-  const loadConfigs = async () => {
-    try {
-      const ups = await getTemplateConfig('ups');
-      const dpd = await getTemplateConfig('dpd');
-      setUpsConfig(ups);
-      setDpdConfig(dpd);
-    } catch (error) {
-      console.error('加载配置失败:', error);
-    }
-  };
-
-  // 选择主数据文件
-  const handleSelectMainFile = async () => {
+  async function chooseFile(kind: 'main' | 'detail') {
+    if (busy) return;
     try {
       const selected = await open({
-        filters: [
-          {
-            name: 'Excel 文件',
-            extensions: ['xlsx', 'xls'],
-          },
-        ],
+        multiple: false,
+        filters: [{ name: 'Excel 文件', extensions: ['xlsx', 'xls'] }],
       });
-
-      if (selected && typeof selected === 'string') {
-        setMainFile(selected);
-        setLogs([]);
-      }
+      if (typeof selected !== 'string') return;
+      if (kind === 'main') setMainFile(selected);
+      else setDetailFile(selected);
+      setOperation({ kind: 'idle' });
     } catch (error) {
-      console.error('选择文件失败:', error);
       toast({
-        title: '错误',
-        description: '选择文件失败',
+        title: '选择文件失败',
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
     }
-  };
+  }
 
-  // 选择明细表文件
-  const handleSelectDetailFile = async () => {
-    try {
-      const selected = await open({
-        filters: [
-          {
-            name: 'Excel 文件',
-            extensions: ['xlsx', 'xls'],
-          },
-        ],
-      });
-
-      if (selected && typeof selected === 'string') {
-        setDetailFile(selected);
-      }
-    } catch (error) {
-      console.error('选择文件失败:', error);
-      toast({
-        title: '错误',
-        description: '选择文件失败',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // 处理文件
-  const handleProcess = async () => {
-    if (!mainFile) {
-      toast({
-        title: '提示',
-        description: '请先选择主数据文件',
-      });
-      return;
-    }
-
-    setProcessing(true);
-    setLogs([]);
-
+  async function processFile() {
+    if (!mainFile || busy) return;
+    setOperation({ kind: 'running' });
     try {
       const request: ProcessRequest = {
         main_file_path: mainFile,
         detail_file_path: detailFile || undefined,
         template_type: templateType,
       };
-
       const result = await processUpsDpdFile(request);
+      setOperation(result.success
+        ? { kind: 'success', message: result.message || '模板填充已完成', outputPath: result.output_path, logs: result.logs || [] }
+        : { kind: 'error', message: result.message || '文件处理失败', logs: result.logs || [] });
+    } catch (error) {
+      setOperation({
+        kind: 'error',
+        message: error instanceof Error ? error.message : String(error),
+        logs: [],
+      });
+    }
+  }
 
-      setLogs(result.logs);
+  function chooseType(next: TemplateType) {
+    if (busy) return;
+    setTemplateType(next);
+    // Do not discard selected Excel files just because the template mode changed.
+    setOperation({ kind: 'idle' });
+  }
 
-      if (result.success) {
-        setOutputFilePath(result.output_path);
-        setShowFileDialog(true);
-        
-        toast({
-          title: '处理完成',
-          description: `${TemplateTypeLabels[templateType]} 数据处理完成`,
-        });
-      } else {
-        toast({
-          title: '处理失败',
-          description: result.message,
-          variant: 'destructive',
-        });
-      }
-    } catch (error: any) {
-      console.error('处理失败:', error);
+  async function loadConfigs() {
+    setConfigs({ kind: 'loading' });
+    try {
+      const [ups, dpd] = await Promise.all([getTemplateConfig('ups'), getTemplateConfig('dpd')]);
+      setConfigs({ kind: 'ready', ups, dpd });
+    } catch (error) {
+      setConfigs({
+        kind: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  function changeTab(next: string) {
+    if (busy) return;
+    setTab(next);
+    if (next === 'config' && configs.kind === 'idle') void loadConfigs();
+  }
+
+  async function chooseCustomTemplate(type: TemplateType) {
+    if (configBusy) return;
+    try {
+      const selected = await open({
+        title: '选择 ' + type.toUpperCase() + ' 自定义模板',
+        multiple: false,
+        filters: [{ name: 'Excel 模板', extensions: ['xlsx'] }],
+      });
+      if (typeof selected !== 'string') return;
+      setConfigBusy(type);
+      await saveTemplateConfig({ template_type: type, template_path: selected, use_default: false });
+      const saved = await getTemplateConfig(type);
+      setConfigs((old) => old.kind === 'ready' ? { ...old, [type]: saved } : old);
+      toast({ title: type.toUpperCase() + ' 模板已保存' });
+    } catch (error) {
       toast({
-        title: '处理失败',
-        description: error?.message || '未知错误',
+        title: '保存模板失败',
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
     } finally {
-      setProcessing(false);
+      setConfigBusy(null);
     }
-  };
+  }
 
-  // 选择自定义模板
-  const handleSelectCustomTemplate = async (type: TemplateType) => {
-    try {
-      const selected = await open({
-        title: '选择模板文件',
-        filters: [
-          {
-            name: 'Excel 文件',
-            extensions: ['xlsx'],
-          },
-        ],
-        multiple: false,
-      });
-
-      if (selected && typeof selected === 'string') {
-        // 保存自定义模板配置
-        const config: TemplateConfig = {
-          template_type: type,
-          template_path: selected,
-          use_default: false,
-        };
-
-        await saveTemplateConfig(config);
-        await loadConfigs();
-
-        toast({
-          title: '成功',
-          description: '已设置自定义模板',
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: '错误',
-        description: error?.message || '设置失败',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // 重置为默认模板
-  const handleResetTemplate = async (type: TemplateType) => {
+  async function resetTemplate(type: TemplateType) {
+    if (configBusy) return;
+    setConfigBusy(type);
     try {
       await resetToDefaultTemplate(type);
-      await loadConfigs();
+      const saved = await getTemplateConfig(type);
+      setConfigs((old) => old.kind === 'ready' ? { ...old, [type]: saved } : old);
+      toast({ title: type.toUpperCase() + ' 已恢复内置模板' });
+    } catch (error) {
       toast({
-        title: '成功',
-        description: '已重置为默认模板',
-      });
-    } catch (error: any) {
-      toast({
-        title: '错误',
-        description: error?.message || '重置失败',
+        title: '恢复模板失败',
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
+    } finally {
+      setConfigBusy(null);
     }
-  };
+  }
+
+  const templateChoices = Object.entries(TemplateTypeLabels) as [TemplateType, string][];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">UPS/DPD 数据处理</h2>
-        <p className="text-muted-foreground">
-          支持 UPS 总结单和 DPD 数据预报模板填充
+    <div className="mx-auto max-w-5xl space-y-6 pb-10">
+      <header>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground-emphasis md:text-3xl">UPS / DPD 数据处理</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          将本地 Excel 数据填入 UPS 或 DPD 模板。主数据文件必需，单件明细表可选。
         </p>
-      </div>
+      </header>
 
-      <Tabs defaultValue="process" className="w-full">
+      <Tabs value={tab} onValueChange={changeTab} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="process">
-            <Play className="w-4 h-4 mr-2" />
-            处理文件
-          </TabsTrigger>
-          <TabsTrigger value="config" onClick={() => loadConfigs()}>
-            <Settings className="w-4 h-4 mr-2" />
-            模板设置
-          </TabsTrigger>
+          <TabsTrigger value="process"><Play className="mr-2 h-4 w-4" />处理文件</TabsTrigger>
+          <TabsTrigger value="config" disabled={busy}><Settings2 className="mr-2 h-4 w-4" />模板设置</TabsTrigger>
         </TabsList>
 
         <TabsContent value="process" className="space-y-4">
-          <Card className="p-6">
-            <div className="space-y-6">
-              {/* 模板类型选择 */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">模板类型</Label>
-                <div className="flex gap-4">
-                  {(Object.entries(TemplateTypeLabels) as [TemplateType, string][]).map(
-                    ([value, label]) => (
-                      <div key={value} className="flex items-center space-x-2">
-                        <input
-                          type="radio"
-                          id={value}
-                          name="templateType"
-                          value={value}
-                          checked={templateType === value}
-                          onChange={(e) => {
-                            setTemplateType(e.target.value as TemplateType);
-                            setMainFile(null);
-                            setDetailFile(null);
-                            setLogs([]);
-                          }}
-                          className="w-4 h-4 text-primary border-input focus:ring-2 focus:ring-primary cursor-pointer"
-                        />
-                        <Label
-                          htmlFor={value}
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          {label}
-                        </Label>
-                      </div>
-                    )
-                  )}
-                </div>
-              </div>
-
-              {/* 主数据文件选择 */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">主数据文件 *</Label>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleSelectMainFile}
-                    variant="outline"
-                    className="flex-1"
+          <Card className="shadow-none">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">1 · 选择物流模板</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="物流模板类型">
+                {templateChoices.map(([type, label]) => (
+                  <button
+                    type="button" key={type} disabled={busy} aria-pressed={type === templateType}
+                    onClick={() => chooseType(type)}
+                    className={
+                      'rounded-xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60 ' +
+                      (type === templateType ? 'border-primary bg-primary-subtle' : 'border-border bg-card hover:border-primary/50')
+                    }
                   >
-                    <FileText className="w-4 h-4 mr-2" />
-                    {mainFile ? '更换文件' : '选择 Excel 文件'}
-                  </Button>
-                  {mainFile && (
-                    <Button
-                      onClick={() => setMainFile(null)}
-                      variant="ghost"
-                      size="icon"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-                {mainFile && (
-                  <p
-                    className="text-sm text-muted-foreground truncate"
-                    title={mainFile}
-                  >
-                    {mainFile}
-                  </p>
-                )}
-              </div>
-
-              {/* 明细表文件选择（可选） */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  单件明细表文件（可选）
-                </Label>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleSelectDetailFile}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <Package className="w-4 h-4 mr-2" />
-                    {detailFile ? '更换明细表' : '选择明细表文件'}
-                  </Button>
-                  {detailFile && (
-                    <Button
-                      onClick={() => setDetailFile(null)}
-                      variant="ghost"
-                      size="icon"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-                {detailFile && (
-                  <p
-                    className="text-sm text-muted-foreground truncate"
-                    title={detailFile}
-                  >
-                    {detailFile}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  用于补充子单号等详细信息
-                </p>
-              </div>
-
-              {/* 处理按钮 */}
-              <Button
-                onClick={handleProcess}
-                disabled={!mainFile || processing}
-                className="w-full"
-              >
-                {processing ? (
-                  <>
-                    <span className="animate-spin mr-2">⏳</span>
-                    处理中...
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4 mr-2" />
-                    开始处理
-                  </>
-                )}
-              </Button>
-            </div>
-          </Card>
-
-          {/* 处理日志 */}
-          {logs.length > 0 && (
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">处理日志</h3>
-              <div className="space-y-1 max-h-96 overflow-y-auto">
-                {logs.map((log, index) => (
-                  <p
-                    key={index}
-                    className="text-sm font-mono text-muted-foreground"
-                  >
-                    {log}
-                  </p>
+                    <p className="text-sm font-semibold text-foreground-emphasis">{label}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{type === 'ups' ? '填充 UPS 总结单' : '填充 DPD 数据预报'}</p>
+                  </button>
                 ))}
               </div>
-            </Card>
-          )}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-none">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">2 · 选择数据文件</CardTitle>
+              <p className="text-xs text-muted-foreground">从电脑中选择 Excel 文件，文件不会上传至云端。</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {([
+                { kind: 'main', label: '主数据文件', help: '必需', path: mainFile },
+                { kind: 'detail', label: '单件明细表', help: '可选，用于补充子单号等信息', path: detailFile },
+              ] as const).map((item) => (
+                <div key={item.kind} className="rounded-lg border border-border p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="text-sm font-semibold text-foreground-emphasis">{item.label}</label>
+                    <span className="text-xs text-muted-foreground">{item.help}</span>
+                  </div>
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <FileSpreadsheet className="h-5 w-5 shrink-0 text-primary" />
+                      <div className="min-w-0">
+                        <p className="break-all text-sm">{item.path ? getFileName(item.path) : '尚未选择文件'}</p>
+                        {item.path && <p className="mt-1 break-all text-xs text-muted-foreground">{item.path}</p>}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button type="button" variant="outline" disabled={busy} onClick={() => void chooseFile(item.kind)}>
+                        {item.path ? '更换文件' : '选择文件'}
+                      </Button>
+                      {item.path && (
+                        <Button
+                          type="button" size="icon" variant="ghost" disabled={busy}
+                          aria-label={'移除' + item.label}
+                          onClick={() => {
+                            if (item.kind === 'main') setMainFile(null);
+                            else setDetailFile(null);
+                            setOperation({ kind: 'idle' });
+                          }}
+                        ><X className="h-4 w-4" /></Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">使用当前保存的 {TemplateTypeLabels[templateType]} 模板；需要更换时进入“模板设置”。</p>
+                <Button type="button" disabled={!mainFile || busy} onClick={() => void processFile()}>
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                  {busy ? '正在处理' : operation.kind === 'error' ? '重试处理' : '开始处理'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <FileOperationFeedback state={operation} title={TemplateTypeLabels[templateType] + ' 处理完成'} />
         </TabsContent>
 
         <TabsContent value="config" className="space-y-4">
-          <Card className="p-6">
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-4">UPS 模板配置</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">模板状态</p>
-                      <p className="text-xs text-muted-foreground">
-                        {upsConfig?.use_default
-                          ? '当前使用内置默认模板'
-                          : '当前使用自定义模板'}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => handleSelectCustomTemplate('ups')}
-                        variant="default"
-                        size="sm"
-                      >
-                        <FileText className="w-4 h-4 mr-1" />
-                        选择自定义模板
-                      </Button>
-                      {!upsConfig?.use_default && (
-                        <Button
-                          onClick={() => handleResetTemplate('ups')}
-                          variant="outline"
-                          size="sm"
-                        >
-                          重置为默认
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  {upsConfig?.template_path && !upsConfig?.use_default && (
-                    <div className="p-3 bg-muted rounded-md">
-                      <p className="text-sm font-medium mb-1">自定义模板路径</p>
-                      <p className="text-xs text-muted-foreground break-all">
-                        {upsConfig.template_path}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4">DPD 模板配置</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">模板状态</p>
-                      <p className="text-xs text-muted-foreground">
-                        {dpdConfig?.use_default
-                          ? '当前使用内置默认模板'
-                          : '当前使用自定义模板'}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => handleSelectCustomTemplate('dpd')}
-                        variant="default"
-                        size="sm"
-                      >
-                        <FileText className="w-4 h-4 mr-1" />
-                        选择自定义模板
-                      </Button>
-                      {!dpdConfig?.use_default && (
-                        <Button
-                          onClick={() => handleResetTemplate('dpd')}
-                          variant="outline"
-                          size="sm"
-                        >
-                          重置为默认
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  {dpdConfig?.template_path && !dpdConfig?.use_default && (
-                    <div className="p-3 bg-muted rounded-md">
-                      <p className="text-sm font-medium mb-1">自定义模板路径</p>
-                      <p className="text-xs text-muted-foreground break-all">
-                        {dpdConfig.template_path}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
+          {configs.kind === 'loading' && (
+            <div role="status" className="flex items-center gap-2 rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />正在读取本地模板设置…
             </div>
-          </Card>
+          )}
+          {configs.kind === 'error' && (
+            <div role="alert" className="rounded-xl border border-danger bg-danger-subtle p-5">
+              <p className="text-sm font-semibold text-danger-subtle-fg">模板设置读取失败</p>
+              <p className="mt-1 break-words text-sm text-danger-fg">{configs.message}</p>
+              <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => void loadConfigs()}>重试读取</Button>
+            </div>
+          )}
+          {configs.kind === 'ready' && templateChoices.map(([type, label]) => {
+            const current = configs[type];
+            return (
+              <Card key={type} className="shadow-none">
+                <CardHeader className="pb-3"><CardTitle className="text-base">{label} · 模板</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{current.use_default ? '正在使用内置模板' : '正在使用自定义模板'}</p>
+                      {!current.use_default && current.template_path && (
+                        <p className="mt-1 break-all text-xs text-muted-foreground">{current.template_path}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" variant="outline" disabled={configBusy !== null} onClick={() => void chooseCustomTemplate(type)}>
+                        {configBusy === type ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                        选择自定义模板
+                      </Button>
+                      {!current.use_default && (
+                        <Button type="button" size="sm" variant="ghost" disabled={configBusy !== null} onClick={() => void resetTemplate(type)}>
+                          <RotateCcw className="h-4 w-4" />恢复内置模板
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </TabsContent>
       </Tabs>
-
-      {/* 文件打开对话框 */}
-      <FileOpenDialog
-        open={showFileDialog}
-        onOpenChange={setShowFileDialog}
-        filePath={outputFilePath}
-        title={`${TemplateTypeLabels[templateType]} 处理完成`}
-        description="数据模板填充处理已完成，是否查看输出文件？"
-        fileName={getFileName(outputFilePath)}
-      />
     </div>
   );
 }
