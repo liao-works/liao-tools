@@ -72,7 +72,7 @@ export function BatchQueryTab() {
 
     try {
       const result = await taxApi.batchQuery(filePath, (current, total) => {
-        setProgress((current / total) * 100);
+        setProgress(total > 0 ? (current / total) * 100 : 0);
       });
       
       setResults(result);
@@ -168,8 +168,8 @@ export function BatchQueryTab() {
       {/* 文件上传和处理 */}
       <Card>
         <CardHeader>
-          <CardTitle>第二步：上传并处理</CardTitle>
-          <CardDescription>支持.xlsx、.xls和.csv格式</CardDescription>
+          <CardTitle>第二步：选择本地文件并处理</CardTitle>
+          <CardDescription>选择 Excel 文件（.xlsx 或 .xls）</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
