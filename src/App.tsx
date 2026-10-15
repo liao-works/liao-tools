@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { listen } from '@tauri-apps/api/event';
 import { MainLayout } from './components/layout/MainLayout';
 import { AltaPage } from './features/alta/AltaPage';
+import { HomePage } from './features/home/HomePage';
 import { TaxPage } from './features/tax/TaxPage';
 import { ExcelPage } from './features/excel/ExcelPage';
 import { UpsUpdPage } from './features/ups-dpd/UpsUpdPage';
@@ -53,7 +54,7 @@ function App() {
       <Routes>
         <Route path="/todo-widget" element={<TodoWidget />} />
         <Route path="/" element={<MainLayout />}>
-          <Route index element={<Navigate to="/system-tools" replace />} />
+          <Route index element={<HomePage />} />
           <Route path="todo" element={<TodoPage />} />
           <Route path="alta" element={<AltaPage />} />
           <Route path="tax" element={<TaxPage />} />
