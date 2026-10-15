@@ -347,8 +347,15 @@ pub async fn install_update(file_path: String, silent: bool, app: tauri::AppHand
         )),
     };
 
-    // 如果安装成功且是静默模式，发送安装完成事件
-    if result.is_ok() && silent {
+    // Only report completion for installers actually awaited to completion.
+    // Opening a macOS DMG or launching an AppImage is not an installation.
+    let completed_synchronously = match platform_info.os_family.as_str() {
+        "windows" => true, // Windows silent EXE/MSI execution waits for exit status.
+        "macos" => file_path.ends_with(".tar.gz"),
+        "linux" => file_path.ends_with(".deb"),
+        _ => false,
+    };
+    if result.is_ok() && silent && completed_synchronously {
         // 发送安装完成事件
         app.emit("install-complete", serde_json::json!({
             "success": true,
@@ -398,6 +405,8 @@ fn install_macos_tarball(path: &Path, silent: bool) -> Result<(), CommandError> 
                 "IO_ERROR"
             ))?;
     }
+    fs::create_dir_all(&extract_dir)
+        .map_err(|e| CommandError::new(format!("创建解压目录失败: {}", e), "IO_ERROR"))?;
 
     // 解压
     let output = std::process::Command::new("tar")

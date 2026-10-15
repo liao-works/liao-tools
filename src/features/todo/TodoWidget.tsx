@@ -23,6 +23,7 @@ export function TodoWidget() {
   const [tasks, setTasks] = useState<TodoTask[]>([]);
   const [config, setConfig] = useState<TodoConfig | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [newTaskPriority, setNewTaskPriority] = useState<TodoPriority>('medium');
   const [isPinned, setIsPinned] = useState(false);
   const [isDesktopMode, setIsDesktopMode] = useState(true);
@@ -45,13 +46,6 @@ export function TodoWidget() {
         input.select();
       }, delay);
     });
-  };
-
-  const cycleFilter = (direction: 1 | -1) => {
-    const filterOrder: Array<typeof filter> = ['pending', 'completed', 'all'];
-    const currentIndex = filterOrder.indexOf(filter);
-    const nextIndex = (currentIndex + direction + filterOrder.length) % filterOrder.length;
-    setFilter(filterOrder[nextIndex]);
   };
 
   const themeColors = useMemo((): ThemeColors => {
@@ -148,30 +142,34 @@ export function TodoWidget() {
       }
     };
 
-    const registerListeners = async () => {
-      const appWindow = getCurrentWindow();
-
-      unlistenFocus = await listen('todo-widget-focus-input', () => {
-        setFilter('pending');
-        focusInput();
-      });
-
-      unlistenData = await listen('sticky-notes-data-updated', () => {
-        void loadData();
-      });
-
-      unlistenMoved = await appWindow.onMoved(() => {
-        scheduleSaveWidgetLayout();
-      });
-
-      unlistenResized = await appWindow.onResized(() => {
-        scheduleSaveWidgetLayout();
-      });
+    let alive = true;
+    const register = async (promise: Promise<() => void>, save: (dispose: () => void) => void) => {
+      try {
+        const dispose = await promise;
+        if (alive) save(dispose);
+        else dispose();
+      } catch (error) {
+        console.error('待办小组件事件监听失败:', error);
+      }
     };
 
-    void registerListeners();
+    const appWindow = getCurrentWindow();
+    void register(listen('todo-widget-focus-input', () => {
+      setFilter('pending');
+      focusInput();
+    }), (dispose) => { unlistenFocus = dispose; });
+    void register(listen('sticky-notes-data-updated', () => {
+      void loadData();
+    }), (dispose) => { unlistenData = dispose; });
+    void register(appWindow.onMoved(() => {
+      scheduleSaveWidgetLayout();
+    }), (dispose) => { unlistenMoved = dispose; });
+    void register(appWindow.onResized(() => {
+      scheduleSaveWidgetLayout();
+    }), (dispose) => { unlistenResized = dispose; });
 
     return () => {
+      alive = false;
       unlistenFocus?.();
       unlistenData?.();
       unlistenMoved?.();
@@ -191,8 +189,11 @@ export function TodoWidget() {
           version: 1,
         },
       });
+      setSaveError(null);
     } catch (err) {
+      setSaveError('保存失败：' + (err instanceof Error ? err.message : String(err)));
       console.error('保存失败:', err);
+      throw err;
     }
   };
 
@@ -209,10 +210,14 @@ export function TodoWidget() {
     };
 
     const updatedTasks = [newTask, ...tasks];
-    setTasks(updatedTasks);
-    await saveData(updatedTasks);
-    setNewTaskTitle('');
-    setNewTaskPriority('medium');
+    try {
+      await saveData(updatedTasks);
+      setTasks(updatedTasks);
+      setNewTaskTitle('');
+      setNewTaskPriority('medium');
+    } catch {
+      // Keep the title, so the user can retry without creating a phantom task.
+    }
   };
 
   const toggleTask = async (id: string) => {
@@ -225,14 +230,22 @@ export function TodoWidget() {
           }
         : task
     );
-    setTasks(updatedTasks);
-    await saveData(updatedTasks);
+    try {
+      await saveData(updatedTasks);
+      setTasks(updatedTasks);
+    } catch {
+      // The task is unchanged until persistence has succeeded.
+    }
   };
 
   const deleteTask = async (id: string) => {
     const updatedTasks = tasks.filter((task) => task.id !== id);
-    setTasks(updatedTasks);
-    await saveData(updatedTasks);
+    try {
+      await saveData(updatedTasks);
+      setTasks(updatedTasks);
+    } catch {
+      // Failed deletes must not disappear from the visible list.
+    }
   };
 
   const startEditingTask = (task: TodoTask) => {
@@ -275,9 +288,13 @@ export function TodoWidget() {
         : task
     );
 
-    setTasks(updatedTasks);
-    await saveData(updatedTasks);
-    cancelEditingTask();
+    try {
+      await saveData(updatedTasks);
+      setTasks(updatedTasks);
+      cancelEditingTask();
+    } catch {
+      // Leave the editor and typed value in place for retry.
+    }
   };
 
   const readCurrentWidgetLayout = async () => {
@@ -527,11 +544,7 @@ export function TodoWidget() {
         target instanceof HTMLSelectElement ||
         target?.isContentEditable;
 
-      if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        event.preventDefault();
-        cycleFilter(event.shiftKey ? -1 : 1);
-        return;
-      }
+      if (target?.closest('button, a, select, [role="dialog"]') || event.ctrlKey || event.metaKey || event.altKey) return;
 
       if (
         (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
@@ -542,8 +555,7 @@ export function TodoWidget() {
         if (isTextInput && target === inputRef.current && newTaskTitle.trim()) return;
         if (isTextInput && target !== inputRef.current) return;
 
-        event.preventDefault();
-        cycleFilter(event.key === 'ArrowRight' ? 1 : -1);
+        // Let focused controls and standard keyboard navigation own left/right.
         return;
       }
 
@@ -559,19 +571,10 @@ export function TodoWidget() {
       if (event.key !== 'Enter') return;
 
       if (isTextInput) {
-        if (target === inputRef.current) {
-          if (newTaskTitle.trim()) {
-            event.preventDefault();
-            void handleAddTask();
-            return;
-          }
-
-          if (!activeTaskId) return;
-          event.preventDefault();
-          void toggleTask(activeTaskId);
-          return;
-        }
-        if (target !== inputRef.current) return;
+        if (target !== inputRef.current || !newTaskTitle.trim()) return;
+        event.preventDefault();
+        void handleAddTask();
+        return;
       }
 
       if (!activeTaskId) return;
@@ -643,6 +646,12 @@ export function TodoWidget() {
         </div>
       </div>
 
+      {saveError && (
+        <div role="alert" className="flex items-start justify-between gap-2 border-b px-3 py-2 text-xs" style={{ borderColor: themeColors.border, color: themeColors.text }}>
+          <span className="min-w-0 break-words">{saveError}</span>
+          <button type="button" aria-label="关闭保存错误" onClick={() => setSaveError(null)} className="shrink-0 rounded p-1 hover:opacity-75"><X className="h-3.5 w-3.5" /></button>
+        </div>
+      )}
       <div className="border-b p-3" style={{ borderColor: themeColors.border }}>
         <div className="flex gap-2">
           <input

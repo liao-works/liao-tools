@@ -1,0 +1,35 @@
+name: R4 Windows desktop compile
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'src-tauri/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/r4-desktop-check.yml'
+  workflow_dispatch:
+
+jobs:
+  tauri-windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate production frontend assets
+        run: pnpm build
+      - name: Compile Tauri desktop entrypoint and registered commands
+        run: cargo check --locked --manifest-path src-tauri/Cargo.toml --bin liao-tools

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -46,12 +46,18 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
   // 新增：安装完成相关状态
   const [installComplete, setInstallComplete] = useState(false);
   const [newVersion, setNewVersion] = useState<string>('');
+  const [installRequested, setInstallRequested] = useState(false);
+  const [installStatus, setInstallStatus] = useState<string | null>(null);
+  const latestVersionRef = useRef('');
+  latestVersionRef.current = updateInfo?.latest_version || '';
 
   const handleCheckUpdate = useCallback(async () => {
     setChecking(true);
     setError(null);
     setUpdateInfo(null);
     setDownloadPath(null);
+    setInstallRequested(false);
+    setInstallStatus(null);
 
     try {
       const info = await checkForUpdates();
@@ -99,16 +105,21 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
       return;
     }
 
+    if (installing || installRequested) return;
     setInstalling(true);
     setError(null);
+    setInstallStatus(null);
 
     try {
       await installUpdate(downloadPath, true);
-      // 不自动关闭，等待安装完成事件
-      // 安装完成后会触发 install-complete 事件
+      // The command can resolve before the OS installer completes.
+      setInstallRequested(true);
+      setInstallStatus('已提交安装命令；请根据系统安装程序完成操作。');
     } catch (err) {
-      setInstalling(false);
+      setInstallRequested(false);
       setError(err instanceof Error ? err.message : '安装失败');
+    } finally {
+      setInstalling(false);
     }
   }, [downloadPath]);
 
@@ -140,34 +151,47 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
   };
 
   useEffect(() => {
+    if (!open) return;
+    let mounted = true;
     loadUpdateSettings().then(settings => {
-      setAutoCheckEnabled(settings.auto_check);
-    }).catch(console.error);
-  }, []);
+      if (mounted) setAutoCheckEnabled(settings.auto_check);
+    }).catch((err: unknown) => {
+      if (mounted) setError('读取更新设置失败：' + String(err));
+    });
+    return () => { mounted = false; };
+  }, [open]);
 
-  // 监听安装完成事件
+  // Register once; a late listener registration must be cleaned up on unmount.
   useEffect(() => {
+    let alive = true;
     let unlistenFn: (() => void) | undefined;
-
-    const setupListener = async () => {
-      unlistenFn = await listenToInstallComplete((event) => {
-        const { success, needs_restart } = event;
-        if (success && needs_restart) {
-          setInstallComplete(true);
-          setInstalling(false);
-          setNewVersion(updateInfo?.latest_version || '');
-        }
-      });
-    };
-
-    setupListener();
-
-    return () => {
-      if (unlistenFn) {
-        unlistenFn();
+    void listenToInstallComplete((event) => {
+      if (!alive) return;
+      setInstalling(false);
+      if (!event.success) {
+        setInstallRequested(false);
+        setInstallStatus(null);
+        setError(event.message || '安装失败');
+        return;
       }
+      setInstallRequested(true);
+      if (event.needs_restart) {
+        setNewVersion(latestVersionRef.current);
+        setInstallComplete(true);
+      } else {
+        setInstallStatus(event.message || '安装命令已完成，无需重启。');
+      }
+    }).then((unlisten) => {
+      if (alive) unlistenFn = unlisten;
+      else unlisten();
+    }).catch((err: unknown) => {
+      if (alive) setError('安装状态监听不可用：' + String(err));
+    });
+    return () => {
+      alive = false;
+      unlistenFn?.();
     };
-  }, [updateInfo]);
+  }, []);
 
   useEffect(() => {
     if (open && !updateInfo) {
@@ -177,7 +201,10 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={(nextOpen) => {
+        if (!nextOpen && (downloading || installing)) return;
+        onOpenChange(nextOpen);
+      }}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -195,6 +222,13 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <span className="ml-3 text-muted-foreground">正在检查更新...</span>
             </div>
+          )}
+
+          {installStatus && !installing && !error && (
+            <Alert>
+              <CheckCircle2 className="h-4 w-4" />
+              <AlertDescription>{installStatus}</AlertDescription>
+            </Alert>
           )}
 
           {error && (
@@ -321,9 +355,9 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
                   立即更新
                 </Button>
               ) : (
-                <Button onClick={handleInstall} className="gap-2">
+                <Button onClick={handleInstall} className="gap-2" disabled={installRequested}>
                   <RefreshCw className="h-4 w-4" />
-                  安装更新
+                  {installRequested ? '安装命令已提交' : '安装更新'}
                 </Button>
               )}
             </>
