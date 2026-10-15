@@ -21,6 +21,7 @@ type ConfigsMap = Record<ProcessType, ProcessConfig>;
 export function ProcessConfigPanel() {
   const [configs, setConfigs] = useState<ConfigsMap | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -28,6 +29,7 @@ export function ProcessConfigPanel() {
   }, []);
 
   const loadAllConfigs = async () => {
+    setLoadError(null);
     try {
       const types: ProcessType[] = ['sea-rail-with-image', 'sea-rail-no-image', 'air-freight'];
       const configsData: ConfigsMap = {} as ConfigsMap;
@@ -40,11 +42,7 @@ export function ProcessConfigPanel() {
       setConfigs(configsData);
     } catch (error) {
       console.error('加载配置失败:', error);
-      toast({
-        title: '错误',
-        description: '加载配置失败',
-        variant: 'destructive',
-      });
+      setLoadError(error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -74,10 +72,6 @@ export function ProcessConfigPanel() {
 
   const handleReset = async () => {
     await loadAllConfigs();
-    toast({
-      title: '已重置',
-      description: '所有配置已恢复为保存的值',
-    });
   };
 
   const updateConfig = (type: ProcessType, updates: Partial<ProcessConfig>) => {
@@ -90,11 +84,15 @@ export function ProcessConfigPanel() {
 
   if (!configs) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center space-y-2">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-sm text-muted-foreground">加载配置中...</p>
-        </div>
+      <div className="rounded-xl border border-border bg-card p-5">
+        {loadError ? (
+          <div role="alert" className="space-y-3">
+            <p className="text-sm font-medium text-danger-fg">读取配置失败：{loadError}</p>
+            <Button variant="outline" size="sm" onClick={() => void loadAllConfigs()}>重试读取</Button>
+          </div>
+        ) : (
+          <p role="status" className="text-sm text-muted-foreground">正在读取处理配置…</p>
+        )}
       </div>
     );
   }
@@ -139,7 +137,6 @@ export function ProcessConfigPanel() {
                   id={`${type}-weight`}
                   type="number"
                   min="1"
-                  max="100"
                   value={config.weight_column}
                   onChange={(e) =>
                     updateConfig(type, { weight_column: parseInt(e.target.value) || 1 })
@@ -161,7 +158,6 @@ export function ProcessConfigPanel() {
                   id={`${type}-box`}
                   type="number"
                   min="1"
-                  max="100"
                   value={config.box_column}
                   onChange={(e) =>
                     updateConfig(type, { box_column: parseInt(e.target.value) || 1 })
@@ -210,7 +206,7 @@ export function ProcessConfigPanel() {
       <div className="space-y-1">
         <h2 className="text-2xl font-bold tracking-tight">处理配置</h2>
         <p className="text-sm text-muted-foreground/50">
-          为所有处理类型配置列索引和参数，配置会自动保存到本地
+          按处理模式分别设置列索引；点击“保存所有配置”后写入本地。
         </p>
       </div>
 
