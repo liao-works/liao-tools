@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Keyboard, Monitor, Palette, Check, Pencil } from 'lucide-react';
 import { useTodoStore } from '../store/todoStore';
-import type { WidgetTheme, ThemeColors } from '../types';
+import type { WidgetTheme, ThemeColors, TodoConfig } from '../types';
 import { DEFAULT_CONFIG, THEME_LABELS, WIDGET_THEMES } from '../types';
 import { isMac } from '@/lib/platform';
 
@@ -139,12 +139,19 @@ const validateShortcut = (shortcut: string): string | null => {
 };
 
 export function SettingsModal({ onClose }: SettingsModalProps) {
-  const { config, updateConfig, updateWidgetOpacity } = useTodoStore();
+  const { config, error, updateConfig, updateWidgetOpacity } = useTodoStore();
   const widgetConfig = config.widget || DEFAULT_CONFIG.widget;
   const hotkeysConfig = config.hotkeys || DEFAULT_CONFIG.hotkeys;
   const modifierLabel = isMac() ? 'Cmd' : 'Ctrl';
   const [draftHotkeys, setDraftHotkeys] = useState(hotkeysConfig);
   const [editingHotkey, setEditingHotkey] = useState<HotkeyField | null>(null);
+  // Store already exposes the persistence error; avoid unhandled rejections from UI events.
+  const saveWidgetConfig = (updates: Partial<TodoConfig>) => {
+    void updateConfig(updates).catch(() => undefined);
+  };
+  const saveWidgetOpacity = (opacity: number) => {
+    saveWidgetOpacity(opacity).catch(() => undefined);
+  };
 
   useEffect(() => {
     setDraftHotkeys(hotkeysConfig);
@@ -230,6 +237,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="mx-4 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-border bg-background shadow-lg">
+        {error && <p role="alert" className="m-3 rounded-lg border border-danger bg-danger-subtle p-3 text-sm text-danger-fg">{error}</p>}
         <div className="flex items-center justify-between border-b border-border p-4">
           <h2 className="text-lg font-semibold text-foreground">Todo 设置</h2>
           <button
@@ -250,7 +258,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               {(Object.keys(WIDGET_THEMES) as Array<Exclude<WidgetTheme, 'custom'>>).map((theme) => (
                 <button
                   key={theme}
-                  onClick={() => void updateConfig({ widget: { ...widgetConfig, theme } })}
+                  onClick={() => saveWidgetConfig({ widget: { ...widgetConfig, theme } })}
                   className={`relative rounded-lg border-2 p-3 transition-all ${
                     widgetConfig.theme === theme
                       ? 'border-primary ring-2 ring-primary/20'
@@ -281,7 +289,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             </div>
 
             <button
-              onClick={() => void updateConfig({ widget: { ...widgetConfig, theme: 'custom' } })}
+              onClick={() => saveWidgetConfig({ widget: { ...widgetConfig, theme: 'custom' } })}
               className={`w-full rounded-lg border-2 p-3 transition-all ${
                 widgetConfig.theme === 'custom'
                   ? 'border-primary ring-2 ring-primary/20'
@@ -310,7 +318,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                         type="text"
                         value={(widgetConfig.customColors as ThemeColors | undefined)?.[key as keyof ThemeColors] || ''}
                         onChange={(event) =>
-                          void updateConfig({
+                          saveWidgetConfig({
                             widget: {
                               ...widgetConfig,
                               customColors: {
@@ -327,7 +335,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                         type="color"
                         value={(widgetConfig.customColors as ThemeColors | undefined)?.[key as keyof ThemeColors] || '#000000'}
                         onChange={(event) =>
-                          void updateConfig({
+                          saveWidgetConfig({
                             widget: {
                               ...widgetConfig,
                               customColors: {
@@ -361,7 +369,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                     max="1"
                     step="0.05"
                     value={widgetConfig.opacity}
-                    onChange={(event) => void updateWidgetOpacity(parseFloat(event.target.value))}
+                    onChange={(event) => saveWidgetOpacity(parseFloat(event.target.value))}
                     className="w-24 accent-primary"
                   />
                   <span className="w-10 text-xs text-muted-foreground">{Math.round(widgetConfig.opacity * 100)}%</span>
@@ -378,7 +386,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                     step="10"
                     value={widgetConfig.width}
                     onChange={(event) =>
-                      void updateConfig({
+                      saveWidgetConfig({
                         widget: { ...widgetConfig, width: parseInt(event.target.value, 10) || 320 },
                       })
                     }
@@ -398,7 +406,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                     step="10"
                     value={widgetConfig.height}
                     onChange={(event) =>
-                      void updateConfig({
+                      saveWidgetConfig({
                         widget: { ...widgetConfig, height: parseInt(event.target.value, 10) || 400 },
                       })
                     }
@@ -464,13 +472,13 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             )}
             <div className="mt-3 flex justify-end gap-2">
               <button
-                onClick={() => void handleResetHotkeys()}
+                onClick={() => void handleResetHotkeys().catch(() => undefined)}
                 className="rounded-lg bg-muted px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted/80"
               >
                 恢复默认
               </button>
               <button
-                onClick={() => void handleSaveHotkeys()}
+                onClick={() => void handleSaveHotkeys().catch(() => undefined)}
                 disabled={Object.keys(hotkeyErrors).length > 0 || hotkeyConflicts.length > 0}
                 className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
