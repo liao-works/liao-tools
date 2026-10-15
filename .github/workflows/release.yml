@@ -1,5 +1,8 @@
 name: Release
 
+# Supported targets: Windows x64 and macOS Apple Silicon (ARM64) only.
+# Universal DMGs contain an Intel slice and must not be generated.
+
 on:
   push:
     tags:
@@ -62,10 +65,6 @@ jobs:
         include:
           - platform: macos-latest
             args: --target aarch64-apple-darwin
-          - platform: macos-latest
-            args: --target x86_64-apple-darwin
-          - platform: macos-latest
-            args: --target universal-apple-darwin
           - platform: windows-latest
             args: ''
     runs-on: ${{ matrix.platform }}
@@ -77,7 +76,7 @@ jobs:
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -151,9 +150,7 @@ jobs:
           for required in \
             "liao-tools_${VERSION}_x64-setup.exe" \
             "liao-tools_${VERSION}_x64_en-US.msi" \
-            "liao-tools_${VERSION}_aarch64.dmg" \
-            "liao-tools_${VERSION}_x64.dmg" \
-            "liao-tools_${VERSION}_universal.dmg"; do
+            "liao-tools_${VERSION}_aarch64.dmg"; do
             if ! grep -Fxq "${required}" <<< "${ASSETS}"; then
               echo "::error::Missing release installer: ${required}"
               exit 1
