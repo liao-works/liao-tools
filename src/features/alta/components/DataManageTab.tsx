@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { RefreshCw, Loader2, History } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertCircle, History, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { altaApi } from '@/lib/api/alta';
 import type { AltaDbStats } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -12,207 +12,128 @@ export function DataManageTab() {
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<string[]>([]);
   const [dbStats, setDbStats] = useState<AltaDbStats | null>(null);
+  const [infoError, setInfoError] = useState<string | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const loadDbInfo = async () => {
+  async function loadDbInfo() {
+    setLoading(true);
+    setInfoError(null);
     try {
-      const info = await altaApi.getDatabaseInfo();
-      setDbStats(info);
+      setDbStats(await altaApi.getDatabaseInfo());
     } catch (error) {
-      console.error('加载数据库信息失败:', error);
+      setInfoError(error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  useEffect(() => {
-    loadDbInfo();
-  }, []);
+  useEffect(() => { void loadDbInfo(); }, []);
 
-  const handleUpdate = async () => {
+  async function handleUpdate() {
+    if (updating) return;
     setUpdating(true);
-    setLogs([]);
-
-    const addLog = (message: string) => {
-      setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
-    };
-
+    setUpdateError(null);
+    setLogs(['开始更新禁运清单…']);
     try {
-      addLog('开始更新禁运清单...');
-      
       const result = await altaApi.updateDatabase();
-      
-      addLog(`成功获取 ${result.items_count} 条禁运数据`);
-      addLog('正在保存到本地数据库...');
-      addLog(result.message);
-      
-      // 重新加载数据库信息
+      if (!result.success) {
+        throw new Error(result.message || '更新命令未确认成功');
+      }
+      setLogs([
+        '禁运清单更新命令已确认成功',
+        '本次更新报告记录数：' + result.items_count.toLocaleString(),
+        result.message,
+      ].filter(Boolean));
+      toast({ title: '禁运清单更新完成', description: result.message });
+      // Status refresh failure should not turn a successful update into a failed one.
       await loadDbInfo();
-      
-      toast({
-        title: '更新成功',
-        description: result.message,
-      });
-    } catch (error: any) {
-      console.error('更新失败:', error);
-      addLog(`错误: ${error.message || '更新失败'}`);
-      toast({
-        title: '更新失败',
-        description: error.message || '请检查网络连接或稍后重试',
-        variant: 'destructive',
-      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setUpdateError(message);
+      setLogs((prev) => [...prev, '更新失败：' + message]);
+      toast({ title: '禁运清单更新失败', description: message, variant: 'destructive' });
     } finally {
       setUpdating(false);
     }
-  };
+  }
+
+  const dateText = dbStats?.last_update
+    ? new Date(dbStats.last_update).toLocaleString('zh-CN')
+    : '未提供更新时间';
 
   return (
     <div className="space-y-4">
-      {/* 数据库信息 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>数据库状态</CardTitle>
-          <CardDescription>本地禁运数据库信息</CardDescription>
+      <Card className="shadow-none">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">本地禁运数据库</CardTitle>
+          <p className="text-xs leading-5 text-muted-foreground">
+            记录数和更新时间来自真实本地数据库；记录存在不代表覆盖完整或每条限制均已核验。
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : dbStats ? (
-            <>
-              {/* 数据库为空时的警告 */}
-              {dbStats.total_items === 0 && (
-                <div className="rounded-lg border border-warning bg-warning-subtle p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="text-warning-fg">
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-warning-subtle-fg">
-                        数据库为空
-                      </p>
-                      <p className="mt-1 text-sm text-warning-fg">
-                        在使用查询功能前，请先点击下方按钮更新禁运数据
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+          {loading && !dbStats && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />正在读取本地数据库…
+          </p>}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">总记录数</p>
-                  <p className={`text-2xl font-bold ${dbStats.total_items === 0 ? 'text-warning-fg' : ''}`}>
-                    {dbStats.total_items.toLocaleString()}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">最后更新</p>
-                  <p className="text-sm font-medium">
-                    {dbStats.last_update 
-                      ? new Date(dbStats.last_update).toLocaleString('zh-CN')
-                      : '从未更新'}
-                  </p>
-                </div>
-              </div>
-
-              <Button
-                onClick={handleUpdate}
-                disabled={updating}
-                className="w-full"
-                variant={dbStats.total_items === 0 ? 'default' : 'outline'}
-              >
-                {updating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    更新中...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    {dbStats.total_items === 0 ? '立即更新数据' : '更新禁运数据'}
-                  </>
-                )}
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openUpdateHistory({ module: 'alta' })}
-                className="w-full"
-              >
-                <History className="mr-2 h-4 w-4" />
-                更新历史
-              </Button>
-            </>
-          ) : (
-            <div className="text-center py-4 text-muted-foreground">
-              <p>数据库未初始化</p>
-              <Button onClick={handleUpdate} className="mt-4">
-                <RefreshCw className="mr-2 h-4 w-4" />
-                首次更新
-              </Button>
+          {infoError && (
+            <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-danger bg-danger-subtle p-3 text-sm text-danger-fg">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span className="min-w-0 flex-1 break-words">读取本地状态失败：{infoError}</span>
+              <Button type="button" variant="outline" size="sm" onClick={() => void loadDbInfo()} disabled={loading}>重试读取</Button>
             </div>
           )}
+          {dbStats && (
+            <>
+              {dbStats.total_items === 0 && (
+                <div role="status" className="rounded-lg border border-warning bg-warning-subtle p-3 text-sm text-warning-fg">
+                  本地清单没有记录；在获得清单前，不能把查询未命中理解为没有限制。
+                </div>
+              )}
+              <dl className="grid gap-3 rounded-lg bg-muted/40 p-4 sm:grid-cols-3">
+                <div>
+                  <dt className="text-xs text-muted-foreground">本地记录数</dt>
+                  <dd className="mt-1 text-xl font-semibold tabular-nums">{dbStats.total_items.toLocaleString()}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">最后更新</dt>
+                  <dd className="mt-1 text-sm font-medium">{dateText}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">数据库大小</dt>
+                  <dd className="mt-1 text-sm font-medium">{(dbStats.db_size / 1024 / 1024).toFixed(2)} MB</dd>
+                </div>
+              </dl>
+            </>
+          )}
+          {updateError && <p role="alert" className="text-sm text-danger-fg">更新失败：{updateError}</p>}
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => void handleUpdate()} disabled={updating}>
+              {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {updating ? '正在更新清单' : '更新禁运清单'}
+            </Button>
+            <Button type="button" variant="outline" disabled={loading || updating} onClick={() => void loadDbInfo()}>
+              <RefreshCw className="h-4 w-4" />刷新本地状态
+            </Button>
+            <Button type="button" variant="outline" onClick={() => openUpdateHistory({ module: 'alta' })}>
+              <History className="h-4 w-4" />更新历史
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            更新由原有 Alta 数据命令执行；完成后重新读取本地数据，不做额外连接测试。
+          </p>
         </CardContent>
       </Card>
 
-      {/* 操作日志 */}
       {logs.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>操作日志</CardTitle>
-            <CardDescription>数据更新过程记录</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg bg-muted p-4">
-              <div className="space-y-1 font-mono text-sm">
-                {logs.map((log, index) => (
-                  <div key={index} className="text-muted-foreground">
-                    {log}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 数据统计 */}
-      {dbStats && (
-        <Card>
-          <CardHeader>
-            <CardTitle>数据统计</CardTitle>
-            <CardDescription>禁运数据库详细信息</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">数据库大小</span>
-                <span className="text-sm font-medium">
-                  {(dbStats.db_size / 1024 / 1024).toFixed(2)} MB
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">数据来源</span>
-                <span className="text-sm font-medium">alta.ru</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">建议更新频率</span>
-                <span className="text-sm font-medium">建议每周一次</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">数据完整性</span>
-                <span className="text-sm font-medium text-success-fg">
-                  {dbStats.total_items > 0 ? '已加载（未作完整性审查）' : '暂无记录'}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <details className="rounded-xl border border-border bg-card">
+          <summary className="cursor-pointer p-4 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            本次操作日志 · {logs.length} 条
+          </summary>
+          <div className="max-h-64 space-y-1 overflow-y-auto border-t border-border p-4 font-mono text-xs text-muted-foreground">
+            {logs.map((entry, index) => <p key={index} className="break-words">{entry}</p>)}
+          </div>
+        </details>
       )}
     </div>
   );

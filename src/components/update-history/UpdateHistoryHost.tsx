@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -17,8 +18,10 @@ export function UpdateHistoryHost() {
 
   const [sessions, setSessions] = useState<UpdateSessionSummary[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [details, setDetails] = useState<UpdateChangeDetail[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [sessionMeta, setSessionMeta] = useState<{
     versionFrom: string | null;
     versionTo: string | null;
@@ -26,9 +29,13 @@ export function UpdateHistoryHost() {
 
   const loadSessions = useCallback(async () => {
     setSessionsLoading(true);
+    setSessionsError(null);
     try {
       const data = await updateHistoryApi.listSessions(module);
       setSessions(data);
+    } catch (error) {
+      setSessionsError(error instanceof Error ? error.message : String(error));
+      setSessions([]);
     } finally {
       setSessionsLoading(false);
     }
@@ -45,10 +52,12 @@ export function UpdateHistoryHost() {
   useEffect(() => {
     if (!activeSessionId) {
       setDetails([]);
+      setDetailError(null);
       return;
     }
     let cancelled = false;
     setDetailLoading(true);
+    setDetailError(null);
     updateHistoryApi
       .getDetails(activeSessionId)
       .then((data) => {
@@ -61,6 +70,12 @@ export function UpdateHistoryHost() {
               versionTo: data[0].version_to,
             });
           }
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setDetails([]);
+          setDetailError(error instanceof Error ? error.message : String(error));
         }
       })
       .finally(() => {
@@ -114,11 +129,17 @@ export function UpdateHistoryHost() {
               更新历史{module ? `（${moduleLabel}）` : ''}
             </DialogTitle>
           </DialogHeader>
-          <UpdateHistoryListView
+          {sessionsError && (
+            <div role="alert" className="space-y-2 rounded-lg border border-danger bg-danger-subtle p-3 text-sm text-danger-fg">
+              <p>读取更新历史失败：{sessionsError}</p>
+              <Button type="button" variant="outline" size="sm" onClick={() => void loadSessions()}>重试读取</Button>
+            </div>
+          )}
+          {!sessionsError && <UpdateHistoryListView
             sessions={sessions}
             loading={sessionsLoading}
             onSelect={handleSelectSession}
-          />
+          />}
         </DialogContent>
       </Dialog>
 
@@ -128,14 +149,17 @@ export function UpdateHistoryHost() {
           <DialogHeader>
             <DialogTitle>{moduleLabel}变更明细</DialogTitle>
           </DialogHeader>
-          <UpdateHistoryDetailView
+          {detailError && <p role="alert" className="rounded-lg border border-danger bg-danger-subtle p-3 text-sm text-danger-fg">
+            读取变更明细失败：{detailError}
+          </p>}
+          {!detailError && <UpdateHistoryDetailView
             details={details}
             detailLoading={detailLoading}
             onBack={handleBack}
             module={module ?? 'tax'}
             versionFrom={sessionMeta.versionFrom}
             versionTo={sessionMeta.versionTo}
-          />
+          />}
         </DialogContent>
       </Dialog>
     </>

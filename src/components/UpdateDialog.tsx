@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle2, Download, Loader2, AlertCircle, RefreshCw, X } from 'lucide-react';
+import { CheckCircle2, Download, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import {
   checkForUpdates,
   loadUpdateSettings,
@@ -74,9 +74,8 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
     setError(null);
     setDownloadProgress(null);
 
+    let unlistenFn: (() => void) | null = null;
     try {
-      let unlistenFn: (() => void) | null = null;
-
       unlistenFn = await listenToDownloadProgress((progress) => {
         setDownloadProgress(progress);
       });
@@ -85,16 +84,12 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
         updateInfo.platform_specific_url,
         updateInfo.latest_version
       );
-
       setDownloadPath(filePath);
-      setDownloading(false);
-
-      if (unlistenFn) {
-        unlistenFn();
-      }
     } catch (err) {
-      setDownloading(false);
       setError(err instanceof Error ? err.message : '下载失败');
+    } finally {
+      unlistenFn?.();
+      setDownloading(false);
     }
   }, [updateInfo]);
 
@@ -118,19 +113,14 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
   }, [downloadPath]);
 
   const handleAutoCheckChange = useCallback(async (checked: boolean) => {
-    setAutoCheckEnabled(checked);
     try {
       const settings = await loadUpdateSettings();
-      settings.auto_check = checked;
-      await saveUpdateSettings(settings);
+      await saveUpdateSettings({ ...settings, auto_check: checked });
+      setAutoCheckEnabled(checked);
+      setError(null);
     } catch (err) {
-      console.error('保存设置失败:', err);
+      setError('保存更新设置失败：' + (err instanceof Error ? err.message : String(err)));
     }
-  }, []);
-
-  const handleCancelDownload = useCallback(() => {
-    setDownloading(false);
-    setDownloadProgress(null);
   }, []);
 
   const formatBytes = (bytes: number) => {
@@ -218,15 +208,7 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">正在下载更新...</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCancelDownload}
-                  disabled={installing}
-                >
-                  <X className="h-4 w-4 mr-1" />
-                  取消
-                </Button>
+                <span className="text-xs text-muted-foreground">下载正在执行，当前版本未提供取消命令。</span>
               </div>
               {downloadProgress && (
                 <>
