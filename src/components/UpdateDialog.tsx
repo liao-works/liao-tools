@@ -12,9 +12,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle2, Download, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Download, Loader2, AlertCircle, RefreshCw, ExternalLink } from 'lucide-react';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import {
   checkForUpdates,
+  formatUpdaterError,
   loadUpdateSettings,
   saveUpdateSettings,
   updateLastCheckTime,
@@ -62,9 +64,12 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
     try {
       const info = await checkForUpdates();
       setUpdateInfo(info);
-      await updateLastCheckTime();
+      // A local settings write failure must not turn a successful online check into an error.
+      void updateLastCheckTime().catch((err: unknown) => {
+        console.warn('已获取更新信息，但未能保存检查时间:', formatUpdaterError(err));
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : '检查更新失败');
+      setError(formatUpdaterError(err, '检查更新失败'));
     } finally {
       setChecking(false);
     }
@@ -92,7 +97,7 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
       );
       setDownloadPath(filePath);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '下载失败');
+      setError(formatUpdaterError(err, '下载失败'));
     } finally {
       unlistenFn?.();
       setDownloading(false);
@@ -117,7 +122,7 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
       setInstallStatus('已提交安装命令；请根据系统安装程序完成操作。');
     } catch (err) {
       setInstallRequested(false);
-      setError(err instanceof Error ? err.message : '安装失败');
+      setError(formatUpdaterError(err, '安装失败'));
     } finally {
       setInstalling(false);
     }
@@ -130,7 +135,7 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
       setAutoCheckEnabled(checked);
       setError(null);
     } catch (err) {
-      setError('保存更新设置失败：' + (err instanceof Error ? err.message : String(err)));
+      setError('保存更新设置失败：' + formatUpdaterError(err));
     }
   }, []);
 
@@ -156,7 +161,7 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
     loadUpdateSettings().then(settings => {
       if (mounted) setAutoCheckEnabled(settings.auto_check);
     }).catch((err: unknown) => {
-      if (mounted) setError('读取更新设置失败：' + String(err));
+      if (mounted) setError('读取更新设置失败：' + formatUpdaterError(err));
     });
     return () => { mounted = false; };
   }, [open]);
@@ -185,7 +190,7 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
       if (alive) unlistenFn = unlisten;
       else unlisten();
     }).catch((err: unknown) => {
-      if (alive) setError('安装状态监听不可用：' + String(err));
+      if (alive) setError('安装状态监听不可用：' + formatUpdaterError(err));
     });
     return () => {
       alive = false;
@@ -234,7 +239,15 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>
+                <p className="whitespace-pre-wrap break-words">{error}</p>
+                <Button type="button" size="sm" variant="outline" className="mt-3 gap-2"
+                  onClick={() => void openUrl('https://github.com/liao-works/liao-tools/releases/latest').catch((err: unknown) => {
+                    setError('无法打开下载页面：' + formatUpdaterError(err));
+                  })}>
+                  <ExternalLink className="h-4 w-4" />打开官方版本下载页
+                </Button>
+              </AlertDescription>
             </Alert>
           )}
 
