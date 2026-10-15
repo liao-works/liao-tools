@@ -38,15 +38,7 @@ export function DataManageTab() {
     };
 
     try {
-      addLog('开始连接Alta.ru网站...');
-      const canConnect = await altaApi.testAltaConnection();
-      
-      if (!canConnect) {
-        addLog('无法连接到Alta.ru，请检查网络连接');
-        throw new Error('无法连接到Alta.ru');
-      }
-      
-      addLog('连接成功，开始获取禁运数据...');
+      addLog('开始更新禁运清单...');
       
       const result = await altaApi.updateDatabase();
       
@@ -209,13 +201,13 @@ export function DataManageTab() {
                 <span className="text-sm font-medium">alta.ru</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">更新频率</span>
+                <span className="text-sm text-muted-foreground">建议更新频率</span>
                 <span className="text-sm font-medium">建议每周一次</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">数据完整性</span>
                 <span className="text-sm font-medium text-success-fg">
-                  {dbStats.total_items > 0 ? '✓ 完整' : '⚠ 待更新'}
+                  {dbStats.total_items > 0 ? '已加载（未作完整性审查）' : '暂无记录'}
                 </span>
               </div>
             </div>
