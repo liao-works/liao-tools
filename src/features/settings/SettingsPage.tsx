@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getVersion } from '@tauri-apps/api/app';
 import { AlertCircle, Check, Database, Download, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FeatureHeader } from '@/components/layout/FeatureHeader';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
@@ -76,11 +77,8 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 pb-10">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground-emphasis md:text-3xl">偏好设置</h1>
-        <p className="mt-2 text-sm text-muted-foreground">外观、应用版本及实际生效的更新选项。</p>
-      </header>
+    <div className="lt-feature mx-auto max-w-5xl space-y-6 pb-10">
+      <FeatureHeader eyebrow="PREFERENCES" title="偏好设置" description="外观、应用版本及实际生效的更新选项。" />
 
       <Card className="shadow-none">
         <CardHeader className="pb-3">
