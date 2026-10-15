@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { AlertCircle, ArrowRight, CheckCircle2, Copy, ExternalLink, FileSearch, Loader2, RefreshCw, Search } from 'lucide-react';
+import { AlertCircle, ArrowRight, Copy, ExternalLink, FileSearch, Loader2, RefreshCw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -335,7 +335,7 @@ export function SingleQueryTab({ onSwitchToUpdate }: Props) {
                     <dt className="text-muted-foreground">来源版本</dt><dd>{entry.version || '未提供'}</dd>
                     <dt className="text-muted-foreground">核验时间</dt><dd>{entry.verified || '未提供'}</dd>
                   </dl>
-                  {entry.url && <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => void openSource(entry.url)}>
+                  {entry.url && <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => void openSource(entry.url!)}>
                     <ExternalLink className="h-3.5 w-3.5" /> 官方来源
                   </Button>}
                 </section>
