@@ -390,7 +390,8 @@ fn mutate_config_in_store(
     let mut config = decode_stored_value::<TodoConfig>(original_config.clone(), "Todo 配置")?
         .unwrap_or_else(default_config);
     mutator(&mut config);
-    let revision = original_revision.as_ref().and_then(|v| v.as_u64()).unwrap_or(0);
+    let revision = decode_stored_value::<u64>(original_revision.clone(), "Todo 修订号")?
+        .unwrap_or(0);
     let next_revision = revision.checked_add(1)
         .ok_or_else(|| "待办修订号已达到上限".to_string())?;
     store.set(
@@ -878,13 +879,9 @@ pub async fn load_sticky_notes(app: AppHandle) -> Result<Option<TodoStoreData>, 
         .unwrap_or_default();
     let config = decode_stored_value::<TodoConfig>(store.get("config"), "Todo 配置")?
         .unwrap_or_else(default_config);
-    let version = store
-        .get("version")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(1) as u32;
-    let revision = store
-        .get("revision")
-        .and_then(|v| v.as_u64())
+    let version = decode_stored_value::<u32>(store.get("version"), "Todo 格式版本")?
+        .unwrap_or(1);
+    let revision = decode_stored_value::<u64>(store.get("revision"), "Todo 修订号")?
         .unwrap_or(0);
 
     Ok(Some(TodoStoreData {
@@ -904,7 +901,8 @@ pub async fn save_sticky_notes(app: AppHandle, data: TodoStoreData) -> Result<u6
         .store("sticky-notes")
         .map_err(|e| format!("Failed to open store: {e}"))?;
     let original_revision = store.get("revision");
-    let current_revision = original_revision.as_ref().and_then(|v| v.as_u64()).unwrap_or(0);
+    let current_revision = decode_stored_value::<u64>(original_revision.clone(), "Todo 修订号")?
+        .unwrap_or(0);
     let next_revision = next_todo_revision(data.revision, current_revision)?;
 
     // Refuse to overwrite malformed persisted data, including when the UI cannot decode it.
@@ -1148,6 +1146,14 @@ mod todo_store_integrity_tests {
             decode_stored_value::<Vec<TodoTask>>(None, "Todo 任务").unwrap().unwrap_or_default().len(),
             0
         );
+    }
+
+    #[test]
+    fn malformed_revision_is_not_coerced_to_zero() {
+        assert!(decode_stored_value::<u64>(
+            Some(serde_json::json!("damaged")),
+            "Todo 修订号",
+        ).is_err());
     }
 
     #[test]
