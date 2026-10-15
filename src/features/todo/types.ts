@@ -50,6 +50,8 @@ export interface TodoStoreData {
   tasks: TodoTask[];
   config: TodoConfig;
   version: number;
+  /** Revision of the shared Rust store, not the schema version. */
+  revision: number;
 }
 
 export const WIDGET_THEMES: Record<Exclude<WidgetTheme, 'custom'>, ThemeColors> = {
