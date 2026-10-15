@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
+
+// All app windows share one store; serialize revision checks and writes in Rust.
+static TODO_STORAGE_LOCK: Mutex<()> = Mutex::new(());
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
@@ -118,6 +121,8 @@ pub struct TodoStoreData {
     pub tasks: Vec<TodoTask>,
     pub config: TodoConfig,
     pub version: u32,
+    #[serde(default)]
+    pub revision: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -338,20 +343,36 @@ fn load_config_from_store(app: &AppHandle) -> Result<TodoConfig, String> {
         .unwrap_or_else(default_config))
 }
 
-fn save_config_to_store(app: &AppHandle, config: &TodoConfig) -> Result<(), String> {
+// Config-only updates must not overwrite a task snapshot and must invalidate stale editors.
+fn mutate_config_in_store(
+    app: &AppHandle,
+    mutator: impl FnOnce(&mut TodoConfig),
+) -> Result<TodoConfig, String> {
+    let guard = TODO_STORAGE_LOCK
+        .lock()
+        .map_err(|_| "Todo storage lock is unavailable".to_string())?;
     let store = app
         .store("sticky-notes")
         .map_err(|e| format!("Failed to open store: {e}"))?;
 
+    let mut config = store
+        .get("config")
+        .and_then(|v| serde_json::from_value::<TodoConfig>(v.clone()).ok())
+        .unwrap_or_else(default_config);
+    mutator(&mut config);
+    let revision = store.get("revision").and_then(|v| v.as_u64()).unwrap_or(0);
     store.set(
         "config",
-        serde_json::to_value(config).map_err(|e| format!("Serialize config failed: {e}"))?,
+        serde_json::to_value(&config).map_err(|e| format!("Serialize config failed: {e}"))?,
     );
-    store
-        .save()
-        .map_err(|e| format!("Failed to save store: {e}"))?;
+    store.set("revision", serde_json::json!(revision + 1));
+    store.save().map_err(|e| format!("Failed to save store: {e}"))?;
+    drop(guard);
 
-    Ok(())
+    if let Err(e) = app.emit("sticky-notes-data-updated", ()) {
+        log::warn!("Failed to notify windows of Todo config update: {e}");
+    }
+    Ok(config)
 }
 
 fn update_todo_widget_layout_in_store(
@@ -360,18 +381,17 @@ fn update_todo_widget_layout_in_store(
     width: Option<u32>,
     height: Option<u32>,
 ) -> Result<TodoConfig, String> {
-    let mut config = load_config_from_store(app)?;
-    if let Some(position) = position {
-        config.widget.position = position;
-    }
-    if let Some(width) = width {
-        config.widget.width = width;
-    }
-    if let Some(height) = height {
-        config.widget.height = height;
-    }
-    save_config_to_store(app, &config)?;
-    Ok(config)
+    mutate_config_in_store(app, |config| {
+        if let Some(position) = position {
+            config.widget.position = position;
+        }
+        if let Some(width) = width {
+            config.widget.width = width;
+        }
+        if let Some(height) = height {
+            config.widget.height = height;
+        }
+    })
 }
 
 fn widget_config_to_window_state(widget: &TodoWidgetConfig) -> NoteWindowState {
@@ -608,13 +628,12 @@ fn toggle_todo_widget_visibility_inner(app: &AppHandle) -> Result<bool, String> 
 }
 
 fn toggle_todo_widget_pin_inner(app: &AppHandle) -> Result<bool, String> {
-    let mut config = load_config_from_store(app)?;
-    config.widget.is_pinned = !config.widget.is_pinned;
-    if config.widget.is_pinned {
-        config.widget.is_desktop_mode = false;
-    }
-
-    save_config_to_store(app, &config)?;
+    let config = mutate_config_in_store(app, |config| {
+        config.widget.is_pinned = !config.widget.is_pinned;
+        if config.widget.is_pinned {
+            config.widget.is_desktop_mode = false;
+        }
+    })?;
 
     if let Some(window) = app.get_webview_window("note-todo-widget") {
         if config.widget.is_pinned {
@@ -810,6 +829,9 @@ fn apply_global_shortcuts_from_config(
 
 #[tauri::command]
 pub async fn load_sticky_notes(app: AppHandle) -> Result<Option<TodoStoreData>, String> {
+    let _guard = TODO_STORAGE_LOCK
+        .lock()
+        .map_err(|_| "Todo storage lock is unavailable".to_string())?;
     let store = app
         .store("sticky-notes")
         .map_err(|e| format!("Failed to open store: {e}"))?;
@@ -826,19 +848,38 @@ pub async fn load_sticky_notes(app: AppHandle) -> Result<Option<TodoStoreData>, 
         .get("version")
         .and_then(|v| v.as_u64())
         .unwrap_or(1) as u32;
+    let revision = store
+        .get("revision")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
 
     Ok(Some(TodoStoreData {
         tasks,
         config,
         version,
+        revision,
     }))
 }
 
 #[tauri::command]
-pub async fn save_sticky_notes(app: AppHandle, data: TodoStoreData) -> Result<(), String> {
+pub async fn save_sticky_notes(app: AppHandle, data: TodoStoreData) -> Result<u64, String> {
+    let guard = TODO_STORAGE_LOCK
+        .lock()
+        .map_err(|_| "Todo storage lock is unavailable".to_string())?;
     let store = app
         .store("sticky-notes")
         .map_err(|e| format!("Failed to open store: {e}"))?;
+    let current_revision = store
+        .get("revision")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+
+    if current_revision != data.revision {
+        return Err(format!(
+            "待办数据已在其他窗口更新（本地修订号 {}，当前修订号 {}），请同步后重试",
+            data.revision, current_revision
+        ));
+    }
 
     store.set(
         "tasks",
@@ -852,9 +893,10 @@ pub async fn save_sticky_notes(app: AppHandle, data: TodoStoreData) -> Result<()
         "version",
         serde_json::to_value(&data.version).map_err(|e| format!("Serialize version failed: {e}"))?,
     );
-    store
-        .save()
-        .map_err(|e| format!("Failed to save store: {e}"))?;
+    let next_revision = current_revision + 1;
+    store.set("revision", serde_json::json!(next_revision));
+    store.save().map_err(|e| format!("Failed to save store: {e}"))?;
+    drop(guard);
 
     if let Err(e) = apply_global_shortcuts_from_config(&app, &data.config.hotkeys) {
         log::warn!("Failed to update sticky notes shortcuts from config: {e}");
@@ -862,8 +904,7 @@ pub async fn save_sticky_notes(app: AppHandle, data: TodoStoreData) -> Result<()
     if let Err(e) = app.emit("sticky-notes-data-updated", ()) {
         log::warn!("Failed to emit sticky-notes-data-updated: {e}");
     }
-
-    Ok(())
+    Ok(next_revision)
 }
 
 #[tauri::command]

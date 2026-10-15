@@ -26,6 +26,7 @@ const toWindowState = (widget: TodoWidgetConfig) => ({
 interface TodoState {
   tasks: TodoTask[];
   config: TodoConfig;
+  revision: number;
   isLoading: boolean;
   error: string | null;
   initialized: boolean;
@@ -66,13 +67,28 @@ export const useTodoStore = create<TodoState>((set, get) => {
   const commit = (transform: (current: TodoState) => Pick<TodoState, 'tasks' | 'config'>) =>
     enqueueSave(async () => {
       const next = transform(get());
+      const expectedRevision = get().revision;
       try {
-        await invoke('save_sticky_notes', {
-          data: { tasks: next.tasks, config: next.config, version: 1 } as TodoStoreData,
+        const revision = await invoke<number>('save_sticky_notes', {
+          data: { tasks: next.tasks, config: next.config, version: 1, revision: expectedRevision } as TodoStoreData,
         });
-        set({ ...next, error: null });
+        set({ ...next, revision, error: null });
       } catch (error) {
-        set({ error: '保存失败：' + (error instanceof Error ? error.message : String(error)) });
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('待办数据已在其他窗口更新')) {
+          try {
+            const latest = await invoke<TodoStoreData>('load_sticky_notes');
+            if (latest) set({
+              tasks: latest.tasks || [],
+              config: latest.config || DEFAULT_CONFIG,
+              revision: latest.revision ?? 0,
+              initialized: true,
+            });
+          } catch {
+            // Preserve the conflict error; the manual refresh remains available.
+          }
+        }
+        set({ error: '保存失败：' + message });
         throw error;
       }
     });
@@ -80,6 +96,7 @@ export const useTodoStore = create<TodoState>((set, get) => {
   return ({
   tasks: [],
   config: DEFAULT_CONFIG,
+  revision: 0,
   isLoading: false,
   error: null,
   initialized: false,
@@ -97,12 +114,14 @@ export const useTodoStore = create<TodoState>((set, get) => {
         set({
           tasks: data.tasks || [],
           config: data.config || DEFAULT_CONFIG,
+          revision: data.revision ?? 0,
           initialized: true,
         });
       } else {
         set({
           tasks: [],
           config: DEFAULT_CONFIG,
+          revision: 0,
           initialized: true,
         });
       }
@@ -130,6 +149,7 @@ export const useTodoStore = create<TodoState>((set, get) => {
       set({
         tasks: data?.tasks || [],
         config: data?.config || DEFAULT_CONFIG,
+        revision: data?.revision ?? 0,
         initialized: true,
       });
     } catch (err) {
@@ -263,6 +283,7 @@ export const useTodoStore = create<TodoState>((set, get) => {
         set({
           tasks: data.tasks || [],
           config: latestConfig,
+          revision: data.revision ?? 0,
           initialized: true,
         });
       }
