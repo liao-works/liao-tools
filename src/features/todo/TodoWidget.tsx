@@ -648,7 +648,8 @@ export function TodoWidget() {
 
       {saveError && (
         <div role="alert" className="flex items-start justify-between gap-2 border-b px-3 py-2 text-xs" style={{ borderColor: themeColors.border, color: themeColors.text }}>
-          <span className="min-w-0 break-words">{saveError}</span>
+          <span className="min-w-0 flex-1 break-words">{saveError}</span>
+          <button type="button" onClick={() => void syncFromRust()} className="shrink-0 rounded px-2 py-1 underline hover:opacity-75">同步最新数据</button>
           <button type="button" aria-label="关闭保存错误" onClick={() => setSaveError(null)} className="shrink-0 rounded p-1 hover:opacity-75"><X className="h-3.5 w-3.5" /></button>
         </div>
       )}
