@@ -79,15 +79,11 @@ export function SystemToolsPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      let all: BackendTool[];
-      try {
-        all = await invoke<BackendTool[]>('get_all_tools');
-      } catch {
-        const system = await invoke<BackendTool[]>('get_system_tools');
-        all = system.map((tool) => ({ ...tool, tool_type: 'system' }));
-      }
+      const all = await invoke<BackendTool[]>('get_all_tools');
       setTools(all.map(toDisplayTool));
     } catch (error) {
+      // A failed user-tool database must not masquerade as a system-only empty collection.
+      setTools([]);
       setLoadError(error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(false);
