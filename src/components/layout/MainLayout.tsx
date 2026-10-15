@@ -1,71 +1,61 @@
 import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
+import { Menu, Search } from 'lucide-react';
 import { Sidebar } from './Sidebar';
+import { GlobalCommand } from './GlobalCommand';
 import { UpdateDialog } from '@/components/UpdateDialog';
 import { checkForUpdates, loadUpdateSettings, updateLastCheckTime } from '@/lib/updater';
 
 export function MainLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [autoUpdateDialogOpen, setAutoUpdateDialogOpen] = useState(false);
 
-  // 应用启动时自动检查更新
+  // Preserve the existing updater behavior. The redesign changes presentation only.
   useEffect(() => {
     const autoCheckUpdate = async () => {
       try {
         const settings = await loadUpdateSettings();
-
-        // 如果未启用自动检查，直接返回
-        if (!settings.auto_check) {
-          return;
-        }
-
-        // 检查是否应该检查更新（基于时间间隔）
+        if (!settings.auto_check) return;
         const now = Math.floor(Date.now() / 1000);
-        const elapsed_hours = (now - settings.last_check_time) / 3600;
+        const elapsedHours = (now - settings.last_check_time) / 3600;
         const interval = settings.check_interval_hours || 24;
-
-        if (elapsed_hours < interval) {
-          console.log(`距离上次检查仅 ${elapsed_hours.toFixed(1)} 小时，跳过自动检查`);
-          return;
-        }
-
-        console.log('开始自动检查更新...');
+        if (elapsedHours < interval) return;
         const updateInfo = await checkForUpdates();
         await updateLastCheckTime();
-
-        // 如果有更新，显示对话框
-        if (updateInfo.has_update) {
-          setAutoUpdateDialogOpen(true);
-        }
+        if (updateInfo.has_update) setAutoUpdateDialogOpen(true);
       } catch (error) {
         console.error('自动检查更新失败:', error);
       }
     };
-
-    // 延迟3秒后执行，避免影响应用启动速度
-    const timer = setTimeout(autoCheckUpdate, 3000);
-    return () => clearTimeout(timer);
+    const timer = window.setTimeout(() => void autoCheckUpdate(), 3000);
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {/* 侧边栏 */}
-      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-
-      {/* 主内容区 */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* 页面内容 */}
-        <main className="flex-1 min-h-0 overflow-y-auto p-8">
+    <div className="flex h-screen min-h-0 overflow-hidden bg-background">
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        mobileOpen={mobileOpen}
+        onToggle={() => setSidebarCollapsed((value) => !value)}
+        onClose={() => setMobileOpen(false)}
+      />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-4 md:hidden">
+          <button type="button" onClick={() => setMobileOpen(true)} aria-label="打开导航菜单" className="rounded-lg p-2 text-foreground hover:bg-accent">
+            <Menu className="h-5 w-5" />
+          </button>
+          <span className="text-sm font-semibold text-foreground-emphasis">Liao Tools</span>
+          <button type="button" onClick={() => window.dispatchEvent(new Event('liao:open-command'))} aria-label="搜索工具" className="rounded-lg p-2 text-foreground hover:bg-accent">
+            <Search className="h-5 w-5" />
+          </button>
+        </header>
+        <main id="main-content" className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>
-
-      {/* 自动检查更新对话框 */}
-      <UpdateDialog
-        open={autoUpdateDialogOpen}
-        onOpenChange={setAutoUpdateDialogOpen}
-        autoCheck={true}
-      />
+      <GlobalCommand />
+      <UpdateDialog open={autoUpdateDialogOpen} onOpenChange={setAutoUpdateDialogOpen} autoCheck={true} />
     </div>
   );
 }
