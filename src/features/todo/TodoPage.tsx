@@ -71,17 +71,14 @@ export function TodoPage() {
   }, []);
 
   const handleAddTask = async () => {
-    if (!newTaskTitle.trim()) return;
-    await addTask(newTaskTitle.trim(), newTaskPriority);
-    setNewTaskTitle('');
-    setNewTaskPriority('medium');
-  };
-
-  const cycleFilter = (direction: 1 | -1) => {
-    const filterOrder: Array<typeof filter> = ['pending', 'completed', 'all'];
-    const currentIndex = filterOrder.indexOf(filter);
-    const nextIndex = (currentIndex + direction + filterOrder.length) % filterOrder.length;
-    setFilter(filterOrder[nextIndex]);
+    if (!newTaskTitle.trim() || isLoading) return;
+    try {
+      await addTask(newTaskTitle.trim(), newTaskPriority);
+      setNewTaskTitle('');
+      setNewTaskPriority('medium');
+    } catch {
+      // The store exposes the real save error. Keep the typed title for retry.
+    }
   };
 
   const filteredTasks = getFilteredTasks();
@@ -117,14 +114,10 @@ export function TodoPage() {
       target instanceof HTMLTextAreaElement ||
       target instanceof HTMLSelectElement ||
       target?.isContentEditable;
+    const isInteractive = !!target?.closest('button, a, [role="dialog"], [role="combobox"], [contenteditable="true"]');
 
-    if (showSettings) return;
-
-    if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-      event.preventDefault();
-      cycleFilter(event.shiftKey ? -1 : 1);
-      return;
-    }
+    // Never hijack native Tab focus navigation or controls in modal dialogs.
+    if (showSettings || isInteractive || event.ctrlKey || event.metaKey || event.altKey) return;
 
     if (
       (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
@@ -135,8 +128,7 @@ export function TodoPage() {
       if (isTextInput && target === inputRef.current && newTaskTitle.trim()) return;
       if (isTextInput && target !== inputRef.current) return;
 
-      event.preventDefault();
-      cycleFilter(event.key === 'ArrowRight' ? 1 : -1);
+      // Left/right belong to the focused control or browser, not a global filter override.
       return;
     }
 
@@ -193,7 +185,7 @@ export function TodoPage() {
   }, [activeTaskId, filter, newTaskTitle, showSettings, visibleTasks]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card shadow-sm">
+    <div className="mx-auto flex h-full min-h-[540px] w-full max-w-5xl flex-col rounded-2xl border border-border bg-card shadow-none">
       <div className="border-b border-border p-4">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -201,7 +193,7 @@ export function TodoPage() {
               <CheckCircle2 className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">Todo List</h1>
+              <h1 className="text-xl font-semibold text-foreground-emphasis">Todo 清单</h1>
               <p className="text-sm text-muted-foreground">
                 {pendingCount} 待办 · {completedCount} 已完成
               </p>
@@ -225,25 +217,26 @@ export function TodoPage() {
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             ref={inputRef}
             type="text"
             value={newTaskTitle}
             onChange={(event) => setNewTaskTitle(event.target.value)}
             placeholder="添加新任务..."
-            className="flex-1 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+            className="min-w-[160px] flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           />
           <select
             value={newTaskPriority}
             onChange={(event) => setNewTaskPriority(event.target.value as TodoPriority)}
-            className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+            aria-label="新任务优先级"
+            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
           >
             <option value="low">低</option>
             <option value="medium">中</option>
             <option value="high">高</option>
           </select>
-          <Button onClick={() => void handleAddTask()} disabled={!newTaskTitle.trim()}>
+          <Button onClick={() => void handleAddTask()} disabled={!newTaskTitle.trim() || isLoading} aria-label="添加任务">
             <Plus className="h-4 w-4" />
           </Button>
         </div>
@@ -260,6 +253,7 @@ export function TodoPage() {
             <button
               key={value}
               onClick={() => setFilter(value as 'all' | 'pending' | 'completed')}
+              aria-pressed={filter === value}
               className={`rounded-full px-3 py-1 text-sm transition-colors ${
                 filter === value
                   ? 'bg-primary text-primary-foreground'
@@ -279,6 +273,7 @@ export function TodoPage() {
             <p className="text-sm text-destructive">{error}</p>
             <button
               onClick={() => setError(null)}
+              aria-label="关闭错误提示"
               className="ml-auto text-destructive hover:text-destructive/80"
             >
               <X className="h-4 w-4" />
@@ -296,7 +291,7 @@ export function TodoPage() {
         ) : filteredTasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-4 py-16">
             <Circle className="mb-4 h-12 w-12 text-muted-foreground/50" />
-            <p className="text-muted-foreground">暂无任务</p>
+            <p className="text-muted-foreground">{filter === 'completed' ? '还没有已完成的任务' : filter === 'pending' ? '当前没有待办任务' : '暂无任务'}</p>
           </div>
         ) : (
           <div className="space-y-4 p-4">
@@ -419,7 +414,7 @@ function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
         className="w-1.5 self-stretch rounded-full"
         style={{ backgroundColor: isActive ? 'var(--primary)' : 'transparent' }}
       />
-      <button onClick={() => void toggleTask(task.id)} className="flex-shrink-0" disabled={isEditing}>
+      <button onClick={() => void toggleTask(task.id)} className="flex-shrink-0" disabled={isEditing} aria-label={task.status === 'completed' ? '标记未完成：' + task.title : '完成任务：' + task.title}>
         {task.status === 'completed' ? (
           <CheckCircle2 className="h-5 w-5" style={{ color: isActive ? 'var(--primary)' : 'var(--success-fg)' }} />
         ) : (
@@ -474,8 +469,8 @@ function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
         )}
         <div className="mt-1 flex items-center gap-2">
           {isActive && (
-            <span className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-primary-foreground">
-              ACTIVE
+            <span className="rounded bg-primary-subtle px-1.5 py-0.5 text-[10px] font-medium text-primary">
+              当前选择
             </span>
           )}
           <span
@@ -494,14 +489,14 @@ function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
         <>
           <button
             onClick={startEditing}
-            className="rounded p-1 text-muted-foreground opacity-0 transition-all group-hover:opacity-100 hover:bg-muted hover:text-foreground"
+            className="rounded p-1 text-muted-foreground opacity-100 transition-all hover:bg-muted hover:text-foreground md:opacity-40 md:group-hover:opacity-100 md:focus-visible:opacity-100"
             title="编辑任务"
           >
             <Pencil className="h-4 w-4" />
           </button>
           <button
             onClick={() => void deleteTask(task.id)}
-            className="rounded p-1 text-muted-foreground opacity-0 transition-all group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
+            className="rounded p-1 text-muted-foreground opacity-100 transition-all hover:bg-destructive/10 hover:text-destructive md:opacity-40 md:group-hover:opacity-100 md:focus-visible:opacity-100"
             title="删除任务"
           >
             <Trash2 className="h-4 w-4" />
