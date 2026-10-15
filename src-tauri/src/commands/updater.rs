@@ -116,7 +116,7 @@ fn platform_download_url(assets: &[GitHubAsset], os: &str, arch: &str) -> Option
     };
     for suffix in patterns {
         if let Some(asset) = assets.iter().find(|asset| {
-            asset.name.ends_with(suffix) && asset.size > 0 && !asset.browser_download_url.is_empty()
+            asset.name.ends_with(*suffix) && asset.size > 0 && !asset.browser_download_url.is_empty()
         }) {
             return Some(asset.browser_download_url.clone());
         }
