@@ -61,6 +61,7 @@ export interface DisplayTool {
   enabled: boolean;
   command?: string;
   executablePath?: string;
+  workingDirectory?: string;
   args?: string[];
   arguments?: string;
   hotkey?: string;
