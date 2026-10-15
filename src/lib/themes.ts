@@ -1,4 +1,4 @@
-export type AccentId = 'blue' | 'sky' | 'purple' | 'green' | 'rose' | 'slate' | 'clay';
+export type AccentId = 'terracotta' | 'blue' | 'sky' | 'purple' | 'green' | 'rose' | 'slate' | 'clay';
 
 export interface Theme {
   id: string;          // 沿用旧 id,保证持久化兼容
@@ -8,6 +8,7 @@ export interface Theme {
 }
 
 export const themes: Theme[] = [
+  { id: 'warm-coral', name: '暖陶橙 · PR3', description: '设计稿指定的暖陶橙主题', accent: 'terracotta' },
   { id: 'default-dark', name: '默认蓝', description: '经典的蓝色主题', accent: 'blue' },
   { id: 'blue-ocean', name: '蓝色海洋', description: '清新的海洋蓝', accent: 'sky' },
   { id: 'purple-night', name: '紫色夜晚', description: '神秘的紫罗兰', accent: 'purple' },
@@ -27,7 +28,7 @@ export const applyTheme = (theme: Theme) => {
 
 /**
  * 持久化迁移:旧版 Theme 含 colors 字段(HSL 三元组),按 id 映射为新结构。
- * 未知 id 回退 'default-dark'。
+ * 未知 id 回退首选的 PR3 暖陶橙。
  */
 export const migrateTheme = (stored: unknown): Theme => {
   if (stored && typeof stored === 'object' && 'id' in stored) {
@@ -41,6 +42,7 @@ export const migrateTheme = (stored: unknown): Theme => {
  * 每个值锚定到该 accent 在浅色模式下的 primary 色相家族,用于区分六个选项
  */
 export const ACCENT_PREVIEW: Record<AccentId, string> = {
+  terracotta: '#c65435',
   blue: '#2E7CF6',
   sky: '#1799C4',
   purple: '#8B5CF6',

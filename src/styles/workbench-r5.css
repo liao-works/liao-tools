@@ -1,0 +1,46 @@
+
+/* R5 high-fidelity workbench — vector editorial illustrations, intentional density */
+.lt-home--polished { gap:16px; }
+.lt-hero--editorial {min-height:292px;padding:34px 38px;background:linear-gradient(108deg,var(--card) 0%,#fff8f3 45%,#fbede2 100%);border-color:rgba(200,118,74,.18);}
+.dark .lt-hero--editorial {background:linear-gradient(108deg,var(--card),#302621);border-color:var(--border);}
+.lt-hero--editorial .lt-hero-copy {max-width:51%;z-index:1}
+.lt-hero--editorial h1 {font-size:clamp(28px,3vw,38px);letter-spacing:-.9px;line-height:1.32;white-space:normal;}
+.lt-hero--editorial h1 span {display:inline;color:var(--primary-fg)}
+.lt-hero--editorial p {font-size:13px;max-width:420px;line-height:1.85;}
+.lt-hero--editorial .lt-hero-art {width:57%;max-width:735px;height:105%;right:-1%;bottom:-6%;opacity:1;object-fit:contain}
+.lt-section-count,.lt-muted-caption{font-size:11px;color:var(--muted-foreground);white-space:nowrap}
+.lt-tools-grid--balanced{grid-template-columns:repeat(12,minmax(0,1fr));gap:11px}
+.lt-tools-grid--balanced .lt-tool-tile{grid-column:span 4;min-height:93px;padding:14px 16px}
+.lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4){grid-column:span 3;min-height:84px}
+.lt-tools-grid--balanced .lt-tool-icon{width:43px;height:43px}
+.lt-tools-grid--balanced .lt-tool-info strong{font-size:13px}
+.lt-tools-grid--balanced .lt-tool-info small{font-size:11px}
+.lt-home-panel{min-width:0}
+.lt-workflow-list,.lt-database-list{display:flex;flex-direction:column}
+.lt-workflow-item{display:flex;align-items:center;gap:12px;border-top:1px solid var(--border);padding:11px 2px;color:var(--foreground);min-height:66px}
+.lt-workflow-item>span:nth-child(2){min-width:0;flex:1}
+.lt-workflow-item strong{font-size:13px;font-weight:680;display:block}
+.lt-workflow-item small{font-size:11px;line-height:1.5;color:var(--muted-foreground);display:block;margin-top:3px}
+.lt-workflow-item>svg{color:var(--muted-foreground);flex:none}
+.lt-workflow-item:hover strong,.lt-workflow-item:hover>svg{color:var(--primary-fg)}
+.lt-workflow-glyph{width:35px;height:35px;background:var(--primary-subtle);border-radius:10px;color:var(--primary-fg);display:flex;align-items:center;justify-content:center;flex:none}
+.lt-data-indicator{font-size:10px;border-radius:8px;padding:5px 8px;white-space:nowrap}
+.lt-data-indicator--ready{background:var(--success-subtle);color:var(--success-subtle-fg)}
+.lt-data-indicator--loading{background:var(--info-subtle);color:var(--info-subtle-fg)}
+.lt-data-indicator--unavailable{background:var(--warning-subtle);color:var(--warning-subtle-fg)}
+.lt-home--polished .lt-database-row{padding:18px 0}
+.lt-home--polished .lt-data-hint{display:flex;gap:8px;align-items:flex-start}
+.lt-home--polished .lt-data-hint>svg{flex:none;margin-top:2px;color:var(--primary-fg)}
+@media(max-width:1200px){.lt-tools-grid--balanced .lt-tool-tile,.lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4){grid-column:span 6}.lt-hero--editorial .lt-hero-copy{max-width:56%}.lt-hero--editorial .lt-hero-art{width:55%}}
+@media(max-width:830px){.lt-hero--editorial .lt-hero-copy{max-width:66%}}
+@media(max-width:620px){.lt-tools-grid--balanced .lt-tool-tile,.lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4){grid-column:span 12;min-height:82px}.lt-hero--editorial{min-height:330px;padding:22px}.lt-hero--editorial .lt-hero-copy{max-width:100%}.lt-hero--editorial h1{font-size:27px;max-width:380px}.lt-hero--editorial p{max-width:350px}.lt-hero--editorial .lt-hero-art{width:70%;height:49%;right:-14%;bottom:-9%;opacity:.36}.lt-hero--editorial .lt-hero-actions{position:relative;z-index:2}.lt-section-count{display:none}}
+
+/* Purposeful heading wraps instead of splitting a Chinese phrase mid-word. */
+.lt-hero--editorial h1 .lt-hero-title-lead,
+.lt-hero--editorial h1 .lt-hero-title-middle{color:var(--foreground-emphasis)}
+.lt-hero--editorial h1 .lt-hero-title-emphasis{color:var(--primary-fg)}
+@media(max-width:620px){
+  .lt-hero--editorial h1 .lt-hero-title-lead{display:block}
+  .lt-hero--editorial h1 .lt-hero-title-middle,
+  .lt-hero--editorial h1 .lt-hero-title-emphasis{display:inline}
+}

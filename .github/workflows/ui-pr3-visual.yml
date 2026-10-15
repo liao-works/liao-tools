@@ -1,0 +1,64 @@
+name: PR3 design visual smoke
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'public/illustrations/**'
+      - '.github/workflows/ui-pr3-visual.yml'
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - name: Prepare browser
+        run: |
+          npm install --prefix /tmp/liao-playwright --no-package-lock --no-save playwright
+          /tmp/liao-playwright/node_modules/.bin/playwright install --with-deps chromium
+      - name: Launch UI preview
+        shell: bash
+        run: |
+          mkdir -p ui-screenshots
+          pnpm exec vite --host 127.0.0.1 --port 1420 > /tmp/liao-vite.log 2>&1 &
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:1420/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/liao-vite.log
+          exit 1
+      - name: Capture pages
+        shell: bash
+        run: |
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/ ui-screenshots/home-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/tax ui-screenshots/tariff-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/ ui-screenshots/home-compact.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/alta ui-screenshots/alta-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/alta?tab=batch ui-screenshots/alta-batch-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/excel ui-screenshots/excel-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/ups-dpd ui-screenshots/ups-dpd-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/revcal ui-screenshots/amazon-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/alta ui-screenshots/alta-compact.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/ups-dpd ui-screenshots/shipping-compact.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/updates ui-screenshots/updates-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "390,844" http://127.0.0.1:1420/updates ui-screenshots/updates-compact.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/settings ui-screenshots/settings-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/system-tools ui-screenshots/tools-desktop.png
+          /tmp/liao-playwright/node_modules/.bin/playwright screenshot --browser chromium --wait-for-timeout 1400 --viewport-size "1440,900" http://127.0.0.1:1420/todo ui-screenshots/todo-desktop.png
+      - name: Upload visual review images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: liao-pr3-design-screenshots
+          path: ui-screenshots/*.png
+          if-no-files-found: warn
+          retention-days: 14

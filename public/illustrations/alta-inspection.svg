@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 530 270" fill="none">
+<defs><linearGradient id="base" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFEFC"/><stop offset="1" stop-color="#FAEFE6"/></linearGradient><linearGradient id="coral" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#EEA078"/><stop offset="1" stop-color="#C35838"/></linearGradient><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#A97051" flood-opacity=".17"/></filter></defs><circle cx="340" cy="135" r="112" fill="#F7E2D3" opacity=".75"/><circle cx="340" cy="135" r="85" stroke="#E6B7A0" stroke-dasharray="3 7" opacity=".6"/>
+<g filter="url(#shadow)" transform="translate(130 30) rotate(-7 118 108)">
+<rect x="4" y="4" width="210" height="222" rx="16" fill="#D49C7D" opacity=".26"/>
+<rect width="210" height="222" rx="16" fill="url(#base)" stroke="#F0D9CC" stroke-width="2"/>
+<rect x="19" y="20" width="64" height="19" rx="5" fill="#FAE5D6"/><text x="30" y="33" font-size="10" font-family="sans-serif" font-weight="700" fill="#A25B3F">ALTA · HS</text>
+<path d="M22 59h155M22 83h140M22 107h156M22 132h113" stroke="#E6CCBB" stroke-width="8" stroke-linecap="round"/>
+<rect x="22" y="166" width="159" height="36" rx="9" fill="#F6E6DC"/>
+<path d="m41 179 7 7 10-14" stroke="#A76F4C" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M78 184h81" stroke="#CFA88D" stroke-width="6" stroke-linecap="round"/>
+</g>
+<g filter="url(#shadow)" transform="translate(315 55)">
+<path d="M66 0 132 24v64c0 48-28 78-66 102C28 166 0 136 0 88V24Z" fill="url(#coral)" stroke="#AB5236" stroke-width="3"/>
+<path d="M66 21 111 38v49c0 34-18 57-45 76-27-19-45-42-45-76V38Z" fill="#FFEADD" opacity=".8"/>
+<path d="M44 82h43M66 60v44" stroke="#BF5A3B" stroke-width="9" stroke-linecap="round"/>
+</g>
+<circle cx="449" cy="178" r="31" fill="#FFE7D8" stroke="#A95740" stroke-width="9"/>
+<path d="m468 202 31 32" stroke="#B65A3E" stroke-width="11" stroke-linecap="round"/>
+</svg>

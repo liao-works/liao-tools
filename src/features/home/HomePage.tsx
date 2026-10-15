@@ -1,95 +1,114 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Command, Search } from 'lucide-react';
-import { findTools, navGroups } from '@/components/layout/navigation';
+import { useEffect, useState } from 'react';
+import {
+  ArrowRight, Search, ShieldCheck, Boxes, FileSpreadsheet, Package,
+  Wrench, CheckCheck, Database, Clock3, ArrowUpRight, BookOpen, Info,
+} from 'lucide-react';
+import { taxApi } from '@/lib/api/tax';
+import { altaApi } from '@/lib/api/alta';
+
+const tools = [
+  { name: '关税查询', text: '查询 GB / NI 税率与来源状态', to: '/tax', icon: Search, accent: 'orange' },
+  { name: 'Alta 禁运查询', text: '查看限制条目及适用例外', to: '/alta', icon: ShieldCheck, accent: 'blue' },
+  { name: 'Amazon 商品查询', text: '商品价格、尺寸与重量信息', to: '/revcal', icon: Boxes, accent: 'blue' },
+  { name: 'Excel 数据拆分', text: '海铁、空运表格处理', to: '/excel', icon: FileSpreadsheet, accent: 'green' },
+  { name: 'UPS / DPD', text: '物流数据与模板填充', to: '/ups-dpd', icon: Package, accent: 'amber' },
+  { name: '系统工具', text: '快速启动常用应用', to: '/system-tools', icon: Wrench, accent: 'green' },
+  { name: 'Todo 清单', text: '记录与整理待办任务', to: '/todo', icon: CheckCheck, accent: 'amber' },
+];
+
+type Snapshot = { kind: 'loading' | 'ready' | 'unavailable'; label: string };
 
 export function HomePage() {
-  const [query, setQuery] = useState('');
-  const results = findTools(query);
-  const isSearching = query.trim().length > 0;
+  const [tax, setTax] = useState<Snapshot>({ kind: 'loading', label: '正在读取本地数据…' });
+  const [alta, setAlta] = useState<Snapshot>({ kind: 'loading', label: '正在读取本地数据…' });
 
-  return (
-    <div className="mx-auto w-full max-w-6xl space-y-8 pb-12">
-      <section className="pt-2 md:pt-8">
-        <div className="mb-3 text-xs font-medium tracking-[0.14em] text-muted-foreground">LIAO TOOLS · 工作空间</div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground-emphasis md:text-3xl">今天要处理什么？</h1>
-        <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-          选择一个工具开始工作。查询结果、文件输出与操作状态均由对应工具管理。
-        </p>
-        <label className="mt-6 flex min-h-12 max-w-2xl items-center gap-3 rounded-xl border border-input bg-card px-4 shadow-xs transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
-          <Search aria-hidden="true" className="h-5 w-5 shrink-0 text-muted-foreground" />
-          <span className="sr-only">搜索工具</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索关税、Alta、DPD、海铁、ASIN..."
-            className="min-w-0 flex-1 bg-transparent py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground"
-          />
-          <span className="hidden items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground sm:inline-flex">
-            <Command className="h-3 w-3" /> K
-          </span>
-        </label>
-        <p className="mt-2 text-xs text-muted-foreground">使用 Ctrl / ⌘ + K，可在任意工具页面搜索并跳转。</p>
+  useEffect(() => {
+    let alive = true;
+    void taxApi.getLocalVersion()
+      .then(info => { if (alive) setTax(info.records > 0
+        ? { kind: 'ready', label: `${info.records.toLocaleString()} 条 · ${info.version}` }
+        : { kind: 'unavailable', label: '尚未安装关税数据' }); })
+      .catch(() => { if (alive) setTax({ kind: 'unavailable', label: '本地数据暂不可读取' }); });
+    void altaApi.getDatabaseInfo()
+      .then(info => { if (alive) setAlta(info.total_items > 0
+        ? { kind: 'ready', label: `${info.total_items.toLocaleString()} 条禁运条目` }
+        : { kind: 'unavailable', label: '禁运数据库为空' }); })
+      .catch(() => { if (alive) setAlta({ kind: 'unavailable', label: '本地数据暂不可读取' }); });
+    return () => { alive = false; };
+  }, []);
+
+  return <div className="lt-home lt-home--polished">
+    <section className="lt-hero lt-hero--editorial" aria-labelledby="welcome-title">
+      <div className="lt-hero-copy">
+        <span className="lt-kicker">WELCOME TO LIAO TOOLS</span>
+        <h1 id="welcome-title"><span className="lt-hero-title-lead">让跨境贸易</span><span className="lt-hero-title-middle">数据处理</span><span className="lt-hero-title-emphasis">更简单</span></h1>
+        <p>从关税查询到 Excel 数据处理，从商品信息到物流核对。让常用工具更顺手，专注完成当前工作。</p>
+        <div className="lt-hero-actions">
+          <Link className="lt-primary-link" to="/tax"><Search size={17}/> 开始查询 <ArrowRight size={16}/></Link>
+          <Link className="lt-secondary-link" to="/excel"><BookOpen size={17}/> 处理 Excel</Link>
+        </div>
+      </div>
+      <img className="lt-hero-art" src="/illustrations/trade-hero.svg"
+        alt="集装箱、海关单据和关税检索放大镜的原创插画"/>
+    </section>
+
+    <section className="lt-home-section" aria-labelledby="tools-title">
+      <div className="lt-section-heading">
+        <div><h2 id="tools-title">快速开始 · 常用工具</h2><p>选择一个工具，直接进入工作流程</p></div>
+        <span className="lt-section-count">7 个核心工具</span>
+      </div>
+      <div className="lt-tools-grid lt-tools-grid--balanced">
+        {tools.map(({ name, text, to, icon: Icon, accent }) =>
+          <Link key={to} to={to} className="lt-tool-tile">
+            <span className={`lt-tool-icon lt-tool-icon--${accent}`}><Icon size={22} strokeWidth={1.85}/></span>
+            <span className="lt-tool-info"><strong>{name}</strong><small>{text}</small></span>
+            <ArrowRight size={16} className="lt-tool-arrow" aria-hidden="true"/>
+          </Link>)}
+      </div>
+    </section>
+
+    <div className="lt-home-bottom">
+      <section className="lt-home-panel">
+        <div className="lt-panel-heading"><div><Clock3 size={18}/><h2>常用操作</h2></div><span className="lt-muted-caption">按任务快速开始</span></div>
+        <div className="lt-workflow-list">
+          <Link to="/tax?tab=batch" className="lt-workflow-item">
+            <span className="lt-workflow-glyph"><FileSpreadsheet size={18}/></span>
+            <span><strong>批量税率查询</strong><small>导入 Excel，生成包含状态的查询结果</small></span>
+            <ArrowUpRight size={16}/>
+          </Link>
+          <Link to="/ups-dpd" className="lt-workflow-item">
+            <span className="lt-workflow-glyph"><Package size={18}/></span>
+            <span><strong>处理物流总结单</strong><small>选择 UPS / DPD 模板及源文件</small></span>
+            <ArrowUpRight size={16}/>
+          </Link>
+          <Link to="/alta?tab=batch" className="lt-workflow-item">
+            <span className="lt-workflow-glyph"><ShieldCheck size={18}/></span>
+            <span><strong>批量禁运筛查</strong><small>检查编码命中及限制条目</small></span>
+            <ArrowUpRight size={16}/>
+          </Link>
+        </div>
       </section>
-
-      {isSearching ? (
-        <section aria-live="polite" aria-label="工具搜索结果">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-foreground">搜索结果</h2>
-            <span className="text-xs text-muted-foreground">{results.length} 个工具</span>
+      <section className="lt-home-panel">
+        <div className="lt-panel-heading"><div><Database size={18}/><h2>本地数据</h2></div>
+          <Link to="/tax?tab=update">数据维护 <ArrowRight size={15}/></Link>
+        </div>
+        <div className="lt-database-list">
+          <div className="lt-database-row">
+            <span className="lt-database-icon"><Database size={20}/></span>
+            <div><strong>英国 / 北爱关税库</strong><p>{tax.label}</p></div>
+            <span className={`lt-data-indicator lt-data-indicator--${tax.kind}`}>{tax.kind === 'ready' ? '本地可用' : tax.kind === 'loading' ? '读取中' : '需检查'}</span>
           </div>
-          {results.length ? (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {results.map((item) => <ToolCard key={item.href} item={item} />)}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center">
-              <p className="font-medium">没有找到匹配的工具</p>
-              <p className="mt-1 text-sm text-muted-foreground">可尝试“关税”、“Excel”、“Amazon”等关键词。</p>
-              <button type="button" className="mt-4 text-sm font-medium text-primary hover:underline" onClick={() => setQuery('')}>查看全部工具</button>
-            </div>
-          )}
-        </section>
-      ) : (
-        <div className="space-y-8">
-          {navGroups.filter((group) => group.title !== '工作空间').map((group) => (
-            <section key={group.title} aria-label={group.title}>
-              <div className="mb-3 flex items-center gap-3">
-                <h2 className="text-sm font-semibold text-foreground-emphasis">{group.title}</h2>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {group.items.map((item) => <ToolCard key={item.href} item={item} />)}
-              </div>
-            </section>
-          ))}
-          <p className="border-t border-border pt-5 text-xs leading-5 text-muted-foreground">
-            数据状态和更新历史可从「数据维护」统一进入；查询与文件处理结果仍由对应工具管理。
-          </p>
+          <div className="lt-database-row">
+            <span className="lt-database-icon"><ShieldCheck size={20}/></span>
+            <div><strong>Alta 禁运数据库</strong><p>{alta.label}</p></div>
+            <span className={`lt-data-indicator lt-data-indicator--${alta.kind}`}>{alta.kind === 'ready' ? '本地可用' : alta.kind === 'loading' ? '读取中' : '需检查'}</span>
+          </div>
         </div>
-      )}
+        <div className="lt-data-hint"><Info size={15} aria-hidden="true"/>
+          <span>数据可用不代表已经完成最新法规核验。涉及实际申报时，请检查查询结果的来源与状态。</span>
+        </div>
+      </section>
     </div>
-  );
-}
-
-function ToolCard({ item }: { item: ReturnType<typeof findTools>[number] }) {
-  const Icon = item.icon;
-  return (
-    <Link
-      to={item.href}
-      className="group flex min-h-28 items-start gap-4 rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-    >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-subtle text-primary">
-        <Icon aria-hidden="true" className="h-5 w-5" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2 text-sm font-semibold text-foreground-emphasis">
-          <span>{item.title}</span>
-          <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
-        </div>
-        <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{item.description}</p>
-      </div>
-    </Link>
-  );
+  </div>;
 }

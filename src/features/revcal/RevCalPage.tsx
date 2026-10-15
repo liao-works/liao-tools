@@ -1,5 +1,6 @@
+import { FeatureHeader } from '@/components/layout/FeatureHeader';
 import { useState } from 'react';
-import { AlertCircle, Calculator, Download, ExternalLink, FileSpreadsheet, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { Calculator, Download, FileSpreadsheet, Loader2, Plus, Search, Trash2, ExternalLink, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { revCalApi } from '@/lib/api/revcal';
 import { openFileWithShell } from '@/lib/file-opener';
 import { open, save } from '@tauri-apps/plugin-dialog';
@@ -47,12 +49,9 @@ const COUNTRY_OPTIONS = [
   { value: 'IE' },
 ];
 
-/** 官方国旗图标（Amazon 官方 CDN，小写国家码） */
-const flagUrl = (cc: string) => `https://d1uznvntk80v7s.cloudfront.net/flags/${cc.toLowerCase()}.svg`;
-
 function formatPrice(p: RevCalProduct): string {
   if (p.price == null) return '—';
-  return p.currency ? `${p.price} ${p.currency}` : String(p.price);
+  return String(p.price);
 }
 
 function ProductImage({ url }: { url: string | null }) {
@@ -82,37 +81,31 @@ export function RevCalPage() {
   const [batchRunning, setBatchRunning] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, code: '', status: '' });
   const [results, setResults] = useState<RevCalQueryResult[]>([]);
-  const [resultsCountry, setResultsCountry] = useState<string | null>(null);
-  const [queryError, setQueryError] = useState<string | null>(null);
-  const [exportPath, setExportPath] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [filterText, setFilterText] = useState('');
   const [onlyFailed, setOnlyFailed] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<RevCalProduct | null>(null);
   const [sortKey, setSortKey] = useState<'code' | 'price' | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const { toast } = useToast();
 
   const handleSingleSearch = async () => {
-    if (querying || batchRunning) return;
     const keywords = singleCode.trim();
     if (!keywords) {
       toast({ title: '请输入查询码', variant: 'destructive' });
       return;
     }
     setQuerying(true);
-    setQueryError(null);
-    setExportPath(null);
+    setFilterText('');
+    setOnlyFailed(false);
     try {
       const products = await revCalApi.search(keywords, countryCode);
       setResults([{ code: keywords, products, error: null }]);
-      setResultsCountry(countryCode);
       if (products.length === 0) {
         toast({ title: '未找到商品', description: keywords });
       }
     } catch (error) {
       setResults([{ code: keywords, products: [], error: String(error) }]);
-      setResultsCountry(countryCode);
-      setQueryError(String(error));
       toast({ title: '查询失败', description: String(error), variant: 'destructive' });
     } finally {
       setQuerying(false);
@@ -144,7 +137,6 @@ export function RevCalPage() {
   };
 
   const handleBatchSearch = async () => {
-    if (querying || batchRunning) return;
     const raw = batchCodes
       .split('\n')
       .map((c) => c.trim())
@@ -156,22 +148,20 @@ export function RevCalPage() {
       return;
     }
     setBatchRunning(true);
-    setQueryError(null);
-    setExportPath(null);
+    setFilterText('');
+    setOnlyFailed(false);
     setProgress({ current: 0, total: codes.length, code: '', status: '' });
     try {
       const result = await revCalApi.batchSearch(codes, countryCode, (p) => {
         setProgress({ current: p.current, total: p.total, code: p.code, status: p.status });
       });
       setResults(result.results);
-      setResultsCountry(countryCode);
       const dupNote = raw.length > codes.length ? `（已去除 ${raw.length - codes.length} 个重复）` : '';
       toast({
         title: '批量查询完成',
         description: `成功 ${result.success} 条，未找到/失败 ${result.failed} 条${dupNote}`,
       });
     } catch (error) {
-      setQueryError(String(error));
       toast({ title: '批量查询失败', description: String(error), variant: 'destructive' });
     } finally {
       setBatchRunning(false);
@@ -194,38 +184,17 @@ export function RevCalPage() {
           ''
         );
       const path = await save({
-        defaultPath: `收益计算器结果_${countryCode}_${ts}.xlsx`,
+        defaultPath: `Amazon商品查询_${countryCode}_${ts}.xlsx`,
         filters: [{ name: 'Excel', extensions: ['xlsx'] }],
       });
       if (!path) return;
       const savedPath = await revCalApi.exportExcel(results, path, splitDimensions);
-      setExportPath(savedPath);
       toast({ title: '导出成功', description: savedPath });
+      await openFileWithShell(savedPath);
     } catch (error) {
       toast({ title: '导出失败', description: String(error), variant: 'destructive' });
     } finally {
       setExporting(false);
-    }
-  };
-
-  const handleCountryChange = (next: string) => {
-    if (querying || batchRunning || exporting) return;
-    if (next === countryCode) return;
-    setCountryCode(next);
-    // Results from one marketplace must never be shown as data from another.
-    setResults([]);
-    setResultsCountry(null);
-    setExportPath(null);
-    setQueryError(null);
-    setProgress({ current: 0, total: 0, code: '', status: '' });
-  };
-
-  const handleOpenExport = async () => {
-    if (!exportPath) return;
-    try {
-      await openFileWithShell(exportPath);
-    } catch (error) {
-      toast({ title: '无法打开导出文件', description: String(error), variant: 'destructive' });
     }
   };
 
@@ -290,38 +259,29 @@ export function RevCalPage() {
     sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
 
   const foundCount = results.filter((r) => r.products.length > 0).length;
-  const failedCount = results.filter((r) => r.error).length;
-  const emptyCount = results.filter((r) => !r.error && r.products.length === 0).length;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 pb-10">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground-emphasis md:text-3xl">Amazon 商品查询</h1>
-        <p className="text-muted-foreground">
-          查询 Amazon 商品尺寸、重量与价格。支持单码、批量和 Excel 导出；仅展示实际接口返回的数据。
-        </p>
-      </div>
+    <div className="lt-feature space-y-6">
+      <FeatureHeader eyebrow="PRODUCT / AMAZON" title="Amazon 商品查询" description="查询商品尺寸、重量、价格与商品信息。支持单码、多站点和 Excel 批量导出；结果来自第三方公开接口。" illustrationSrc="/illustrations/product-lookup.svg"/>
 
-      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-card p-4">
-        <span className="text-sm font-semibold">Amazon 站点</span>
-        <Select value={countryCode} onValueChange={handleCountryChange} disabled={batchRunning || querying || exporting}>
-          <SelectTrigger className="w-[152px]" aria-label="Amazon 站点"><SelectValue /></SelectTrigger>
+      <div className="lt-product-toolbar">
+        <div><span className="lt-step-index">01</span>
+          <div><strong>选择 Amazon 查询站点</strong><small>切换站点时会清空当前结果，避免混用不同国家的数据</small></div>
+        </div>
+        <Select value={countryCode} disabled={batchRunning || querying} onValueChange={value => {
+          setCountryCode(value);setResults([]);setFilterText('');setOnlyFailed(false);setSelectedProduct(null);
+          setProgress({current:0,total:0,code:'',status:''});
+        }}>
+          <SelectTrigger className="lt-product-country"><SelectValue placeholder="选择 Amazon 站点"/></SelectTrigger>
           <SelectContent className="max-h-[280px]">
-            {COUNTRY_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                <span className="flex items-center gap-2">
-                  <img src={flagUrl(opt.value)} alt="" aria-hidden="true" className="h-3.5 w-5 rounded-sm object-cover"
-                    onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }} />
-                  {opt.value}
-                </span>
-              </SelectItem>
-            ))}
+            {COUNTRY_OPTIONS.map(option => <SelectItem key={option.value} value={option.value}>
+              Amazon {option.value}
+            </SelectItem>)}
           </SelectContent>
         </Select>
-        <span className="text-xs text-muted-foreground">切换站点会清除旧站点的查询结果，避免误用跨站点价格。</span>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="lt-product-search-grid">
         {/* 单码查询 */}
         <Card>
           <CardHeader>
@@ -337,12 +297,11 @@ export function RevCalPage() {
                 placeholder="例如：B0GD7VRN9V"
                 value={singleCode}
                 onChange={(e) => setSingleCode(e.target.value)}
-                disabled={querying || batchRunning}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !querying && !batchRunning) void handleSingleSearch();
+                  if (e.key === 'Enter' && !querying) void handleSingleSearch();
                 }}
               />
-              <Button onClick={() => void handleSingleSearch()} disabled={querying || batchRunning || !singleCode.trim()}>
+              <Button onClick={() => void handleSingleSearch()} disabled={querying || batchRunning}>
                 {querying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 查询
               </Button>
@@ -365,7 +324,7 @@ export function RevCalPage() {
               placeholder={'B0GD7VRN9V\nB09B9615X2\n…'}
               value={batchCodes}
               onChange={(e) => setBatchCodes(e.target.value)}
-              disabled={batchRunning || querying}
+              disabled={batchRunning}
             />
             {batchRunning && progress.total > 0 && (
               <div className="space-y-1">
@@ -381,7 +340,7 @@ export function RevCalPage() {
                 <FileSpreadsheet className="h-4 w-4" />
                 上传 Excel
               </Button>
-              <Button onClick={() => void handleBatchSearch()} disabled={batchRunning || querying || !batchCodes.trim()}>
+              <Button onClick={() => void handleBatchSearch()} disabled={batchRunning || querying}>
                 {batchRunning && <Loader2 className="h-4 w-4 animate-spin" />}
                 开始批量查询
               </Button>
@@ -390,50 +349,35 @@ export function RevCalPage() {
         </Card>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <label htmlFor="split-dimensions" className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-          <Checkbox id="split-dimensions" checked={splitDimensions} onCheckedChange={(value) => setSplitDimensions(value === true)} />
-          将长 / 宽 / 高 / 重量分列显示与导出
+      <div className="lt-product-result-options">
+        <div><SlidersHorizontal size={17}/><strong>结果展示与导出</strong></div>
+        <label htmlFor="split-dimensions" className="lt-product-checkbox">
+          <Checkbox id="split-dimensions" checked={splitDimensions}
+            onCheckedChange={value => setSplitDimensions(value === true)}/>
+          分列展示和导出长 / 宽 / 高 / 重量
         </label>
-        {(querying || batchRunning) && <span role="status" className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />正在查询 {countryCode} 站点</span>}
       </div>
 
-      {queryError && (
-        <div role="alert" className="flex items-start gap-2 rounded-xl border border-danger bg-danger-subtle p-4 text-sm text-danger-fg">
-          <AlertCircle className="h-4 w-4 shrink-0" />{queryError}
-        </div>
-      )}
-
-      {exportPath && (
-        <div role="status" className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-4">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Excel 文件已导出</p>
-            <p className="mt-1 break-all text-xs text-muted-foreground">{exportPath}</p>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => void handleOpenExport()}><ExternalLink className="h-4 w-4" /> 打开导出文件</Button>
-        </div>
-      )}
-
       {/* 结果表 */}
-      <Card>
+      <Card className="lt-product-results">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
             <CardTitle className="text-base">查询结果</CardTitle>
             <CardDescription>
-              {resultsCountry || countryCode} 站点 · {results.length} 条查询 · 命中 {foundCount} · 未找到 {emptyCount} · 失败 {failedCount}
+              {results.length === 0 ? '结果将显示在这里' : `已查询 ${results.length} 个编码，${foundCount} 个编码找到商品`}
             </CardDescription>
           </div>
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { setResults([]); setResultsCountry(null); setExportPath(null); setQueryError(null); }}
-              disabled={results.length === 0 || querying || batchRunning}
+              onClick={() => {setResults([]);setSelectedProduct(null);setFilterText('');setOnlyFailed(false);}}
+              disabled={results.length === 0}
             >
               <Trash2 className="h-4 w-4" />
               清空
             </Button>
-            <Button size="sm" onClick={() => void handleExport()} disabled={exporting || querying || batchRunning || results.length === 0}>
+            <Button size="sm" onClick={() => void handleExport()} disabled={exporting || results.length === 0}>
               {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               导出 Excel
             </Button>
@@ -441,11 +385,19 @@ export function RevCalPage() {
         </CardHeader>
         <CardContent>
           {rows.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              暂无查询结果，请先在上方查询单码或批量编码
-            </p>
+            <div className="lt-product-empty">
+              <img src="/illustrations/product-lookup.svg" alt="" aria-hidden="true"/>
+              <strong>暂无商品查询结果</strong>
+              <p>选择 Amazon 站点，输入 ASIN / UPC / EAN / ISBN 或关键词，或导入 Excel 批量查询。</p>
+            </div>
           ) : (
-            <>
+            <> 
+              <div className="lt-product-stats">
+                <div><small>查询编码</small><strong>{results.length}</strong></div>
+                <div><small>命中编码</small><strong>{foundCount}</strong></div>
+                <div><small>未找到或失败</small><strong>{results.length - foundCount}</strong></div>
+                <div><small>商品结果</small><strong>{rows.filter(row => row.product).length}</strong></div>
+              </div>
               {/* 筛选工具栏 */}
               <div className="mb-3 flex flex-wrap items-center gap-3">
                 <Input
@@ -498,6 +450,7 @@ export function RevCalPage() {
                       Prix{sortIndicator('price')}
                     </TableHead>
                     <TableHead className="whitespace-nowrap">错误信息</TableHead>
+                     <TableHead className="text-right whitespace-nowrap">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -523,15 +476,15 @@ export function RevCalPage() {
                       </TableCell>
                       <TableCell className="whitespace-nowrap font-mono text-xs">
                         {row.product ? (
-                          row.product.product_link ? <a
-                            href={row.product.product_link}
+                          <a
+                            href={row.product.product_link ?? '#'}
                             target="_blank"
                             rel="noreferrer"
                             title="在 Amazon 打开商品页面"
                             className="text-foreground underline-offset-2 hover:text-primary hover:underline"
                           >
                             {row.product.asin}
-                          </a> : <span>{row.product.asin}</span>
+                          </a>
                         ) : (
                           '—'
                         )}
@@ -568,6 +521,9 @@ export function RevCalPage() {
                       >
                         {row.error ?? '—'}
                       </TableCell>
+                      <TableCell className="text-right">{row.product &&
+                        <Button variant="outline" size="sm" onClick={() => setSelectedProduct(row.product)}>详情</Button>}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -578,6 +534,34 @@ export function RevCalPage() {
           )}
         </CardContent>
       </Card>
+      <Dialog open={selectedProduct != null} onOpenChange={isOpen => {if(!isOpen)setSelectedProduct(null);}}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[590px]">
+          <DialogHeader>
+            <DialogTitle>商品信息详情</DialogTitle>
+            <DialogDescription>来自当前 Amazon 站点查询结果，价格和详情请以来源页面为准。</DialogDescription>
+          </DialogHeader>
+          {selectedProduct && <div className="lt-product-detail">
+            <div className="lt-product-detail-hero">
+              <div className="lt-product-detail-image"><ProductImage url={selectedProduct.image_url}/></div>
+              <div><h3>{selectedProduct.title || '未提供商品名称'}</h3>
+                <p>ASIN · {selectedProduct.asin}</p>
+                <p>品牌 · {selectedProduct.brand || '未提供'}</p>
+                {selectedProduct.product_link && <a href={selectedProduct.product_link} target="_blank" rel="noreferrer">
+                  在 Amazon 查看 <ExternalLink size={14}/></a>}
+              </div>
+            </div>
+            <dl>
+              <div><dt>价格</dt><dd>{formatPrice(selectedProduct)} {selectedProduct.currency || ''}</dd></div>
+              <div><dt>尺寸</dt><dd>{selectedProduct.dimensions_official || '未提供'}</dd></div>
+              <div><dt>重量</dt><dd>{selectedProduct.weight ?? '未提供'} {selectedProduct.weight_unit || ''}</dd></div>
+              <div><dt>类目</dt><dd>{selectedProduct.fee_category || '未提供'}</dd></div>
+              <div><dt>销售排名</dt><dd>{selectedProduct.sales_rank ?? '未提供'} {selectedProduct.sales_rank_context || ''}</dd></div>
+              <div><dt>评论数</dt><dd>{selectedProduct.reviews_count ?? '未提供'}</dd></div>
+              <div><dt>评分</dt><dd>{selectedProduct.rating || '未提供'}</dd></div>
+            </dl>
+          </div>}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

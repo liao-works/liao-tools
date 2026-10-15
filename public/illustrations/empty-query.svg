@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 260" fill="none"><defs><filter id="s" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#97533E" flood-opacity=".13"/></filter></defs>
+<circle cx="244" cy="130" r="111" fill="#F8E9DE"/>
+<g filter="url(#s)" transform="translate(92 38) rotate(-7 110 93)"><rect width="210" height="180" rx="17" fill="#FFFBF8" stroke="#ECD4C2"/><rect x="25" y="28" width="77" height="10" rx="5" fill="#D8A992"/><rect x="25" y="59" width="159" height="7" rx="3" fill="#ECD7C9"/><rect x="25" y="79" width="139" height="7" rx="3" fill="#ECD7C9"/><rect x="25" y="99" width="154" height="7" rx="3" fill="#ECD7C9"/><path d="M25 128h156" stroke="#E9D9C9" stroke-width="2"/></g>
+<g filter="url(#s)"><circle cx="310" cy="165" r="44" stroke="#C65739" stroke-width="12" fill="#F9E5D6" fill-opacity=".55"/><path d="M343 198l42 42" stroke="#B15135" stroke-width="17" stroke-linecap="round"/></g>
+<path d="M95 225c47 15 89 13 136 0" stroke="#D8A98F" stroke-width="3" stroke-linecap="round" opacity=".7"/></svg>

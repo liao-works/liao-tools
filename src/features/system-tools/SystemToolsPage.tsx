@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { AlertCircle, Grid3x3, List, Loader2, Plus, RefreshCw, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { FeatureHeader } from '@/components/layout/FeatureHeader';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -201,12 +202,9 @@ export function SystemToolsPage() {
   });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 pb-10">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground-emphasis md:text-3xl">系统工具</h1>
-          <p className="mt-2 text-sm text-muted-foreground">启动系统程序、管理自己的工具和快捷键。</p>
-        </div>
+    <div className="lt-feature mx-auto max-w-6xl space-y-6 pb-10">
+      <FeatureHeader eyebrow="UTILITIES / LAUNCHER" title="系统工具" description="启动系统程序、管理自己的工具和快捷键。" illustrationSrc="/illustrations/tools-empty.svg" />
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="flex flex-wrap gap-2">
           <Button variant={viewMode === 'grid' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('grid')}><Grid3x3 className="h-4 w-4" />工具列表</Button>
           <Button variant={viewMode === 'manage' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('manage')}><List className="h-4 w-4" />管理工具</Button>
@@ -259,7 +257,8 @@ export function SystemToolsPage() {
                 ))}
               </div>
             ) : !loadError && (
-              <Card className="shadow-none"><CardContent className="py-10 text-center text-sm text-muted-foreground">
+              <Card className="shadow-none"><CardContent className="flex flex-col items-center gap-3 py-10 text-center text-sm text-muted-foreground">
+                <img src="/illustrations/tools-empty.svg" className="lt-tools-empty-art" alt="" aria-hidden="true" />
                 {tools.length ? '没有符合搜索条件的工具' : '目前没有可用工具'}
               </CardContent></Card>
             )
