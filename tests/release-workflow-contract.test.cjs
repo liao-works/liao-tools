@@ -34,7 +34,7 @@ test('publishing requires strictly increasing stable versions before and after b
   assert.equal((yml.match(/node scripts\/release-version-gate\.cjs/g) || []).length, 2);
   assert.match(yml, /group:\s*liao-tools-release-all-versions/);
   assert.match(yml, /gh api --paginate --slurp/);
-  assert(yml.indexOf('node scripts/release-version-gate.cjs') < yml.indexOf('uses: tauri-apps/tauri-action@v0'));
+  assert(yml.indexOf('node scripts/release-version-gate.cjs') < yml.indexOf('uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5'));
   assert(yml.lastIndexOf('node scripts/release-version-gate.cjs') < yml.indexOf('await github.rest.repos.updateRelease'));
 });
 
@@ -44,4 +44,9 @@ test('cryptographic verification is mandatory before draft release becomes publi
   assert.match(yml, /TAURI_UPDATER_PUBLIC_KEY:\s*\$\{\{ vars\.TAURI_UPDATER_PUBLIC_KEY \}\}/);
   assert(yml.indexOf('node scripts/verify-signed-release-cryptography.cjs') <
     yml.indexOf('await github.rest.repos.updateRelease'));
+});
+
+test('release build action is SHA-pinned to reviewed Tauri Action v0.6.2', () => {
+  assert.match(yml, /uses: tauri-apps\/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5/);
+  assert.doesNotMatch(yml, /uses: tauri-apps\/tauri-action@v0\b/);
 });
