@@ -1,118 +1,125 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { getVersion } from '@tauri-apps/api/app';
+import { AlertCircle, Check, Database, Download, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Github, Mail, Globe, Check, Download } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { getVersion } from '@tauri-apps/api/app';
 import { useTheme } from '@/hooks/use-theme';
 import { useDarkMode, type DarkModeType } from '@/hooks/use-dark-mode';
-import { cn } from '@/lib/utils';
 import { ACCENT_PREVIEW } from '@/lib/themes';
+import { cn } from '@/lib/utils';
 import { UpdateDialog } from '@/components/UpdateDialog';
-import { loadSettings, saveSettings, type AppSettings } from '@/lib/settings';
+import { loadUpdateSettings, saveUpdateSettings, type UpdateSettings } from '@/lib/updater';
+import { openUrlPath } from '@/lib/file-opener';
 import logo from '@/assets/logo-64.png';
 
+const appearanceOptions: { value: DarkModeType; label: string }[] = [
+  { value: 'system', label: '跟随系统' },
+  { value: 'light', label: '浅色' },
+  { value: 'dark', label: '深色' },
+];
+
 export function SettingsPage() {
-  const [settings, setSettings] = useState<AppSettings>(loadSettings);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
-  const [appVersion, setAppVersion] = useState<string>('');
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  const [versionError, setVersionError] = useState(false);
+  const [updaterSettings, setUpdaterSettings] = useState<UpdateSettings | null>(null);
+  const [updaterError, setUpdaterError] = useState<string | null>(null);
+  const [updaterLoading, setUpdaterLoading] = useState(true);
+  const [updaterSaving, setUpdaterSaving] = useState(false);
   const { currentTheme, themes, changeTheme } = useTheme();
   const { mode: darkMode, setDarkMode } = useDarkMode();
 
-  // 获取应用版本号
   useEffect(() => {
-    getVersion().then(setAppVersion).catch(console.error);
+    let active = true;
+    getVersion()
+      .then((version) => { if (active) setAppVersion(version); })
+      .catch(() => { if (active) setVersionError(true); });
+    return () => { active = false; };
   }, []);
 
-  const appearanceOptions: { value: DarkModeType; label: string; description: string }[] = [
-    { value: 'system', label: '跟随系统', description: '自动适配系统主题设置' },
-    { value: 'light', label: '浅色模式', description: '始终使用浅色外观' },
-    { value: 'dark', label: '深色模式', description: '始终使用深色外观' },
-  ];
-
-  // 自动保存设置
   useEffect(() => {
-    saveSettings(settings);
-  }, [settings]);
+    let active = true;
+    loadUpdateSettings()
+      .then((settings) => { if (active) setUpdaterSettings(settings); })
+      .catch((error: unknown) => {
+        if (active) setUpdaterError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => { if (active) setUpdaterLoading(false); });
+    return () => { active = false; };
+  }, []);
 
-  const updateSetting = (key: keyof AppSettings, value: boolean) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-  };
+  async function changeAutoCheck(enabled: boolean) {
+    if (!updaterSettings || updaterSaving) return;
+    setUpdaterSaving(true);
+    setUpdaterError(null);
+    try {
+      const next = { ...updaterSettings, auto_check: enabled };
+      await saveUpdateSettings(next);
+      setUpdaterSettings(next);
+    } catch (error) {
+      setUpdaterError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setUpdaterSaving(false);
+    }
+  }
+
+  async function openRepository() {
+    try {
+      await openUrlPath('https://github.com/liao-works/liao-tools');
+    } catch (error) {
+      setUpdaterError('无法打开项目仓库：' + (error instanceof Error ? error.message : String(error)));
+    }
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">设置</h2>
-        <p className="text-muted-foreground">管理应用偏好设置和配置</p>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6 pb-10">
+      <header>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground-emphasis md:text-3xl">偏好设置</h1>
+        <p className="mt-2 text-sm text-muted-foreground">外观、应用版本及实际生效的更新选项。</p>
+      </header>
 
-      {/* 主题设置 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>主题设置</CardTitle>
-          <CardDescription>自定义应用的外观显示</CardDescription>
+      <Card className="shadow-none">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">外观</CardTitle>
+          <p className="text-xs text-muted-foreground">外观设置会在应用内立即生效。</p>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* 外观模式 */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="appearance-mode" className="text-base font-semibold">外观模式</Label>
-              <p className="text-sm text-muted-foreground">选择应用的外观显示模式</p>
+        <CardContent className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <Label htmlFor="appearance-mode" className="text-sm font-semibold">显示模式</Label>
+              <p className="mt-1 text-xs text-muted-foreground">浅色、深色或跟随系统</p>
             </div>
             <Select value={darkMode} onValueChange={(value) => setDarkMode(value as DarkModeType)}>
-              <SelectTrigger id="appearance-mode" className="w-[180px]">
-                <SelectValue placeholder="选择外观模式" />
-              </SelectTrigger>
+              <SelectTrigger id="appearance-mode" className="w-40" aria-label="外观显示模式"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {appearanceOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{option.label}</span>
-                      <span className="text-xs text-muted-foreground">{option.description}</span>
-                    </div>
-                  </SelectItem>
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-
-          {/* 配色方案 */}
-          <div className="pt-4 border-t">
-            <Label className="text-base font-semibold">配色方案</Label>
-            <p className="text-sm text-muted-foreground mb-4">选择您喜欢的配色方案</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="border-t border-border pt-4">
+            <Label className="text-sm font-semibold">配色方案</Label>
+            <p className="mt-1 text-xs text-muted-foreground">选择主题色，不改变业务查询结果。</p>
+            <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
               {themes.map((theme) => (
-                <button
-                  key={theme.id}
+                <button type="button" key={theme.id} aria-pressed={currentTheme.id === theme.id}
                   onClick={() => changeTheme(theme.id)}
                   className={cn(
-                    'relative flex flex-col items-start gap-2 rounded-lg border-2 p-4 transition-all hover:shadow-md',
-                    currentTheme.id === theme.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
+                    'flex min-h-24 flex-col items-start gap-2 rounded-xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                    currentTheme.id === theme.id ? 'border-primary bg-primary-subtle' : 'border-border hover:border-primary/50',
                   )}
                 >
-                  {/* 主题预览色块 */}
-                  <div className="flex gap-1.5 w-full">
-                    <div
-                      className="h-8 w-8 rounded-md shadow-sm"
-                      style={{ backgroundColor: ACCENT_PREVIEW[theme.accent] }}
-                    />
-                    <div className="flex-1" />
-                    {currentTheme.id === theme.id && (
-                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-                        <Check className="h-4 w-4 text-primary-foreground" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 主题信息 */}
-                  <div className="text-left">
-                    <p className="font-semibold text-sm">{theme.name}</p>
-                    <p className="text-xs text-muted-foreground">{theme.description}</p>
-                  </div>
+                  <span className="flex w-full items-center justify-between gap-2">
+                    <span className="h-7 w-7 rounded-lg border border-border" style={{ backgroundColor: ACCENT_PREVIEW[theme.accent] }} />
+                    {currentTheme.id === theme.id && <Check className="h-4 w-4 text-primary" aria-hidden="true" />}
+                  </span>
+                  <span className="text-sm font-medium text-foreground-emphasis">{theme.name}</span>
+                  <span className="text-xs text-muted-foreground">{theme.description}</span>
                 </button>
               ))}
             </div>
@@ -120,112 +127,86 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* 常规设置 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>常规设置</CardTitle>
-          <CardDescription>应用的基本配置选项</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="auto-update">自动更新数据</Label>
-              <p className="text-sm text-muted-foreground">
-                启动时自动检查并下载最新数据
-              </p>
-            </div>
-            <Switch
-              id="auto-update"
-              checked={settings.autoUpdate}
-              onCheckedChange={(checked) => updateSetting('autoUpdate', checked)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="notifications">桌面通知</Label>
-              <p className="text-sm text-muted-foreground">
-                处理完成后显示系统通知
-              </p>
-            </div>
-            <Switch
-              id="notifications"
-              checked={settings.notifications}
-              onCheckedChange={(checked) => updateSetting('notifications', checked)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="save-history">保存查询历史</Label>
-              <p className="text-sm text-muted-foreground">
-                自动保存查询记录以便快速访问
-              </p>
-            </div>
-            <Switch
-              id="save-history"
-              checked={settings.saveHistory}
-              onCheckedChange={(checked) => updateSetting('saveHistory', checked)}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 关于 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>关于 Liao Tools</CardTitle>
-          <CardDescription>应用信息和版本详情</CardDescription>
+      <Card className="shadow-none">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">应用更新</CardTitle>
+          <p className="text-xs leading-5 text-muted-foreground">
+            这里管理 Liao Tools 应用程序自身的更新检查，不控制英国/北爱关税或 Alta 数据库更新。
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="h-16 w-16 rounded-lg overflow-hidden flex items-center justify-center">
-              <img src={logo} alt="Liao Tools" className="h-full w-full object-contain" />
+          {updaterError && (
+            <div role="alert" className="flex items-start gap-2 rounded-lg border border-danger bg-danger-subtle p-3 text-sm text-danger-fg">
+              <AlertCircle className="h-4 w-4 shrink-0" />{updaterError}
             </div>
-            <div>
-              <p className="font-semibold text-lg">Liao Tools</p>
-              <p className="text-sm text-muted-foreground">版本 {appVersion || '加载中...'}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                集成多功能桌面工具
-              </p>
+          )}
+          {updaterLoading ? (
+            <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />正在读取更新设置…
+            </p>
+          ) : updaterSettings ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <Label htmlFor="auto-check-app-update" className="text-sm font-semibold">自动检查应用更新</Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  应用启动时按已保存的间隔检查是否有新版本；不会自动安装。
+                  {updaterSettings.check_interval_hours > 0 && <> 当前检查间隔：{updaterSettings.check_interval_hours} 小时。</>}
+                </p>
+              </div>
+              <Switch
+                id="auto-check-app-update"
+                checked={updaterSettings.auto_check}
+                disabled={updaterSaving}
+                onCheckedChange={(checked) => void changeAutoCheck(checked)}
+              />
             </div>
-          </div>
-
-          <div className="space-y-2 pt-4 border-t">
-            <p className="text-sm">
-              Liao Tools 是一个集成多功能的桌面工具，包含禁运商品查询、税率查询和Excel数据处理功能。
-            </p>
-            <p className="text-sm text-muted-foreground">
-              © 2024 Liao Tools. All rights reserved.
-            </p>
-          </div>
-
-          <div className="flex gap-2 pt-4 border-t">
-            <Button variant="outline" size="sm" onClick={() => setUpdateDialogOpen(true)}>
-              <Download className="mr-2 h-4 w-4" />
-              检查更新
-            </Button>
-            <Button variant="outline" size="sm">
-              <Github className="mr-2 h-4 w-4" />
-              GitHub
-            </Button>
-            <Button variant="outline" size="sm">
-              <Mail className="mr-2 h-4 w-4" />
-              反馈
-            </Button>
-            <Button variant="outline" size="sm">
-              <Globe className="mr-2 h-4 w-4" />
-              官网
-            </Button>
-          </div>
+          ) : (
+            <Button type="button" size="sm" variant="outline" onClick={() => {
+              setUpdaterError(null);
+              setUpdaterLoading(true);
+              void loadUpdateSettings().then(setUpdaterSettings)
+                .catch((error: unknown) => setUpdaterError(String(error)))
+                .finally(() => setUpdaterLoading(false));
+            }}><RefreshCw className="h-4 w-4" />重试读取</Button>
+          )}
+          <Button type="button" variant="outline" onClick={() => setUpdateDialogOpen(true)}>
+            <Download className="h-4 w-4" />检查应用版本
+          </Button>
         </CardContent>
       </Card>
 
-      {/* 更新对话框 */}
-      <UpdateDialog
-        open={updateDialogOpen}
-        onOpenChange={setUpdateDialogOpen}
-      />
+      <Card className="shadow-none">
+        <CardHeader className="pb-3"><CardTitle className="text-base">业务数据维护</CardTitle></CardHeader>
+        <CardContent className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-foreground-emphasis">关税与禁运数据</p>
+            <p className="mt-1 text-xs text-muted-foreground">数据版本、检查更新和更新历史由独立页面管理。</p>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/data-maintenance"><Database className="h-4 w-4" />打开数据维护</Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-none">
+        <CardHeader className="pb-3"><CardTitle className="text-base">关于 Liao Tools</CardTitle></CardHeader>
+        <CardContent className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="" className="h-12 w-12 rounded-lg object-contain" />
+            <div>
+              <p className="text-sm font-semibold">Liao Tools</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                版本 {appVersion || (versionError ? '无法读取' : '读取中…')}
+              </p>
+            </div>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => void openRepository()}>
+            <ExternalLink className="h-4 w-4" />GitHub 仓库
+          </Button>
+        </CardContent>
+      </Card>
+
+      <UpdateDialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen} />
     </div>
   );
 }
