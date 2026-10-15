@@ -145,8 +145,14 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     };
 
     set({ tasks: [newTask, ...tasks] });
-    await saveTasks();
-    return newTask;
+    try {
+      await saveTasks();
+      return newTask;
+    } catch (error) {
+      // Failed persistence must not leave a ghost task in memory.
+      set((state) => ({ tasks: state.tasks.filter((task) => task.id !== newTask.id) }));
+      throw error;
+    }
   },
 
   updateTask: async (id, updates) => {
