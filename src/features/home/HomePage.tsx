@@ -53,7 +53,7 @@ export function HomePage() {
         </section>
       ) : (
         <div className="space-y-8">
-          {navGroups.filter((group) => group.title !== '工作空间' && group.title !== '管理').map((group) => (
+          {navGroups.filter((group) => group.title !== '工作空间').map((group) => (
             <section key={group.title} aria-label={group.title}>
               <div className="mb-3 flex items-center gap-3">
                 <h2 className="text-sm font-semibold text-foreground-emphasis">{group.title}</h2>
@@ -65,7 +65,7 @@ export function HomePage() {
             </section>
           ))}
           <p className="border-t border-border pt-5 text-xs leading-5 text-muted-foreground">
-            数据更新、审核与详细状态请在对应工具页面查看。工作台不会将示例数据呈现为真实业务结果。
+            数据状态和更新历史可从「数据维护」统一进入；查询与文件处理结果仍由对应工具管理。
           </p>
         </div>
       )}
