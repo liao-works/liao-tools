@@ -1,61 +1,92 @@
-import { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
-import { Menu, Search } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, Search, Moon, Sun } from 'lucide-react';
 import { Sidebar } from './Sidebar';
-import { GlobalCommand } from './GlobalCommand';
+import { CommandPalette } from './CommandPalette';
 import { UpdateDialog } from '@/components/UpdateDialog';
 import { checkForUpdates, loadUpdateSettings, updateLastCheckTime } from '@/lib/updater';
+import { useDarkMode } from '@/hooks/use-dark-mode';
 
 export function MainLayout() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('lt-sidebar-collapsed') === '1');
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [autoUpdateDialogOpen, setAutoUpdateDialogOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [autoUpdateOpen, setAutoUpdateOpen] = useState(false);
+  const promptedVersion = useRef<string | null>(null);
+  const { isDark, toggleDarkMode } = useDarkMode();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Preserve the existing updater behavior. The redesign changes presentation only.
+  useEffect(() => { localStorage.setItem('lt-sidebar-collapsed', collapsed ? '1' : '0'); }, [collapsed]);
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
   useEffect(() => {
-    const autoCheckUpdate = async () => {
+    const handler = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault(); event.stopPropagation(); setCommandOpen(x => !x);
+      } else if (event.key === 'Escape') setCommandOpen(false);
+    };
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, []);
+  useEffect(() => {
+    let active = true;
+    let checking = false;
+    const check = async () => {
+      if (!active || checking) return;
+      checking = true;
       try {
-        const settings = await loadUpdateSettings();
-        if (!settings.auto_check) return;
-        const now = Math.floor(Date.now() / 1000);
-        const elapsedHours = (now - settings.last_check_time) / 3600;
-        const interval = settings.check_interval_hours || 24;
-        if (elapsedHours < interval) return;
-        const updateInfo = await checkForUpdates();
+        const cfg = await loadUpdateSettings();
+        if (!active || !cfg.auto_check) return;
+        const elapsed = (Math.floor(Date.now() / 1000) - cfg.last_check_time) / 3600;
+        if (elapsed < (cfg.check_interval_hours || 24)) return;
+        const info = await checkForUpdates();
+        if (!active) return;
         await updateLastCheckTime();
-        if (updateInfo.has_update) setAutoUpdateDialogOpen(true);
+        if (info.has_update && promptedVersion.current !== info.latest_version) {
+          promptedVersion.current = info.latest_version;
+          setAutoUpdateOpen(true);
+        }
       } catch (error) {
+        // Keep the previous successful check timestamp, allowing retry.
         console.error('自动检查更新失败:', error);
+      } finally {
+        checking = false;
       }
     };
-    const timer = window.setTimeout(() => void autoCheckUpdate(), 3000);
-    return () => window.clearTimeout(timer);
+    const initial = window.setTimeout(() => { void check(); }, 3000);
+    // Also check while the application stays open, respecting persisted intervals.
+    const periodic = window.setInterval(() => { void check(); }, 60 * 60 * 1000);
+    return () => {
+      active = false;
+      window.clearTimeout(initial);
+      window.clearInterval(periodic);
+    };
   }, []);
 
   return (
-    <div className="flex h-screen min-h-0 overflow-hidden bg-background">
-      <Sidebar
-        collapsed={sidebarCollapsed}
-        mobileOpen={mobileOpen}
-        onToggle={() => setSidebarCollapsed((value) => !value)}
-        onClose={() => setMobileOpen(false)}
-      />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-4 md:hidden">
-          <button type="button" onClick={() => setMobileOpen(true)} aria-label="打开导航菜单" className="rounded-lg p-2 text-foreground hover:bg-accent">
-            <Menu className="h-5 w-5" />
-          </button>
-          <span className="text-sm font-semibold text-foreground-emphasis">Liao Tools</span>
-          <button type="button" onClick={() => window.dispatchEvent(new Event('liao:open-command'))} aria-label="搜索工具" className="rounded-lg p-2 text-foreground hover:bg-accent">
-            <Search className="h-5 w-5" />
-          </button>
-        </header>
-        <main id="main-content" className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <Outlet />
-        </main>
+    <div className="lt-app">
+      {mobileOpen && <button className="lt-mobile-scrim" type="button" onClick={() => setMobileOpen(false)} aria-label="关闭导航"/>}
+      <div className={['lt-sidebar-host', mobileOpen ? 'lt-sidebar-host--open' : ''].join(' ')}>
+        <Sidebar collapsed={collapsed && !mobileOpen} onToggle={() => setCollapsed(x => !x)}
+          onNavigate={() => setMobileOpen(false)}/>
       </div>
-      <GlobalCommand />
-      <UpdateDialog open={autoUpdateDialogOpen} onOpenChange={setAutoUpdateDialogOpen} autoCheck={true} />
+      <div className="lt-main">
+        <header className="lt-topbar">
+          <button type="button" className="lt-icon-button lt-mobile-menu" aria-label="展开导航" onClick={() => setMobileOpen(true)}><Menu size={20}/></button>
+          <button type="button" className="lt-top-search" onClick={() => setCommandOpen(true)}>
+            <Search size={17}/><span>搜索工具、查询 HS Code、快速打开功能…</span><kbd>Ctrl K</kbd>
+          </button>
+          <div className="lt-top-actions">
+            <span className="lt-local-note"><i/>本地桌面工具</span>
+            <button type="button" className="lt-icon-button" title={isDark ? '切换到浅色模式' : '切换到深色模式'}
+              onClick={toggleDarkMode}>{isDark ? <Sun size={18}/> : <Moon size={18}/>}</button>
+            <button type="button" className="lt-avatar" title="偏好设置" onClick={() => navigate('/settings')}>L</button>
+          </div>
+        </header>
+        <main className="lt-content" id="main-content"><Outlet/></main>
+      </div>
+      <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)}/>
+      <UpdateDialog open={autoUpdateOpen} onOpenChange={setAutoUpdateOpen} autoCheck/>
     </div>
   );
 }

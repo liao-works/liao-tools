@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { listen } from '@tauri-apps/api/event';
 import { MainLayout } from './components/layout/MainLayout';
+import { UpdateCenter } from './components/UpdateCenter';
 import { AltaPage } from './features/alta/AltaPage';
 import { HomePage } from './features/home/HomePage';
 import { TaxPage } from './features/tax/TaxPage';
@@ -71,6 +72,7 @@ function App() {
           <Route path="system-tools" element={<SystemToolsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="data-maintenance" element={<DataMaintenancePage />} />
+          <Route path="updates" element={<UpdateCenter />} />
         </Route>
       </Routes>
       <Toaster />

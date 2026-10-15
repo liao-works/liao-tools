@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 530 270" fill="none">
+<defs><linearGradient id="base" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFEFC"/><stop offset="1" stop-color="#FAEFE6"/></linearGradient><linearGradient id="coral" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#EEA078"/><stop offset="1" stop-color="#C35838"/></linearGradient><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#A97051" flood-opacity=".17"/></filter></defs><circle cx="305" cy="125" r="111" fill="#F6E1D3" opacity=".7"/>
+<g filter="url(#shadow)" transform="translate(122 49)">
+<rect x="4" y="6" width="164" height="181" rx="14" fill="#B57B60" opacity=".16"/><rect width="164" height="181" rx="14" fill="url(#base)" stroke="#EFD9CB"/>
+<rect x="17" y="18" width="130" height="82" rx="9" fill="#F9E8D9"/>
+<path d="m46 46 34-19 34 19-34 19Z" fill="#EBA87B"/><path d="M46 46v38l34 18V65Z" fill="#D47E55"/><path d="M80 65v37l34-18V46Z" fill="#B76543"/>
+<rect x="17" y="118" width="110" height="10" rx="4" fill="#E6CBB7"/><rect x="17" y="140" width="76" height="9" rx="4" fill="#EEDFD1"/>
+</g>
+<g filter="url(#shadow)" transform="translate(314 55)"><path d="M0 0h143v146H0Z" fill="#FFFCF8" stroke="#E7CBB9" stroke-width="2"/><rect x="17" y="21" width="53" height="17" rx="5" fill="#F8DECB"/><text x="29" y="34" font-size="11" font-weight="800" font-family="sans-serif" fill="#B96D46">ASIN</text><path d="M17 55h109M17 77h109M17 99h77" stroke="#EAD6C9" stroke-width="7" stroke-linecap="round"/><path d="M20 122h90" stroke="#B5704D" stroke-width="4" stroke-dasharray="5 5"/></g>
+<path d="M320 220h134" stroke="#C79177" stroke-width="3" stroke-linecap="round"/><path d="m332 210-10 10 10 10m110-20 10 10-10 10" stroke="#C79177" stroke-width="3" stroke-linecap="round"/>
+</svg>
