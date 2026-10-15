@@ -332,14 +332,44 @@ fn default_config() -> TodoConfig {
     }
 }
 
+fn decode_stored_value<T: serde::de::DeserializeOwned>(
+    value: Option<serde_json::Value>,
+    name: &str,
+) -> Result<Option<T>, String> {
+    value
+        .map(|raw| serde_json::from_value(raw)
+            .map_err(|e| format!("已保存的 {name} 数据损坏，未执行覆盖操作: {e}")))
+        .transpose()
+}
+
+fn next_todo_revision(expected: u64, current: u64) -> Result<u64, String> {
+    if expected != current {
+        return Err(format!(
+            "待办数据已在其他窗口更新（本地修订号 {}，当前修订号 {}），请同步后重试",
+            expected, current
+        ));
+    }
+    current.checked_add(1).ok_or_else(|| "待办修订号已达到上限".to_string())
+}
+
+fn rollback_stored_values(
+    store: &tauri_plugin_store::Store<tauri::Wry>,
+    originals: Vec<(&'static str, Option<serde_json::Value>)>,
+) {
+    for (key, original) in originals {
+        match original {
+            Some(value) => store.set(key, value),
+            None => { store.delete(key); },
+        }
+    }
+}
+
 fn load_config_from_store(app: &AppHandle) -> Result<TodoConfig, String> {
     let store = app
         .store("sticky-notes")
         .map_err(|e| format!("Failed to open store: {e}"))?;
 
-    Ok(store
-        .get("config")
-        .and_then(|v| serde_json::from_value::<TodoConfig>(v.clone()).ok())
+    Ok(decode_stored_value::<TodoConfig>(store.get("config"), "Todo 配置")?
         .unwrap_or_else(default_config))
 }
 
@@ -355,18 +385,27 @@ fn mutate_config_in_store(
         .store("sticky-notes")
         .map_err(|e| format!("Failed to open store: {e}"))?;
 
-    let mut config = store
-        .get("config")
-        .and_then(|v| serde_json::from_value::<TodoConfig>(v.clone()).ok())
+    let original_config = store.get("config");
+    let original_revision = store.get("revision");
+    let mut config = decode_stored_value::<TodoConfig>(original_config.clone(), "Todo 配置")?
         .unwrap_or_else(default_config);
     mutator(&mut config);
-    let revision = store.get("revision").and_then(|v| v.as_u64()).unwrap_or(0);
+    let revision = decode_stored_value::<u64>(original_revision.clone(), "Todo 修订号")?
+        .unwrap_or(0);
+    let next_revision = revision.checked_add(1)
+        .ok_or_else(|| "待办修订号已达到上限".to_string())?;
     store.set(
         "config",
         serde_json::to_value(&config).map_err(|e| format!("Serialize config failed: {e}"))?,
     );
-    store.set("revision", serde_json::json!(revision + 1));
-    store.save().map_err(|e| format!("Failed to save store: {e}"))?;
+    store.set("revision", serde_json::json!(next_revision));
+    if let Err(error) = store.save() {
+        rollback_stored_values(&store, vec![
+            ("config", original_config),
+            ("revision", original_revision),
+        ]);
+        return Err(format!("Failed to save store: {error}"));
+    }
     drop(guard);
 
     if let Err(e) = app.emit("sticky-notes-data-updated", ()) {
@@ -836,21 +875,13 @@ pub async fn load_sticky_notes(app: AppHandle) -> Result<Option<TodoStoreData>, 
         .store("sticky-notes")
         .map_err(|e| format!("Failed to open store: {e}"))?;
 
-    let tasks = store
-        .get("tasks")
-        .and_then(|v| serde_json::from_value::<Vec<TodoTask>>(v.clone()).ok())
+    let tasks = decode_stored_value::<Vec<TodoTask>>(store.get("tasks"), "Todo 任务")?
         .unwrap_or_default();
-    let config = store
-        .get("config")
-        .and_then(|v| serde_json::from_value::<TodoConfig>(v.clone()).ok())
+    let config = decode_stored_value::<TodoConfig>(store.get("config"), "Todo 配置")?
         .unwrap_or_else(default_config);
-    let version = store
-        .get("version")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(1) as u32;
-    let revision = store
-        .get("revision")
-        .and_then(|v| v.as_u64())
+    let version = decode_stored_value::<u32>(store.get("version"), "Todo 格式版本")?
+        .unwrap_or(1);
+    let revision = decode_stored_value::<u64>(store.get("revision"), "Todo 修订号")?
         .unwrap_or(0);
 
     Ok(Some(TodoStoreData {
@@ -869,17 +900,18 @@ pub async fn save_sticky_notes(app: AppHandle, data: TodoStoreData) -> Result<u6
     let store = app
         .store("sticky-notes")
         .map_err(|e| format!("Failed to open store: {e}"))?;
-    let current_revision = store
-        .get("revision")
-        .and_then(|v| v.as_u64())
+    let original_revision = store.get("revision");
+    let current_revision = decode_stored_value::<u64>(original_revision.clone(), "Todo 修订号")?
         .unwrap_or(0);
+    let next_revision = next_todo_revision(data.revision, current_revision)?;
 
-    if current_revision != data.revision {
-        return Err(format!(
-            "待办数据已在其他窗口更新（本地修订号 {}，当前修订号 {}），请同步后重试",
-            data.revision, current_revision
-        ));
-    }
+    // Refuse to overwrite malformed persisted data, including when the UI cannot decode it.
+    decode_stored_value::<Vec<TodoTask>>(store.get("tasks"), "Todo 任务")?;
+    decode_stored_value::<TodoConfig>(store.get("config"), "Todo 配置")?;
+
+    let original_tasks = store.get("tasks");
+    let original_config = store.get("config");
+    let original_version = store.get("version");
 
     store.set(
         "tasks",
@@ -893,9 +925,18 @@ pub async fn save_sticky_notes(app: AppHandle, data: TodoStoreData) -> Result<u6
         "version",
         serde_json::to_value(&data.version).map_err(|e| format!("Serialize version failed: {e}"))?,
     );
-    let next_revision = current_revision + 1;
     store.set("revision", serde_json::json!(next_revision));
-    store.save().map_err(|e| format!("Failed to save store: {e}"))?;
+    if let Err(error) = store.save() {
+        // Store.set mutates the shared in-memory view before disk persistence.
+        // A failed disk write must not become visible as a successfully saved task.
+        rollback_stored_values(&store, vec![
+            ("tasks", original_tasks),
+            ("config", original_config),
+            ("version", original_version),
+            ("revision", original_revision),
+        ]);
+        return Err(format!("Failed to save store: {error}"));
+    }
     drop(guard);
 
     if let Err(e) = apply_global_shortcuts_from_config(&app, &data.config.hotkeys) {
@@ -1090,4 +1131,46 @@ pub async fn show_todo_widget_and_focus_input(app: AppHandle) -> Result<(), Stri
 #[tauri::command]
 pub async fn toggle_todo_widget_pin(app: AppHandle) -> Result<bool, String> {
     toggle_todo_widget_pin_inner(&app)
+}
+
+#[cfg(test)]
+mod todo_store_integrity_tests {
+    use super::*;
+
+    #[test]
+    fn malformed_tasks_are_not_treated_as_an_empty_list() {
+        let corrupt = serde_json::json!([{"id": "abc", "title": "Keep this task"}]);
+        assert!(decode_stored_value::<Vec<TodoTask>>(Some(corrupt), "Todo 任务")
+            .unwrap_err().contains("数据损坏"));
+        assert_eq!(
+            decode_stored_value::<Vec<TodoTask>>(None, "Todo 任务").unwrap().unwrap_or_default().len(),
+            0
+        );
+    }
+
+    #[test]
+    fn malformed_revision_is_not_coerced_to_zero() {
+        assert!(decode_stored_value::<u64>(
+            Some(serde_json::json!("damaged")),
+            "Todo 修订号",
+        ).is_err());
+    }
+
+    #[test]
+    fn existing_legacy_task_data_without_revision_deserializes() {
+        let legacy = serde_json::json!({
+            "tasks": [],
+            "config": default_config(),
+            "version": 1
+        });
+        let loaded: TodoStoreData = serde_json::from_value(legacy).unwrap();
+        assert_eq!(loaded.revision, 0);
+    }
+
+    #[test]
+    fn stale_window_snapshot_cannot_increment_revision() {
+        assert_eq!(next_todo_revision(4, 4).unwrap(), 5);
+        assert!(next_todo_revision(4, 5).unwrap_err().contains("其他窗口"));
+        assert!(next_todo_revision(u64::MAX, u64::MAX).is_err());
+    }
 }
