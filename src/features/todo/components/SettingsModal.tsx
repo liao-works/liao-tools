@@ -150,7 +150,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     void updateConfig(updates).catch(() => undefined);
   };
   const saveWidgetOpacity = (opacity: number) => {
-    saveWidgetOpacity(opacity).catch(() => undefined);
+    void updateWidgetOpacity(opacity).catch(() => undefined);
   };
 
   useEffect(() => {
