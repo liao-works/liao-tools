@@ -33,3 +33,5 @@ jobs:
         run: pnpm build
       - name: Compile Tauri desktop entrypoint and registered commands
         run: cargo check --locked --manifest-path src-tauri/Cargo.toml --bin liao-tools
+      - name: Test Todo revision conflict and corrupt-data behavior
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib sticky_notes::todo_store_integrity_tests -- --nocapture
