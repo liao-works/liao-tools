@@ -22,23 +22,29 @@ function TodoShortcutBridge() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let alive = true;
     let unlisten: (() => void) | undefined;
-
-    const register = async () => {
-      unlisten = await listen('sticky-notes-open-main-for-input', () => {
-        navigate('/todo');
-        [0, 60, 180].forEach((delay) => {
-          window.setTimeout(() => {
-            window.dispatchEvent(new Event('todo:focus-main-input'));
-          }, delay);
-        });
+    const focusTimers = new Set<number>();
+    void listen('sticky-notes-open-main-for-input', () => {
+      navigate('/todo');
+      [0, 60, 180].forEach((delay) => {
+        const timer = window.setTimeout(() => {
+          focusTimers.delete(timer);
+          if (alive) window.dispatchEvent(new Event('todo:focus-main-input'));
+        }, delay);
+        focusTimers.add(timer);
       });
-    };
-
-    void register();
+    }).then((dispose) => {
+      if (alive) unlisten = dispose;
+      else dispose();
+    }).catch((error: unknown) => {
+      console.error('待办快捷入口监听失败:', error);
+    });
 
     return () => {
+      alive = false;
       unlisten?.();
+      focusTimers.forEach((timer) => window.clearTimeout(timer));
     };
   }, [navigate]);
 
