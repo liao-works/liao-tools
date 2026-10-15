@@ -84,12 +84,12 @@ export const useTodoStore = create<TodoState>((set, get) => ({
         });
       }
     } catch (err) {
+      // Do not silently present a storage failure as an empty task list.
       set({
-        tasks: [],
-        config: DEFAULT_CONFIG,
         initialized: true,
+        error: '读取任务失败：' + (err instanceof Error ? err.message : String(err)),
       });
-      console.warn('加载任务数据失败，使用默认配置:', err);
+      console.warn('加载任务数据失败:', err);
     } finally {
       set({ isLoading: false });
     }
@@ -109,6 +109,7 @@ export const useTodoStore = create<TodoState>((set, get) => ({
         initialized: true,
       });
     } catch (err) {
+      set({ error: '重新读取任务失败：' + (err instanceof Error ? err.message : String(err)) });
       console.warn('重新加载任务数据失败:', err);
     } finally {
       set({ isLoading: false });
@@ -260,6 +261,7 @@ export const useTodoStore = create<TodoState>((set, get) => ({
         windowState: toWindowState(latestConfig.widget),
       });
     } catch (err) {
+      set({ error: '打开桌面小部件失败：' + (err instanceof Error ? err.message : String(err)) });
       console.error('显示小部件失败:', err);
     }
   },
