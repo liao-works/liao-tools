@@ -28,11 +28,14 @@ export function BatchQueryTab() {
 
   // 检查数据是否存在
   useEffect(() => {
-    const checkData = async () => {
-      const exists = await taxApi.checkDataExists();
-      setHasData(exists);
-    };
-    checkData();
+    let active = true;
+    taxApi.checkDataExists()
+      .then((exists) => { if (active) setHasData(exists); })
+      .catch(() => {
+        // Unable to check local metadata should not be mistaken for missing data.
+        if (active) setHasData(null);
+      });
+    return () => { active = false; };
   }, []);
 
   const handleSelectFile = async () => {
