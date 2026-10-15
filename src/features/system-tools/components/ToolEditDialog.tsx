@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { UserTool, CreateUserToolRequest, UpdateUserToolRequest } from '@/types';
+import type { DisplayTool, CreateUserToolRequest, UpdateUserToolRequest } from '@/types';
 import { Loader2, FolderOpen, AppWindow } from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { AppPickerDialog } from './AppPickerDialog';
@@ -18,7 +18,7 @@ interface InstalledApp {
 }
 
 interface ToolEditDialogProps {
-  tool?: UserTool | null;
+  tool?: DisplayTool | null;
   open: boolean;
   onSave: (tool: CreateUserToolRequest | UpdateUserToolRequest) => Promise<void>;
   onCancel: () => void;
@@ -76,7 +76,7 @@ export function ToolEditDialog({ tool, open, onSave, onCancel }: ToolEditDialogP
     try {
       if (tool) {
         const updateData: UpdateUserToolRequest = {
-          id: tool.id!,
+          id: Number(tool.id.replace(/^custom_/, '')),
           name: formData.name!,
           description: formData.description || '',
           icon: formData.icon,
@@ -85,7 +85,7 @@ export function ToolEditDialog({ tool, open, onSave, onCancel }: ToolEditDialogP
           workingDirectory: formData.workingDirectory,
           category: formData.category || 'custom',
           hotkey: formData.hotkey,
-          enabled: true,
+          enabled: tool.enabled,
         };
         await onSave(updateData);
       } else {

@@ -21,20 +21,21 @@ export function ToolCategoryFilter({
   onCategoryChange,
 }: ToolCategoryFilterProps) {
   return (
-    <div className="flex gap-2">
+    <div className="flex max-w-full flex-wrap gap-1.5" role="group" aria-label="工具分类">
       {categories.map((category) => (
         <Button
           key={category.value}
           variant={selectedCategory === category.value ? 'default' : 'outline'}
           size="sm"
           onClick={() => onCategoryChange(category.value)}
+          aria-pressed={selectedCategory === category.value}
           className={cn(
             'gap-2',
             selectedCategory === category.value && 'shadow-md'
           )}
         >
-          <span>{category.icon}</span>
-          <span className="hidden sm:inline">{category.label}</span>
+          <span aria-hidden="true">{category.icon}</span>
+          <span>{category.label}</span>
         </Button>
       ))}
     </div>

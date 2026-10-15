@@ -33,11 +33,9 @@ export function SystemToolCard({ tool, onLaunch, disabled }: SystemToolCardProps
     <Card
       className={cn(
         'group hover:shadow-lg transition-all duration-200',
-        'hover:scale-[1.02] active:scale-[0.98]',
-        'cursor-pointer',
+        'hover:border-primary/40',
         !tool.enabled && 'opacity-50'
       )}
-      onClick={() => !disabled && tool.enabled && onLaunch(tool)}
     >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
@@ -75,12 +73,9 @@ export function SystemToolCard({ tool, onLaunch, disabled }: SystemToolCardProps
           className="w-full"
           size="sm"
           disabled={disabled || !tool.enabled}
-          onClick={(e) => {
-            e.stopPropagation();
-            onLaunch(tool);
-          }}
+          onClick={() => onLaunch(tool)}
         >
-          启动工具
+          {tool.enabled ? '启动工具' : '当前不可用'}
         </Button>
 
         {/* 快捷键提示 */}

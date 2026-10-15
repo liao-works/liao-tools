@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calculator, Download, FileSpreadsheet, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { AlertCircle, Calculator, Download, ExternalLink, FileSpreadsheet, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -52,7 +52,7 @@ const flagUrl = (cc: string) => `https://d1uznvntk80v7s.cloudfront.net/flags/${c
 
 function formatPrice(p: RevCalProduct): string {
   if (p.price == null) return '—';
-  return String(p.price);
+  return p.currency ? `${p.price} ${p.currency}` : String(p.price);
 }
 
 function ProductImage({ url }: { url: string | null }) {
@@ -82,6 +82,9 @@ export function RevCalPage() {
   const [batchRunning, setBatchRunning] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, code: '', status: '' });
   const [results, setResults] = useState<RevCalQueryResult[]>([]);
+  const [resultsCountry, setResultsCountry] = useState<string | null>(null);
+  const [queryError, setQueryError] = useState<string | null>(null);
+  const [exportPath, setExportPath] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [filterText, setFilterText] = useState('');
   const [onlyFailed, setOnlyFailed] = useState(false);
@@ -90,20 +93,26 @@ export function RevCalPage() {
   const { toast } = useToast();
 
   const handleSingleSearch = async () => {
+    if (querying || batchRunning) return;
     const keywords = singleCode.trim();
     if (!keywords) {
       toast({ title: '请输入查询码', variant: 'destructive' });
       return;
     }
     setQuerying(true);
+    setQueryError(null);
+    setExportPath(null);
     try {
       const products = await revCalApi.search(keywords, countryCode);
       setResults([{ code: keywords, products, error: null }]);
+      setResultsCountry(countryCode);
       if (products.length === 0) {
         toast({ title: '未找到商品', description: keywords });
       }
     } catch (error) {
       setResults([{ code: keywords, products: [], error: String(error) }]);
+      setResultsCountry(countryCode);
+      setQueryError(String(error));
       toast({ title: '查询失败', description: String(error), variant: 'destructive' });
     } finally {
       setQuerying(false);
@@ -135,6 +144,7 @@ export function RevCalPage() {
   };
 
   const handleBatchSearch = async () => {
+    if (querying || batchRunning) return;
     const raw = batchCodes
       .split('\n')
       .map((c) => c.trim())
@@ -146,18 +156,22 @@ export function RevCalPage() {
       return;
     }
     setBatchRunning(true);
+    setQueryError(null);
+    setExportPath(null);
     setProgress({ current: 0, total: codes.length, code: '', status: '' });
     try {
       const result = await revCalApi.batchSearch(codes, countryCode, (p) => {
         setProgress({ current: p.current, total: p.total, code: p.code, status: p.status });
       });
       setResults(result.results);
+      setResultsCountry(countryCode);
       const dupNote = raw.length > codes.length ? `（已去除 ${raw.length - codes.length} 个重复）` : '';
       toast({
         title: '批量查询完成',
         description: `成功 ${result.success} 条，未找到/失败 ${result.failed} 条${dupNote}`,
       });
     } catch (error) {
+      setQueryError(String(error));
       toast({ title: '批量查询失败', description: String(error), variant: 'destructive' });
     } finally {
       setBatchRunning(false);
@@ -185,12 +199,33 @@ export function RevCalPage() {
       });
       if (!path) return;
       const savedPath = await revCalApi.exportExcel(results, path, splitDimensions);
+      setExportPath(savedPath);
       toast({ title: '导出成功', description: savedPath });
-      await openFileWithShell(savedPath);
     } catch (error) {
       toast({ title: '导出失败', description: String(error), variant: 'destructive' });
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleCountryChange = (next: string) => {
+    if (querying || batchRunning || exporting) return;
+    if (next === countryCode) return;
+    setCountryCode(next);
+    // Results from one marketplace must never be shown as data from another.
+    setResults([]);
+    setResultsCountry(null);
+    setExportPath(null);
+    setQueryError(null);
+    setProgress({ current: 0, total: 0, code: '', status: '' });
+  };
+
+  const handleOpenExport = async () => {
+    if (!exportPath) return;
+    try {
+      await openFileWithShell(exportPath);
+    } catch (error) {
+      toast({ title: '无法打开导出文件', description: String(error), variant: 'destructive' });
     }
   };
 
@@ -255,14 +290,35 @@ export function RevCalPage() {
     sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
 
   const foundCount = results.filter((r) => r.products.length > 0).length;
+  const failedCount = results.filter((r) => r.error).length;
+  const emptyCount = results.filter((r) => !r.error && r.products.length === 0).length;
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6 pb-10">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Amazon 收益计算器</h2>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground-emphasis md:text-3xl">Amazon 商品查询</h1>
         <p className="text-muted-foreground">
-          通过 Amazon 收益计算器公开接口查询商品尺寸与价格，支持批量查询与 Excel 导出
+          查询 Amazon 商品尺寸、重量与价格。支持单码、批量和 Excel 导出；仅展示实际接口返回的数据。
         </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-card p-4">
+        <span className="text-sm font-semibold">Amazon 站点</span>
+        <Select value={countryCode} onValueChange={handleCountryChange} disabled={batchRunning || querying || exporting}>
+          <SelectTrigger className="w-[152px]" aria-label="Amazon 站点"><SelectValue /></SelectTrigger>
+          <SelectContent className="max-h-[280px]">
+            {COUNTRY_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                <span className="flex items-center gap-2">
+                  <img src={flagUrl(opt.value)} alt="" aria-hidden="true" className="h-3.5 w-5 rounded-sm object-cover"
+                    onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }} />
+                  {opt.value}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="text-xs text-muted-foreground">切换站点会清除旧站点的查询结果，避免误用跨站点价格。</span>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -281,11 +337,12 @@ export function RevCalPage() {
                 placeholder="例如：B0GD7VRN9V"
                 value={singleCode}
                 onChange={(e) => setSingleCode(e.target.value)}
+                disabled={querying || batchRunning}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !querying) void handleSingleSearch();
+                  if (e.key === 'Enter' && !querying && !batchRunning) void handleSingleSearch();
                 }}
               />
-              <Button onClick={() => void handleSingleSearch()} disabled={querying}>
+              <Button onClick={() => void handleSingleSearch()} disabled={querying || batchRunning || !singleCode.trim()}>
                 {querying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 查询
               </Button>
@@ -308,7 +365,7 @@ export function RevCalPage() {
               placeholder={'B0GD7VRN9V\nB09B9615X2\n…'}
               value={batchCodes}
               onChange={(e) => setBatchCodes(e.target.value)}
-              disabled={batchRunning}
+              disabled={batchRunning || querying}
             />
             {batchRunning && progress.total > 0 && (
               <div className="space-y-1">
@@ -320,11 +377,11 @@ export function RevCalPage() {
               </div>
             )}
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => void handleSelectExcel()} disabled={batchRunning}>
+              <Button variant="outline" onClick={() => void handleSelectExcel()} disabled={batchRunning || querying}>
                 <FileSpreadsheet className="h-4 w-4" />
                 上传 Excel
               </Button>
-              <Button onClick={() => void handleBatchSearch()} disabled={batchRunning}>
+              <Button onClick={() => void handleBatchSearch()} disabled={batchRunning || querying || !batchCodes.trim()}>
                 {batchRunning && <Loader2 className="h-4 w-4 animate-spin" />}
                 开始批量查询
               </Button>
@@ -333,47 +390,29 @@ export function RevCalPage() {
         </Card>
       </div>
 
-      {/* Boutique Amazon 选择（带国旗，与官方一致）+ 尺寸拆分开关 */}
-      <div className="flex flex-wrap items-center gap-6">
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold">Boutique Amazon</span>
-          <Select value={countryCode} onValueChange={setCountryCode} disabled={batchRunning || querying}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="max-h-[280px]">
-              {COUNTRY_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  <span className="flex items-center gap-2">
-                    <img
-                      src={flagUrl(opt.value)}
-                      alt={opt.value}
-                      className="h-3.5 w-5 rounded-[2px] object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.visibility = 'hidden';
-                      }}
-                    />
-                    <span>{opt.value}</span>
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="split-dimensions"
-            checked={splitDimensions}
-            onCheckedChange={(v) => setSplitDimensions(v === true)}
-          />
-          <label
-            htmlFor="split-dimensions"
-            className="text-sm text-muted-foreground cursor-pointer"
-          >
-            拆分尺寸（长 / 宽 / 高 / 重量 分列显示）
-          </label>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <label htmlFor="split-dimensions" className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+          <Checkbox id="split-dimensions" checked={splitDimensions} onCheckedChange={(value) => setSplitDimensions(value === true)} />
+          将长 / 宽 / 高 / 重量分列显示与导出
+        </label>
+        {(querying || batchRunning) && <span role="status" className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />正在查询 {countryCode} 站点</span>}
       </div>
+
+      {queryError && (
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-danger bg-danger-subtle p-4 text-sm text-danger-fg">
+          <AlertCircle className="h-4 w-4 shrink-0" />{queryError}
+        </div>
+      )}
+
+      {exportPath && (
+        <div role="status" className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Excel 文件已导出</p>
+            <p className="mt-1 break-all text-xs text-muted-foreground">{exportPath}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void handleOpenExport()}><ExternalLink className="h-4 w-4" /> 打开导出文件</Button>
+        </div>
+      )}
 
       {/* 结果表 */}
       <Card>
@@ -381,20 +420,20 @@ export function RevCalPage() {
           <div>
             <CardTitle className="text-base">查询结果</CardTitle>
             <CardDescription>
-              共 {results.length} 条查询，命中 {foundCount} 条
+              {resultsCountry || countryCode} 站点 · {results.length} 条查询 · 命中 {foundCount} · 未找到 {emptyCount} · 失败 {failedCount}
             </CardDescription>
           </div>
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setResults([])}
-              disabled={results.length === 0}
+              onClick={() => { setResults([]); setResultsCountry(null); setExportPath(null); setQueryError(null); }}
+              disabled={results.length === 0 || querying || batchRunning}
             >
               <Trash2 className="h-4 w-4" />
               清空
             </Button>
-            <Button size="sm" onClick={() => void handleExport()} disabled={exporting || results.length === 0}>
+            <Button size="sm" onClick={() => void handleExport()} disabled={exporting || querying || batchRunning || results.length === 0}>
               {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               导出 Excel
             </Button>
@@ -484,15 +523,15 @@ export function RevCalPage() {
                       </TableCell>
                       <TableCell className="whitespace-nowrap font-mono text-xs">
                         {row.product ? (
-                          <a
-                            href={row.product.product_link ?? '#'}
+                          row.product.product_link ? <a
+                            href={row.product.product_link}
                             target="_blank"
                             rel="noreferrer"
                             title="在 Amazon 打开商品页面"
                             className="text-foreground underline-offset-2 hover:text-primary hover:underline"
                           >
                             {row.product.asin}
-                          </a>
+                          </a> : <span>{row.product.asin}</span>
                         ) : (
                           '—'
                         )}
