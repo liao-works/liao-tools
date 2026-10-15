@@ -72,7 +72,7 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
       
       toast({
         title: '处理完成',
-        description: `成功处理 ${data.total} 条记录，其中 ${data.forbidden} 条禁运`,
+        description: `处理 ${data.total} 条记录，命中 ${data.forbidden} 条，未命中 ${data.safe} 条`,
       });
     } catch (error: any) {
       console.error('处理失败:', error);
@@ -225,7 +225,7 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
                 <p className="text-2xl font-bold text-destructive">{result.forbidden}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">正常</p>
+                <p className="text-sm text-muted-foreground">未命中</p>
                 <p className="text-2xl font-bold text-success-fg">{result.safe}</p>
               </div>
               <div className="space-y-1">
@@ -253,7 +253,7 @@ export function BatchTab({ onSwitchToManage }: BatchTabProps) {
         onOpenChange={setShowResultFileDialog}
         filePath={result?.output_path || ''}
         title="Alta 禁运查询完成"
-        description="禁运商品批量查询已完成，是否查看结果文件？"
+        description="当前清单匹配已完成，未命中不代表全面合规。是否查看结果文件？"
         fileName={result?.output_path ? getFileName(result.output_path) : undefined}
       />
     </div>
