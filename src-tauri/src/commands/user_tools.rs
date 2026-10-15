@@ -150,8 +150,8 @@ pub fn get_all_tools() -> Result<Vec<DisplayTool>, CommandError> {
             ) {
                 Ok(s) => s,
                 Err(e) => {
-                    info!("准备查询失败: {}", e);
-                    return Ok(system_display_tools);
+                    error!("读取自定义工具列表失败: {}", e);
+                    return Err(CommandError::new(format!("读取自定义工具列表失败: {}", e), "DB_ERROR"));
                 }
             };
 
@@ -179,8 +179,8 @@ pub fn get_all_tools() -> Result<Vec<DisplayTool>, CommandError> {
             }) {
                 Ok(r) => r,
                 Err(e) => {
-                    info!("查询自定义工具失败: {}", e);
-                    return Ok(system_display_tools);
+                    error!("查询自定义工具失败: {}", e);
+                    return Err(CommandError::new(format!("查询自定义工具失败: {}", e), "DB_ERROR"));
                 }
             };
 
@@ -190,14 +190,14 @@ pub fn get_all_tools() -> Result<Vec<DisplayTool>, CommandError> {
                     tools
                 }
                 Err(e) => {
-                    info!("解析自定义工具失败: {}", e);
-                    vec![]
+                    error!("解析自定义工具失败: {}", e);
+                    return Err(CommandError::new(format!("解析自定义工具失败: {}", e), "DB_ERROR"));
                 }
             }
         }
         Err(e) => {
-            info!("数据库连接失败: {}，返回仅系统工具", e);
-            vec![]
+            error!("自定义工具数据库连接失败: {}", e);
+            return Err(e);
         }
     };
 
