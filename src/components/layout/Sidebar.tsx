@@ -1,67 +1,26 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { FileBarChart, FileSpreadsheet, Settings, Percent, ChevronLeft, ChevronRight, Moon, Sun, Palette, Package, Download, Check, Wrench, CheckCircle2, Calculator } from 'lucide-react';
+import {
+  Check, ChevronLeft, ChevronRight, Download, Moon, Palette, Search, Settings, Sun, X,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useTheme } from '@/hooks/use-theme';
 import { useDarkMode } from '@/hooks/use-dark-mode';
 import { ACCENT_PREVIEW } from '@/lib/themes';
 import { UpdateDialog } from '@/components/UpdateDialog';
+import { navGroups } from './navigation';
 import logo from '@/assets/logo-64.png';
 
 interface SidebarProps {
   collapsed: boolean;
+  mobileOpen: boolean;
   onToggle: () => void;
+  onClose: () => void;
 }
 
-const navItems = [
-  {
-    title: 'Todo',
-    href: '/todo',
-    icon: CheckCircle2,
-    description: '任务清单与桌面小部件',
-  },
-  {
-    title: '系统工具',
-    href: '/system-tools',
-    icon: Wrench,
-    description: '快速启动系统工具',
-  },
-  {
-    title: 'Alta查询',
-    href: '/alta',
-    icon: FileBarChart,
-    description: '禁运商品查询',
-  },
-  {
-    title: '税率查询',
-    href: '/tax',
-    icon: Percent,
-    description: '英国海关税率',
-  },
-  {
-    title: 'Excel拆分',
-    href: '/excel',
-    icon: FileSpreadsheet,
-    description: '合并单元格拆分',
-  },
-  {
-    title: 'UPS/DPD',
-    href: '/ups-dpd',
-    icon: Package,
-    description: '物流数据模板填充',
-  },
-  {
-    title: '收益计算器',
-    href: '/revcal',
-    icon: Calculator,
-    description: 'Amazon 商品尺寸价格查询',
-  },
-];
-
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, mobileOpen, onToggle, onClose }: SidebarProps) {
   const navigate = useNavigate();
   const { currentTheme, themes, changeTheme } = useTheme();
   const { isDark, toggleDarkMode } = useDarkMode();
@@ -69,186 +28,128 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const [themePopoverOpen, setThemePopoverOpen] = useState(false);
 
   return (
-    <aside
-      className={cn(
-        'relative border-r bg-card transition-all duration-300 flex flex-col',
-        collapsed ? 'w-16' : 'w-64'
+    <>
+      {mobileOpen && (
+        <button
+          type="button"
+          aria-label="关闭导航菜单"
+          onClick={onClose}
+          className="fixed inset-0 z-40 bg-foreground/30 md:hidden"
+        />
       )}
-    >
-      {/* 折叠按钮 */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute -right-3 top-6 z-10 h-6 w-6 rounded-full border bg-background"
-        onClick={onToggle}
-      >
-        {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
-      </Button>
-
-      {/* Logo区域 */}
-      <div className="flex h-16 items-center border-b px-4 shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg flex items-center justify-center overflow-hidden">
-            <img src={logo} alt="Liao Tools" className="h-full w-full object-contain" />
-          </div>
-          {!collapsed && (
-            <div className="flex flex-col">
-              <span className="font-semibold text-sm">Liao Tools</span>
-              <span className="text-xs text-muted-foreground">多功能工具集</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 导航菜单 */}
-      <nav className="flex-1 space-y-1 p-3 overflow-y-auto">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.href}
-            to={item.href}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                'hover:bg-accent hover:text-accent-foreground',
-                isActive
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'text-muted-foreground',
-                collapsed && 'justify-center'
-              )
-            }
-            title={collapsed ? item.title : undefined}
-          >
-            <item.icon className="h-5 w-5 shrink-0" />
-            {!collapsed && (
-              <div className="flex flex-col">
-                <span>{item.title}</span>
-                <span className="text-xs opacity-70">{item.description}</span>
-              </div>
-            )}
-          </NavLink>
-        ))}
-      </nav>
-
-      {/* 底部控制区域 */}
-      <div className="shrink-0 border-t bg-card/50">
-        {!collapsed && (
-          <>
-            {/* 当前主题显示 */}
-            <div className="p-3">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50">
-                <div
-                  className="h-3 w-3 rounded-full shadow-sm shrink-0"
-                  style={{ backgroundColor: 'var(--primary)' }}
-                />
-                <span className="text-sm font-medium truncate">{currentTheme.name}</span>
-              </div>
-            </div>
-            <Separator className="mx-3" />
-          </>
+      <aside
+        aria-label="主导航"
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex h-full w-64 shrink-0 flex-col border-r border-border bg-card shadow-lg transition-transform duration-200 md:relative md:z-auto md:translate-x-0 md:shadow-none',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full',
+          collapsed ? 'md:w-16' : 'md:w-64',
         )}
-
-        {/* 控制按钮组 */}
-        <div className={cn(
-          "flex p-3 gap-1",
-          collapsed ? "flex-col" : "items-center justify-center"
-        )}>
-          {/* 亮色/暗色切换 */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleDarkMode}
-            title={isDark ? '切换到亮色模式' : '切换到暗色模式'}
-            className="group relative shrink-0 h-9 w-9"
+      >
+        <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border px-3">
+          <NavLink to="/" onClick={onClose} title="返回工作台" className="flex min-w-0 items-center gap-2 rounded-md p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            <img src={logo} alt="" className="h-9 w-9 shrink-0 rounded-lg object-contain" />
+            <span className={cn('min-w-0', collapsed && 'md:hidden')}>
+              <span className="block truncate text-sm font-semibold text-foreground-emphasis">Liao Tools</span>
+              <span className="block truncate text-[11px] text-muted-foreground">轻量专业工具集</span>
+            </span>
+          </NavLink>
+          <button type="button" aria-label="关闭侧边栏" onClick={onClose} className="rounded-md p-2 text-muted-foreground hover:bg-accent md:hidden">
+            <X className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
+            onClick={onToggle}
+            className="hidden rounded-md p-2 text-muted-foreground hover:bg-accent md:block"
           >
-            <Sun
-              className={`h-4 w-4 transition-all duration-300 absolute ${
-                isDark
-                  ? 'rotate-0 scale-100 opacity-100'
-                  : 'rotate-90 scale-0 opacity-0'
-              } group-hover:rotate-90`}
-            />
-            <Moon
-              className={`h-4 w-4 transition-all duration-300 absolute ${
-                isDark
-                  ? '-rotate-90 scale-0 opacity-0'
-                  : 'rotate-0 scale-100 opacity-100'
-              } group-hover:-rotate-12`}
-            />
-          </Button>
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
+        </div>
 
-          {/* 配色方案按钮 */}
-          <Popover open={themePopoverOpen} onOpenChange={setThemePopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                title="配色方案"
-                className="group relative shrink-0 h-9 w-9"
-              >
-                <Palette className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-56 p-2">
+        <div className="px-3 pt-3">
+          <button
+            type="button"
+            onClick={() => { onClose(); window.dispatchEvent(new Event('liao:open-command')); }}
+            title="搜索工具（Ctrl / ⌘ + K）"
+            className={cn(
+              'flex h-10 w-full items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+              collapsed && 'md:justify-center md:px-0',
+            )}
+          >
+            <Search className="h-4 w-4 shrink-0" />
+            <span className={cn('flex-1 text-left', collapsed && 'md:hidden')}>搜索工具</span>
+            <kbd className={cn('text-[11px]', collapsed && 'md:hidden')}>⌘ K</kbd>
+          </button>
+        </div>
+
+        <nav aria-label="工具列表" className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4">
+          {navGroups.map((group) => (
+            <div key={group.title}>
+              <div className={cn('mb-1.5 px-3 text-[10px] font-semibold tracking-[.12em] text-muted-foreground/80', collapsed && 'md:sr-only')}>
+                {group.title}
+              </div>
               <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground px-2 py-1">配色方案</p>
-                {themes.map((theme) => (
-                  <button
-                    key={theme.id}
-                    onClick={() => {
-                      changeTheme(theme.id);
-                      setThemePopoverOpen(false);
-                    }}
-                    className={cn(
-                      'w-full flex items-center gap-3 px-2 py-2 rounded-md transition-colors',
-                      'hover:bg-accent hover:text-accent-foreground',
-                      currentTheme.id === theme.id && 'bg-accent'
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.href}
+                    to={item.href}
+                    end={item.href === '/'}
+                    onClick={onClose}
+                    title={collapsed ? item.title : undefined}
+                    className={({ isActive }) => cn(
+                      'flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                      isActive ? 'bg-primary-subtle font-semibold text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                      collapsed && 'md:justify-center md:px-0',
                     )}
                   >
-                    <div className="flex gap-1">
-                      <div
-                        className="h-4 w-4 rounded-sm shadow-sm"
-                        style={{ backgroundColor: ACCENT_PREVIEW[theme.accent] }}
-                      />
-                    </div>
-                    <span className="text-sm flex-1 text-left">{theme.name}</span>
-                    {currentTheme.id === theme.id && (
-                      <Check className="h-4 w-4 text-primary" />
-                    )}
-                  </button>
+                    <item.icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                    <span className={cn('truncate', collapsed && 'md:hidden')}>{item.title}</span>
+                  </NavLink>
                 ))}
               </div>
-            </PopoverContent>
-          </Popover>
+            </div>
+          ))}
+        </nav>
 
-          {/* 检查更新按钮 */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setUpdateDialogOpen(true)}
-            title="检查更新"
-            className="shrink-0 h-9 w-9"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-
-          {/* 设置按钮 */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/settings')}
-            title="设置"
-            className="shrink-0 h-9 w-9"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
+        <div className="shrink-0 border-t border-border p-3">
+          <div className={cn('mb-2 flex items-center gap-2 rounded-lg bg-muted/60 px-3 py-2', collapsed && 'md:hidden')}>
+            <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: 'var(--primary)' }} />
+            <span className="truncate text-xs text-muted-foreground">{currentTheme.name}</span>
+          </div>
+          <div className={cn('flex items-center justify-between gap-1', collapsed && 'md:flex-col')}>
+            <Button variant="ghost" size="icon" onClick={toggleDarkMode} title={isDark ? '切换到浅色' : '切换到深色'} aria-label={isDark ? '切换到浅色' : '切换到深色'}>
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Popover open={themePopoverOpen} onOpenChange={setThemePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" title="配色方案" aria-label="配色方案"><Palette className="h-4 w-4" /></Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-56 p-2">
+                <p className="px-2 py-1 text-xs font-medium text-muted-foreground">配色方案</p>
+                {themes.map((theme) => (
+                  <button
+                    type="button"
+                    key={theme.id}
+                    onClick={() => { changeTheme(theme.id); setThemePopoverOpen(false); }}
+                    className={cn('flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm hover:bg-accent', currentTheme.id === theme.id && 'bg-accent')}
+                  >
+                    <span className="h-4 w-4 rounded-sm" style={{ backgroundColor: ACCENT_PREVIEW[theme.accent] }} />
+                    <span className="flex-1">{theme.name}</span>
+                    {currentTheme.id === theme.id && <Check className="h-4 w-4 text-primary" />}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
+            <Button variant="ghost" size="icon" onClick={() => setUpdateDialogOpen(true)} title="检查应用更新" aria-label="检查应用更新">
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => { onClose(); navigate('/settings'); }} title="设置" aria-label="设置">
+              <Settings className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-      </div>
-
-      {/* 更新对话框 */}
-      <UpdateDialog
-        open={updateDialogOpen}
-        onOpenChange={setUpdateDialogOpen}
-      />
-    </aside>
+      </aside>
+      <UpdateDialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen} />
+    </>
   );
 }
