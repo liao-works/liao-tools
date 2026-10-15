@@ -829,6 +829,9 @@ fn apply_global_shortcuts_from_config(
 
 #[tauri::command]
 pub async fn load_sticky_notes(app: AppHandle) -> Result<Option<TodoStoreData>, String> {
+    let _guard = TODO_STORAGE_LOCK
+        .lock()
+        .map_err(|_| "Todo storage lock is unavailable".to_string())?;
     let store = app
         .store("sticky-notes")
         .map_err(|e| format!("Failed to open store: {e}"))?;
