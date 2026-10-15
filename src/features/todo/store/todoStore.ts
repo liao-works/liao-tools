@@ -54,7 +54,30 @@ interface TodoState {
   getCompletedCount: () => number;
 }
 
-export const useTodoStore = create<TodoState>((set, get) => ({
+// Serialize writes from the main window so successive task edits cannot persist stale snapshots.
+let pendingSave: Promise<void> = Promise.resolve();
+const enqueueSave = (action: () => Promise<void>): Promise<void> => {
+  const next = pendingSave.then(action);
+  pendingSave = next.catch(() => undefined);
+  return next;
+};
+
+export const useTodoStore = create<TodoState>((set, get) => {
+  const commit = (transform: (current: TodoState) => Pick<TodoState, 'tasks' | 'config'>) =>
+    enqueueSave(async () => {
+      const next = transform(get());
+      try {
+        await invoke('save_sticky_notes', {
+          data: { tasks: next.tasks, config: next.config, version: 1 } as TodoStoreData,
+        });
+        set({ ...next, error: null });
+      } catch (error) {
+        set({ error: '保存失败：' + (error instanceof Error ? error.message : String(error)) });
+        throw error;
+      }
+    });
+
+  return ({
   tasks: [],
   config: DEFAULT_CONFIG,
   isLoading: false,
@@ -96,6 +119,7 @@ export const useTodoStore = create<TodoState>((set, get) => ({
   },
 
   reloadTasks: async () => {
+    await pendingSave;
     const { isLoading } = get();
     if (isLoading) return;
 
@@ -117,24 +141,10 @@ export const useTodoStore = create<TodoState>((set, get) => ({
   },
 
   saveTasks: async () => {
-    const { tasks, config } = get();
-    try {
-      await invoke('save_sticky_notes', {
-        data: {
-          tasks,
-          config,
-          version: 1,
-        } as TodoStoreData,
-      });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      set({ error: `保存失败: ${errorMessage}` });
-      throw err;
-    }
+    await commit((current) => ({ tasks: current.tasks, config: current.config }));
   },
 
   addTask: async (title, priority = 'medium') => {
-    const { tasks, saveTasks } = get();
     const now = Date.now();
     const newTask: TodoTask = {
       id: `task-${now}-${Math.random().toString(36).slice(2, 11)}`,
@@ -143,48 +153,43 @@ export const useTodoStore = create<TodoState>((set, get) => ({
       priority,
       createdAt: now,
     };
-
-    set({ tasks: [newTask, ...tasks] });
-    try {
-      await saveTasks();
-      return newTask;
-    } catch (error) {
-      // Failed persistence must not leave a ghost task in memory.
-      set((state) => ({ tasks: state.tasks.filter((task) => task.id !== newTask.id) }));
-      throw error;
-    }
+    await commit((current) => ({
+      tasks: [newTask, ...current.tasks],
+      config: current.config,
+    }));
+    return newTask;
   },
 
   updateTask: async (id, updates) => {
-    const { tasks, saveTasks } = get();
-    set({
-      tasks: tasks.map((task) => (task.id === id ? { ...task, ...updates } : task)),
-    });
-    await saveTasks();
+    await commit((current) => ({
+      tasks: current.tasks.map((task) => (task.id === id ? { ...task, ...updates } : task)),
+      config: current.config,
+    }));
   },
 
   deleteTask: async (id) => {
-    const { tasks, saveTasks } = get();
-    set({ tasks: tasks.filter((task) => task.id !== id) });
-    await saveTasks();
+    await commit((current) => ({
+      tasks: current.tasks.filter((task) => task.id !== id),
+      config: current.config,
+    }));
   },
 
   toggleTask: async (id) => {
-    const { tasks, updateTask } = get();
-    const task = tasks.find((item) => item.id === id);
-    if (!task) return;
-
-    const newStatus: TodoStatus = task.status === 'pending' ? 'completed' : 'pending';
-    await updateTask(id, {
-      status: newStatus,
-      completedAt: newStatus === 'completed' ? Date.now() : undefined,
-    });
+    await commit((current) => ({
+      tasks: current.tasks.map((task) => {
+        if (task.id !== id) return task;
+        const status: TodoStatus = task.status === 'pending' ? 'completed' : 'pending';
+        return { ...task, status, completedAt: status === 'completed' ? Date.now() : undefined };
+      }),
+      config: current.config,
+    }));
   },
 
   clearCompleted: async () => {
-    const { tasks, saveTasks } = get();
-    set({ tasks: tasks.filter((task) => task.status !== 'completed') });
-    await saveTasks();
+    await commit((current) => ({
+      tasks: current.tasks.filter((task) => task.status !== 'completed'),
+      config: current.config,
+    }));
   },
 
   updateWidgetPosition: async (position) => {
@@ -281,15 +286,16 @@ export const useTodoStore = create<TodoState>((set, get) => ({
   },
 
   updateConfig: async (updates) => {
-    const { config, saveTasks } = get();
-    const updatedConfig: TodoConfig = {
-      ...config,
-      ...updates,
-      widget: updates.widget ? { ...config.widget, ...updates.widget } : config.widget,
-      hotkeys: updates.hotkeys ? { ...config.hotkeys, ...updates.hotkeys } : config.hotkeys,
-    };
-    set({ config: updatedConfig });
-    await saveTasks();
+    await commit((current) => {
+      const config = current.config;
+      const updatedConfig: TodoConfig = {
+        ...config,
+        ...updates,
+        widget: updates.widget ? { ...config.widget, ...updates.widget } : config.widget,
+        hotkeys: updates.hotkeys ? { ...config.hotkeys, ...updates.hotkeys } : config.hotkeys,
+      };
+      return { tasks: current.tasks, config: updatedConfig };
+    });
   },
 
   setFilter: (filter) => {
@@ -314,7 +320,8 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     const { tasks } = get();
     return tasks.filter((task) => task.status === 'completed').length;
   },
-}));
+  });
+});
 
 if (typeof window !== 'undefined') {
   void listen('sticky-notes-data-updated', () => {

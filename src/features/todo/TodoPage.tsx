@@ -37,6 +37,7 @@ export function TodoPage() {
   } = useTodoStore();
 
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [addingTask, setAddingTask] = useState(false);
   const [newTaskPriority, setNewTaskPriority] = useState<TodoPriority>('medium');
   const [showSettings, setShowSettings] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
@@ -72,13 +73,16 @@ export function TodoPage() {
   }, []);
 
   const handleAddTask = async () => {
-    if (!newTaskTitle.trim() || isLoading) return;
+    if (!newTaskTitle.trim() || isLoading || addingTask) return;
+    setAddingTask(true);
     try {
       await addTask(newTaskTitle.trim(), newTaskPriority);
       setNewTaskTitle('');
       setNewTaskPriority('medium');
     } catch {
       // The store exposes the real save error. Keep the typed title for retry.
+    } finally {
+      setAddingTask(false);
     }
   };
 
@@ -155,7 +159,7 @@ export function TodoPage() {
     if (!activeTaskId) return;
 
     event.preventDefault();
-    void useTodoStore.getState().toggleTask(activeTaskId);
+    void useTodoStore.getState().toggleTask(activeTaskId).catch(() => undefined);
   };
 
   useEffect(() => {
@@ -237,7 +241,7 @@ export function TodoPage() {
             <option value="medium">中</option>
             <option value="high">高</option>
           </select>
-          <Button onClick={() => void handleAddTask()} disabled={!newTaskTitle.trim() || isLoading} aria-label="添加任务">
+          <Button onClick={() => void handleAddTask()} disabled={!newTaskTitle.trim() || isLoading || addingTask} aria-label="添加任务">
             <Plus className="h-4 w-4" />
           </Button>
         </div>
@@ -330,7 +334,7 @@ export function TodoPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => void useTodoStore.getState().clearCompleted()}
+            onClick={() => void useTodoStore.getState().clearCompleted().catch(() => undefined)}
             className="text-muted-foreground"
           >
             <Trash2 className="mr-2 h-4 w-4" />
@@ -393,11 +397,14 @@ function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
       return;
     }
 
-    if (nextTitle !== task.title) {
-      await updateTask(task.id, { title: nextTitle });
+    try {
+      if (nextTitle !== task.title) {
+        await updateTask(task.id, { title: nextTitle });
+      }
+      setIsEditing(false);
+    } catch {
+      // The store displays the persistence error; leave the edit field open.
     }
-
-    setIsEditing(false);
   };
 
   return (
@@ -420,7 +427,7 @@ function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
         className="w-1.5 self-stretch rounded-full"
         style={{ backgroundColor: isActive ? 'var(--primary)' : 'transparent' }}
       />
-      <button onClick={() => void toggleTask(task.id)} className="flex-shrink-0" disabled={isEditing} aria-label={task.status === 'completed' ? '标记未完成：' + task.title : '完成任务：' + task.title}>
+      <button onClick={() => void toggleTask(task.id).catch(() => undefined)} className="flex-shrink-0" disabled={isEditing} aria-label={task.status === 'completed' ? '标记未完成：' + task.title : '完成任务：' + task.title}>
         {task.status === 'completed' ? (
           <CheckCircle2 className="h-5 w-5" style={{ color: isActive ? 'var(--primary)' : 'var(--success-fg)' }} />
         ) : (
@@ -501,7 +508,7 @@ function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
             <Pencil className="h-4 w-4" />
           </button>
           <button
-            onClick={() => void deleteTask(task.id)}
+            onClick={() => void deleteTask(task.id).catch(() => undefined)}
             className="rounded p-1 text-muted-foreground opacity-100 transition-all hover:bg-destructive/10 hover:text-destructive md:opacity-40 md:group-hover:opacity-100 md:focus-visible:opacity-100"
             title="删除任务"
           >

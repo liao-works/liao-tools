@@ -150,8 +150,8 @@ pub fn get_all_tools() -> Result<Vec<DisplayTool>, CommandError> {
             ) {
                 Ok(s) => s,
                 Err(e) => {
-                    info!("准备查询失败: {}", e);
-                    return Ok(system_display_tools);
+                    error!("读取自定义工具列表失败: {}", e);
+                    return Err(CommandError::new(format!("读取自定义工具列表失败: {}", e), "DB_ERROR"));
                 }
             };
 
@@ -179,8 +179,8 @@ pub fn get_all_tools() -> Result<Vec<DisplayTool>, CommandError> {
             }) {
                 Ok(r) => r,
                 Err(e) => {
-                    info!("查询自定义工具失败: {}", e);
-                    return Ok(system_display_tools);
+                    error!("查询自定义工具失败: {}", e);
+                    return Err(CommandError::new(format!("查询自定义工具失败: {}", e), "DB_ERROR"));
                 }
             };
 
@@ -190,14 +190,14 @@ pub fn get_all_tools() -> Result<Vec<DisplayTool>, CommandError> {
                     tools
                 }
                 Err(e) => {
-                    info!("解析自定义工具失败: {}", e);
-                    vec![]
+                    error!("解析自定义工具失败: {}", e);
+                    return Err(CommandError::new(format!("解析自定义工具失败: {}", e), "DB_ERROR"));
                 }
             }
         }
         Err(e) => {
-            info!("数据库连接失败: {}，返回仅系统工具", e);
-            vec![]
+            error!("自定义工具数据库连接失败: {}", e);
+            return Err(e);
         }
     };
 
@@ -373,37 +373,33 @@ pub fn launch_custom_tool(id: i64) -> Result<LaunchToolResult, CommandError> {
     let conn = get_connection()?;
     let tool = get_tool_by_id(&conn, id)?;
 
-    // 更新启动统计
+    // A successful process spawn is the success condition; do not count a failed launch.
+    launch_program(&tool.executable_path, &tool.arguments, &tool.working_directory)
+        .map_err(|error| {
+            error!("工具启动失败: {} - {}", tool.name, error);
+            error
+        })?;
+
     let now = chrono::Utc::now().to_rfc3339();
-    conn.execute(
+    if let Err(error) = conn.execute(
         "UPDATE user_tools
          SET launch_count = launch_count + 1, last_launched_at = ?1
          WHERE id = ?2",
         params![now, id],
-    )
-    .map_err(|e| CommandError::new(format!("更新统计失败: {}", e), "DB_ERROR"))?;
-
-    // 启动程序
-    let result = launch_program(&tool.executable_path, &tool.arguments, &tool.working_directory);
-
-    match result {
-        Ok(_) => {
-            // 记录到最近使用
-            record_program_launch_internal(&conn, &tool.executable_path, &tool.name)?;
-
-            info!("工具启动成功: {}", tool.name);
-            Ok(LaunchToolResult {
-                success: true,
-                tool_id: id.to_string(),
-                message: format!("{} 启动成功", tool.name),
-                error: None,
-            })
-        }
-        Err(e) => {
-            error!("工具启动失败: {} - {}", tool.name, e);
-            Err(e)
-        }
+    ) {
+        log::warn!("工具已启动，但启动统计写入失败: {}", error);
     }
+    if let Err(error) = record_program_launch_internal(&conn, &tool.executable_path, &tool.name) {
+        log::warn!("工具已启动，但最近使用记录写入失败: {}", error);
+    }
+
+    info!("工具启动成功: {}", tool.name);
+    Ok(LaunchToolResult {
+        success: true,
+        tool_id: id.to_string(),
+        message: format!("{} 启动成功", tool.name),
+        error: None,
+    })
 }
 
 /// 启动程序
