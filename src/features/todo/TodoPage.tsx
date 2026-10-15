@@ -190,7 +190,7 @@ export function TodoPage() {
   }, [activeTaskId, filter, newTaskTitle, showSettings, visibleTasks]);
 
   return (
-    <div className="mx-auto flex h-full min-h-[540px] w-full max-w-5xl flex-col rounded-2xl border border-border bg-card shadow-none">
+    <div className="lt-todo mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col rounded-2xl border border-border bg-card shadow-sm">
       <div className="border-b border-border p-4">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -300,7 +300,7 @@ export function TodoPage() {
           </div>
         ) : filteredTasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-4 py-16">
-            <Circle className="mb-4 h-12 w-12 text-muted-foreground/50" />
+            <img src="/illustrations/todo-empty.svg" className="lt-todo-empty-art" alt="" aria-hidden="true" />
             <p className="text-muted-foreground">{filter === 'completed' ? '还没有已完成的任务' : filter === 'pending' ? '当前没有待办任务' : '暂无任务'}</p>
           </div>
         ) : (
