@@ -189,11 +189,27 @@ impl TaxDatabase {
     pub fn read_all_from_path(db_path: &std::path::Path) -> Result<Vec<TaxTariff>> {
         let conn = crate::core::database::create_connection(db_path)
             .context("Failed to open new tariffs db for diff")?;
-        let mut stmt = conn.prepare(
+        let cols: Vec<String> = conn.prepare("PRAGMA table_info(tariffs)")?
+            .query_map([], |row| row.get(1))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let optional_col = |name: &str| -> String {
+            if cols.iter().any(|column| column == name) {
+                name.to_owned()
+            } else {
+                format!("NULL AS {}", name)
+            }
+        };
+        // Old installed snapshots have 10 columns and must still be readable.
+        // New snapshots include separate XI charges and exporter evidence.
+        let sql = format!(
             "SELECT code, description, rate, url, north_ireland_rate,
-                    north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated
-             FROM tariffs",
-        )?;
+                    north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated,
+                    {}, {}, {} FROM tariffs",
+            optional_col("ni_anti_dumping_rate"),
+            optional_col("ni_countervailing_rate"),
+            optional_col("trade_remedy_details")
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], |row| {
             Ok(TaxTariff {
                 code: row.get(0)?,
@@ -212,9 +228,9 @@ impl TaxDatabase {
                 ni_verified_at: None,
                 uk_rate_status: None,
                 ni_rate_status: None,
-                ni_anti_dumping_rate: None,
-                ni_countervailing_rate: None,
-                trade_remedy_details: None,
+                ni_anti_dumping_rate: row.get(10)?, 
+                ni_countervailing_rate: row.get(11)?,
+                trade_remedy_details: row.get(12)?,
                 similarity: None,
             })
         })?;
