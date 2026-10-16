@@ -16,6 +16,25 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
   const needsReview =
     rateNeedsAttention(tariff.rate, tariff.uk_rate_status) ||
     rateNeedsAttention(tariff.north_ireland_rate || tariff.northIrelandRate, tariff.ni_rate_status);
+  type TradeRemedyDetail = {
+    region: 'GB' | 'XI'; type: 'anti_dumping' | 'countervailing';
+    measure_type: string; geography: string; expression: string;
+    additional_code: string; additional_description: string;
+    conditions: string; effective_start: string; effective_end: string;
+  };
+  let remedies: TradeRemedyDetail[] = [];
+  try {
+    const parsed: unknown = JSON.parse(tariff.trade_remedy_details || '[]');
+    if (Array.isArray(parsed)) {
+      remedies = parsed.filter((item): item is TradeRemedyDetail =>
+        !!item && typeof item === 'object' &&
+        (item.region === 'GB' || item.region === 'XI') &&
+        (item.type === 'anti_dumping' || item.type === 'countervailing')
+      );
+    }
+  } catch {
+    // Old database metadata has no detail column. The summary remains usable.
+  }
   const sources = [
     { name: '英国税率来源', url: tariff.url, rate: tariff.rate, status: tariff.uk_rate_status,
       version: tariff.uk_source_version, verified: tariff.uk_verified_at },
@@ -49,6 +68,35 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
           网页临时比对（不修改数据库）
         </Button>
       </section>
+      {remedies.length > 0 && <section className="lt-tax-facts" aria-labelledby="lt-remedies-heading">
+        <div className="lt-tax-panel-heading">
+          <div>
+            <span className="lt-kicker">CHINA TRADE REMEDIES</span>
+            <h3 id="lt-remedies-heading">中国原产 · 反倾销和反补贴措施</h3>
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground mb-3">
+          附加税与普通进口关税分开计算。不同生产商、附加代码和条件可能有不同税率，
+          请按实际生产商选择，不能把“其他企业”的税率套用到所有企业。
+        </p>
+        <div className="max-h-80 overflow-y-auto space-y-2">
+          {remedies.map((r, index) => <div key={index} className="rounded-lg border p-3 text-sm space-y-1">
+            <div className="font-medium">
+              {r.region} · {r.type === 'anti_dumping' ? '反倾销' : '反补贴'}
+              {r.measure_type === '551' || r.measure_type === '553' ? '（临时）' : '（最终）'}
+              {' · '}{r.expression || '税率需查看官方条件'}
+            </div>
+            {r.additional_code && <div>附加代码：<span className="font-mono">{r.additional_code}</span>
+              {r.additional_description && <> · {r.additional_description}</>}</div>}
+            {r.conditions && <div>适用条件：{r.conditions}</div>}
+            <div className="text-muted-foreground">
+              {r.effective_start ? `生效：${r.effective_start}` : '生效日期未记录'}
+              {r.effective_end ? ` · 截止：${r.effective_end}` : ''}
+              {' · '}中国适用范围：{r.geography === 'CN' ? '中国' : '包括中国的所有国家'}
+            </div>
+          </div>)}
+        </div>
+      </section>}
       <aside className="lt-tax-sources" aria-labelledby="lt-tax-sources-title">
         <div className="lt-tax-panel-heading">
           <div><span className="lt-kicker">EVIDENCE</span><h3 id="lt-tax-sources-title">来源与核验</h3></div>
