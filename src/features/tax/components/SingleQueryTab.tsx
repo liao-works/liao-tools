@@ -12,6 +12,7 @@ import type { TaxTariff } from '@/types';
 import { TaxResultDetail } from './TaxResultDetail';
 import { Link } from 'react-router-dom';
 import { validateTaxHsCode } from '@/lib/hs-code';
+import { displayedRate, displayedRateStatus, rateNeedsAttention } from '@/lib/tariff-display';
 
 interface UpdateLog {
   code: string;
@@ -28,27 +29,23 @@ interface UpdateProgress {
 
 
 function TariffOverview({ tariff }: { tariff: TaxTariff }) {
-  const statusLabel = (status?: string | null) =>
-    status === 'verified' ? '来源已核验' :
-    status === 'conditional' ? '存在条件 · 需复核' :
-    status === 'stale' ? '旧缓存 · 未核验' : '来源未经核验';
+  const niRate = tariff.north_ireland_rate || tariff.northIrelandRate;
   const cards = [
-    {label:'英国 (GB) 进口税率',rate:tariff.rate || '—',status:statusLabel(tariff.uk_rate_status),tone:tariff.uk_rate_status === 'verified' ? 'ok' : 'review'},
-    {label:'北爱尔兰 (NI) 进口税率',rate:tariff.north_ireland_rate || tariff.northIrelandRate || '—',status:statusLabel(tariff.ni_rate_status),tone:tariff.ni_rate_status === 'verified' ? 'ok' : 'review'},
-    {label:'反倾销税率',rate:tariff.anti_dumping_rate || '—',status:tariff.anti_dumping_rate ? '本地有记录' : '本地未提供',tone:'neutral'},
-    {label:'反补贴税率',rate:tariff.countervailing_rate || '—',status:tariff.countervailing_rate ? '本地有记录' : '本地未提供',tone:'neutral'}
+    { label: '英国 (GB) 进口税率', rate: tariff.rate, status: tariff.uk_rate_status },
+    { label: '北爱尔兰 (NI) 进口税率', rate: niRate, status: tariff.ni_rate_status },
+    { label: '反倾销税率', rate: tariff.anti_dumping_rate },
+    { label: '反补贴税率', rate: tariff.countervailing_rate },
   ];
-  return <>
-    <div className="lt-rate-grid">
-      {cards.map(item => <div className="lt-rate-card" key={item.label}>
+  return <div className="lt-rate-grid">
+    {cards.map(item => {
+      const status = displayedRateStatus(item.rate, item.status);
+      return <div className="lt-rate-card" key={item.label}>
         <span className="lt-rate-label">{item.label}</span>
-        <strong>{item.rate}</strong>
-        <span className={['lt-rate-state','lt-rate-state--'+item.tone].join(' ')}>{item.status}</span>
-      </div>)}
-    </div>
-    {(tariff.uk_rate_status !== 'verified' || tariff.ni_rate_status !== 'verified') &&
-      <div className="lt-rate-caution">当前查询包含未完全核验的税率或条件项。请核对相应官方来源，不要仅凭此结果进行申报。</div>}
-  </>;
+        <strong>{displayedRate(item.rate)}</strong>
+        {status && <span className="lt-rate-state lt-rate-state--review">{status}</span>}
+      </div>;
+    })}
+  </div>;
 }
 
 export function SingleQueryTab() {
@@ -262,7 +259,7 @@ export function SingleQueryTab() {
       <Card className="lt-tax-form">
         <CardHeader>
           <CardTitle>商品编码查询</CardTitle>
-          <CardDescription>同时查看英国和北爱尔兰税率及来源核验状态</CardDescription>
+          <CardDescription>查询英国与北爱尔兰本地税率；未提供的值显示为 —</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="lt-tax-form-fields">
@@ -339,12 +336,10 @@ export function SingleQueryTab() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <div className="flex flex-col">
-                          <span className="font-medium">{result.rate || '待核验'}</span>
-                          {result.uk_rate_status !== 'verified' && (
+                          <span className="font-medium">{displayedRate(result.rate)}</span>
+                          {rateNeedsAttention(result.rate, result.uk_rate_status) && (
                             <span className="text-xs text-muted-foreground">
-                              {result.uk_rate_status === 'stale' ? '旧缓存·未核验' :
-                                result.uk_rate_status === 'conditional' ? '存在条件·不可直接使用' :
-                                !result.uk_rate_status ? '旧版数据·来源未经核验' : '无确定税率'}
+                              {displayedRateStatus(result.rate, result.uk_rate_status)}
                             </span>
                           )}
                         </div>
@@ -363,13 +358,10 @@ export function SingleQueryTab() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <span className="font-medium">
-                          {result.north_ireland_rate || result.northIrelandRate || '待核验'}
-                          {result.ni_rate_status !== 'verified' && (
+                          {displayedRate(result.north_ireland_rate || result.northIrelandRate)}
+                          {rateNeedsAttention(result.north_ireland_rate || result.northIrelandRate, result.ni_rate_status) && (
                             <span className="block text-xs text-muted-foreground">
-                              {result.ni_rate_status === 'stale' ? '旧缓存·未经官方核验' :
-                                result.ni_rate_status === 'conditional' ? '条件限制' :
-                                !result.ni_rate_status ? '旧版数据·来源未经核验' :
-                                '暂未获取可信数据'}
+                              {displayedRateStatus(result.north_ireland_rate || result.northIrelandRate, result.ni_rate_status)}
                             </span>
                           )}
                         </span>
@@ -393,7 +385,7 @@ export function SingleQueryTab() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <span className="font-medium">
-                          {result.anti_dumping_rate || '-'}
+                          {displayedRate(result.anti_dumping_rate)}
                         </span>
                         {result.anti_dumping_rate && (
                           <Button
@@ -411,7 +403,7 @@ export function SingleQueryTab() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <span className="font-medium">
-                          {result.countervailing_rate || '-'}
+                          {displayedRate(result.countervailing_rate)}
                         </span>
                         {result.countervailing_rate && (
                           <Button
