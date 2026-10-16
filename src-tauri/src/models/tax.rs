@@ -22,6 +22,8 @@ pub struct TaxTariff {
     /// producer additional codes, effective dates and original conditions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trade_remedy_details: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate_options: Option<String>,
     pub last_updated: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uk_source_version: Option<String>,
