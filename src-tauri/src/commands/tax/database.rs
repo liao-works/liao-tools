@@ -135,6 +135,7 @@ impl TaxDatabase {
                 ni_anti_dumping_rate: row.get(16)?,
                 ni_countervailing_rate: row.get(17)?,
                 trade_remedy_details: row.get(18)?,
+                rate_options: row.get(19)?,
                 similarity: None,
             }))
         } else {
@@ -174,6 +175,7 @@ impl TaxDatabase {
                 ni_anti_dumping_rate: row.get(16)?,
                 ni_countervailing_rate: row.get(17)?,
                 trade_remedy_details: row.get(18)?,
+                rate_options: row.get(19)?,
                 similarity: None,
             })
         })?;
