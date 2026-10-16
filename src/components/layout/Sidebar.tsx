@@ -28,7 +28,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
     <aside className={['lt-sidebar', collapsed ? 'lt-sidebar--collapsed' : ''].join(' ')} aria-label="主导航">
       <div className="lt-brand">
         <NavLink to="/" end className="lt-brand-link" onClick={onNavigate} title="Liao Tools 工作台">
-          <span className="lt-brand-symbol">L</span>
+          <img className="lt-brand-symbol" src="/app-icon.svg" alt="" aria-hidden="true" />
           {!collapsed && <span className="lt-brand-title">Liao <strong>Tools</strong></span>}
         </NavLink>
         <button className="lt-icon-button lt-collapse" type="button" onClick={onToggle}
