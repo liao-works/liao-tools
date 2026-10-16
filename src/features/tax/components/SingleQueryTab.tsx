@@ -33,8 +33,10 @@ function TariffOverview({ tariff }: { tariff: TaxTariff }) {
   const cards = [
     { label: '英国 (GB) 进口税率', rate: tariff.rate, status: tariff.uk_rate_status },
     { label: '北爱尔兰 (NI) 进口税率', rate: niRate, status: tariff.ni_rate_status },
-    { label: '反倾销税率', rate: tariff.anti_dumping_rate },
-    { label: '反补贴税率', rate: tariff.countervailing_rate },
+    { label: '反倾销 · 英国 GB', rate: tariff.anti_dumping_rate },
+    { label: '反补贴 · 英国 GB', rate: tariff.countervailing_rate },
+    { label: '反倾销 · 北爱 XI', rate: tariff.ni_anti_dumping_rate },
+    { label: '反补贴 · 北爱 XI', rate: tariff.ni_countervailing_rate },
   ];
   return <div className="lt-rate-grid">
     {cards.map(item => {
@@ -323,8 +325,10 @@ export function SingleQueryTab() {
                   <TableHead>商品编码</TableHead>
                   <TableHead>英国税率</TableHead>
                   <TableHead>北爱尔兰税率</TableHead>
-                  <TableHead>反倾销税率</TableHead>
-                  <TableHead>反补贴税率</TableHead>
+                  <TableHead>反倾销（GB）</TableHead>
+                  <TableHead>反补贴（GB）</TableHead>
+                  <TableHead>反倾销（XI）</TableHead>
+                  <TableHead>反补贴（XI）</TableHead>
                   {fuzzyMode && <TableHead>相似度</TableHead>}
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
@@ -417,6 +421,12 @@ export function SingleQueryTab() {
                           </Button>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-medium">{displayedRate(result.ni_anti_dumping_rate)}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-medium">{displayedRate(result.ni_countervailing_rate)}</span>
                     </TableCell>
                     {fuzzyMode && (
                       <TableCell>
