@@ -102,47 +102,31 @@ pub fn get_platform_info_impl() -> PlatformInfo {
     }
 }
 
-/// 获取平台特定的下载 URL
-fn get_platform_download_url(assets: &[GitHubAsset]) -> Result<Option<String>, CommandError> {
-    let platform_info = get_platform_info_impl();
-    
-    // 根据平台和架构选择合适的安装包
-    let target_patterns = match platform_info.os_family.as_str() {
-        "windows" => {
-            if platform_info.arch.contains("x86_64") || platform_info.arch.contains("amd64") {
-                vec!["x64_setup.exe", "x64.msi", "setup.exe", ".exe"]
-            } else {
-                vec![".exe", ".msi"]
-            }
-        }
-        "macos" => {
-            if platform_info.arch.contains("aarch64") || platform_info.arch.contains("arm64") {
-                vec!["aarch64.dmg", "arm64.dmg", "universal.dmg", ".dmg"]
-            } else {
-                vec!["x86_64.dmg", ".dmg", ".app.tar.gz"]
-            }
-        }
-        "linux" => {
-            if platform_info.arch.contains("x86_64") || platform_info.arch.contains("amd64") {
-                vec!["amd64.AppImage", "x86_64.AppImage", ".AppImage", ".deb", ".rpm"]
-            } else {
-                vec![".AppImage", ".deb", ".rpm"]
-            }
-        }
-        _ => return Ok(None),
+/// 只选择符合当前系统和架构的安装包，避免 Intel Mac 误下载 ARM DMG。
+/// 官方发布文件名例：liao-tools_0.0.15_x64-setup.exe / _x64.dmg / _aarch64.dmg
+fn platform_download_url(assets: &[GitHubAsset], os: &str, arch: &str) -> Option<String> {
+    let patterns: &[&str] = match (os, arch) {
+        ("windows", "x86_64" | "amd64") => &["_x64-setup.exe", "_x64_en-US.msi"],
+        ("windows", "aarch64" | "arm64") => &["_aarch64-setup.exe", "_aarch64.msi"],
+        ("macos", "aarch64" | "arm64") => &["_aarch64.dmg", "_arm64.dmg", "_universal.dmg"],
+        ("macos", "x86_64" | "amd64") => &["_x64.dmg", "_x86_64.dmg", "_universal.dmg"],
+        ("linux", "x86_64" | "amd64") => &["_amd64.AppImage", "_x86_64.AppImage", "_amd64.deb", "_x86_64.rpm"],
+        ("linux", "aarch64" | "arm64") => &["_aarch64.AppImage", "_arm64.AppImage", "_arm64.deb"],
+        _ => return None,
     };
-
-    // 按优先级查找匹配的文件
-    for pattern in target_patterns {
-        for asset in assets {
-            if asset.name.contains(pattern) {
-                println!("找到平台特定文件: {}", asset.name);
-                return Ok(Some(asset.browser_download_url.clone()));
-            }
+    for suffix in patterns {
+        if let Some(asset) = assets.iter().find(|asset| {
+            asset.name.ends_with(*suffix) && asset.size > 0 && !asset.browser_download_url.is_empty()
+        }) {
+            return Some(asset.browser_download_url.clone());
         }
     }
+    None
+}
 
-    Ok(None)
+fn get_platform_download_url(assets: &[GitHubAsset]) -> Result<Option<String>, CommandError> {
+    let info = get_platform_info_impl();
+    Ok(platform_download_url(assets, &info.os_family, &info.arch))
 }
 
 /// 获取文件大小
@@ -609,7 +593,7 @@ fn install_linux_deb(path: &Path, _silent: bool) -> Result<(), CommandError> {
 pub async fn check_for_updates() -> Result<UpdateInfo, CommandError> {
     let client = reqwest::Client::builder()
         .user_agent("liao-tools")
-        .timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(20))
         .build()
         .map_err(|e| CommandError::new(format!("创建 HTTP 客户端失败: {}", e), "NETWORK_ERROR"))?;
 
@@ -638,10 +622,20 @@ pub async fn check_for_updates() -> Result<UpdateInfo, CommandError> {
                 format!("仓库 {} 未找到 Release，请确保已发布至少一个版本", GITHUB_REPO),
                 "NOT_FOUND"
             ));
-        } else if status.as_u16() == 403 || status.as_u16() == 401 {
+        } else if status.as_u16() == 429 || (status.as_u16() == 403 && error_body.to_lowercase().contains("rate limit")) {
             return Err(CommandError::new(
-                format!("访问私有仓库失败，请设置 GITHUB_TOKEN 环境变量。错误: {}", error_body),
+                "GitHub 更新接口请求次数受限（HTTP 403/429）。请稍后重试，或打开官方发布页面手动下载安装。",
+                "RATE_LIMIT"
+            ));
+        } else if status.as_u16() == 401 {
+            return Err(CommandError::new(
+                "GitHub API 身份验证失败（HTTP 401）。如果配置了 GITHUB_TOKEN，请检查其有效性；否则可打开官方发布页面手动下载。",
                 "AUTH_ERROR"
+            ));
+        } else if status.as_u16() == 403 {
+            return Err(CommandError::new(
+                "GitHub 拒绝访问更新接口（HTTP 403），请检查网络或代理，再重试；也可以在官方发布页面手动下载。",
+                "ACCESS_DENIED"
             ));
         } else {
             return Err(CommandError::new(
@@ -828,6 +822,42 @@ mod tests {
         assert!(compare_versions("2.0.0", "1.9.9"));
         assert!(!compare_versions("1.2.2", "1.2.3"));
         assert!(!compare_versions("1.2.3", "1.2.3"));
+    }
+
+    fn sample_asset(name: &str) -> GitHubAsset {
+        GitHubAsset {
+            name: name.to_string(),
+            browser_download_url: format!("https://github.com/liao-works/liao-tools/releases/download/v0.0.15/{}", name),
+            size: 100,
+        }
+    }
+
+    #[test]
+    fn selects_correct_installer_for_each_architecture() {
+        // Intentionally put ARM first: Intel must never accept it as a generic DMG.
+        let assets = vec![
+            sample_asset("liao-tools_0.0.15_aarch64.dmg"),
+            sample_asset("liao-tools_0.0.15_universal.dmg"),
+            sample_asset("liao-tools_0.0.15_x64.dmg"),
+            sample_asset("liao-tools_0.0.15_x64-setup.exe"),
+            sample_asset("liao-tools_0.0.15_x64_en-US.msi"),
+        ];
+        assert!(platform_download_url(&assets, "macos", "x86_64").unwrap().ends_with("_x64.dmg"));
+        assert!(platform_download_url(&assets, "macos", "aarch64").unwrap().ends_with("_aarch64.dmg"));
+        assert!(platform_download_url(&assets, "windows", "x86_64").unwrap().ends_with("_x64-setup.exe"));
+        assert!(platform_download_url(&assets, "windows", "aarch64").is_none());
+    }
+
+    #[test]
+    fn unsupported_architecture_or_missing_installer_is_not_falsely_matched() {
+        let assets = vec![
+            sample_asset("liao-tools_0.0.15_aarch64.dmg"),
+            sample_asset("liao-tools_0.0.15_x64_en-US.msi"),
+            sample_asset("liao-tools_x64.app.tar.gz"),
+        ];
+        assert!(platform_download_url(&assets, "macos", "x86_64").is_none());
+        assert!(platform_download_url(&assets, "linux", "x86_64").is_none());
+        assert!(platform_download_url(&assets, "windows", "x86_64").unwrap().ends_with("_x64_en-US.msi"));
     }
 
     #[test]

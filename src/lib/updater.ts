@@ -1,6 +1,26 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 
+
+/**
+ * Tauri commands may reject with a serialized { code, message } object rather
+ * than a native Error. Preserve the actual backend cause for the update UI.
+ */
+export function formatUpdaterError(error: unknown, fallback = '操作失败'): string {
+  if (typeof error === 'string' && error.trim()) return error.trim();
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (error && typeof error === 'object' && 'message' in error) {
+    const detail = error as { message?: unknown; code?: unknown };
+    if (typeof detail.message === 'string' && detail.message.trim()) {
+      const code = typeof detail.code === 'string' && detail.code.trim()
+        ? `（${detail.code}）`
+        : '';
+      return `${detail.message.trim()}${code}`;
+    }
+  }
+  return fallback;
+}
+
 export interface UpdateInfo {
   current_version: string;
   latest_version: string;
