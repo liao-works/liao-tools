@@ -207,7 +207,7 @@ impl TaxDatabase {
         let sql = format!(
             "SELECT code, description, rate, url, north_ireland_rate,
                     north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated,
-                    {}, {}, {} FROM tariffs",
+                    {}, {}, {}, {} FROM tariffs",
             optional_col("ni_anti_dumping_rate"),
             optional_col("ni_countervailing_rate"),
             optional_col("trade_remedy_details"),
