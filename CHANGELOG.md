@@ -1,3 +1,17 @@
+## [0.0.16](https://github.com/liao-works/liao-tools/compare/v0.0.15...v0.0.16) (2026-10-16)
+
+### 🎨 品牌视觉与高清桌面图标
+
+* 全新 Liao Tools 品牌图标：浅蓝地球、英国及爱尔兰轮廓、粉色星环与星芒（PR #18）。
+* 桌面 Windows 多分辨率 ICO 和 macOS ICNS 统一使用高清矢量母版生成，修复原 Windows 图标文件分辨率不足的问题。
+* 替换应用侧边栏品牌标识、网页 favicon 与兼容图标，并新增统一生成、检查图标资源的脚本与文档。
+* 新安装包提供 Windows x64（NSIS/MSI）和 macOS Apple Silicon（ARM64）版本；不再生成 macOS Intel 和 Universal 安装包（继承既有发布配置）。
+
+### ✅ 发布边界
+
+* 本次仅合入品牌图标与已在 master 的发布配置，不包含尚未合并的应用更新错误处理修复 PR #16。
+* 新图标在安装或升级到 v0.0.16 后生效，部分 Windows 图标可能需要刷新系统缓存；未经实机 GUI 全功能回归，不宣称所有业务流程经过手工验收。
+
 ## [0.0.15](https://github.com/liao-works/liao-tools/compare/v0.0.14...v0.0.15) (2026-10-15)
 
 ### ✨ 高保真 UI 正式版：恢复 PR #3 原定设计
