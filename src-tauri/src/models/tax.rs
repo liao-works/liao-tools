@@ -14,6 +14,14 @@ pub struct TaxTariff {
     pub anti_dumping_rate: Option<String>, // 反倾销税率
     #[serde(skip_serializing_if = "Option::is_none")]
     pub countervailing_rate: Option<String>, // 反补贴税率
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ni_anti_dumping_rate: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ni_countervailing_rate: Option<String>,
+    /// JSON array of original China-applicable GB/XI remedy evidence, including
+    /// producer additional codes, effective dates and original conditions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trade_remedy_details: Option<String>,
     pub last_updated: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uk_source_version: Option<String>,

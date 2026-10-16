@@ -143,7 +143,10 @@ export interface TaxTariff {
   description?: string;
   other_rate?: string;
   anti_dumping_rate?: string; // 反倾销税率
-  countervailing_rate?: string; // 反补贴税率
+  countervailing_rate?: string; // 英国 GB 反补贴税率
+  ni_anti_dumping_rate?: string | null; // 北爱 XI 反倾销
+  ni_countervailing_rate?: string | null; // 北爱 XI 反补贴
+  trade_remedy_details?: string | null; // GB/XI 企业代码、税率、条件及生效日期原始措施摘要
   last_updated?: string;
   uk_source_version?: string | null;
   ni_source_version?: string | null;

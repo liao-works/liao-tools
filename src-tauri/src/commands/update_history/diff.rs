@@ -17,11 +17,16 @@ pub fn diff_tariffs(
     let mut out = Vec::new();
 
     // tax 对比的共有字段：(字段名, 取值函数)
-    let fields: [(&str, fn(&TaxTariff) -> Option<String>); 4] = [
+    let fields: [(&str, fn(&TaxTariff) -> Option<String>); 9] = [
         ("rate", |t| Some(t.rate.clone())),
         ("north_ireland_rate", |t| t.north_ireland_rate.clone()),
         ("description", |t| t.description.clone()),
         ("other_rate", |t| t.other_rate.clone()),
+        ("anti_dumping_rate", |t| t.anti_dumping_rate.clone()),
+        ("countervailing_rate", |t| t.countervailing_rate.clone()),
+        ("ni_anti_dumping_rate", |t| t.ni_anti_dumping_rate.clone()),
+        ("ni_countervailing_rate", |t| t.ni_countervailing_rate.clone()),
+        ("trade_remedy_details", |t| t.trade_remedy_details.clone()),
     ];
 
     let mk = |code: &str, field: Option<&str>, old_v: Option<String>,
@@ -135,6 +140,9 @@ mod tests {
             other_rate: None,
             anti_dumping_rate: None,
             countervailing_rate: None,
+            ni_anti_dumping_rate: None,
+            ni_countervailing_rate: None,
+            trade_remedy_details: None,
             last_updated: None,
             uk_source_version: None,
             ni_source_version: None,
@@ -165,6 +173,19 @@ mod tests {
         assert_eq!(added.new_value.as_deref(), Some("商品03"));
         assert_eq!(added.old_value, None);
         assert_eq!(added.field, None);
+    }
+
+    #[test]
+    fn test_remedy_changes_in_new_snapshot_are_recorded() {
+        let old = vec![tariff("7010901000", "6%", Some("5%"))];
+        let mut changed = old.clone();
+        changed[0].anti_dumping_rate = Some("52.97%（其他企业，8A95）".into());
+        changed[0].ni_countervailing_rate = Some("按企业/条件适用（见详情）".into());
+        changed[0].trade_remedy_details = Some(r#"[{"type":"anti_dumping"}]"#.into());
+        let history = diff_tariffs(&old, &changed, "change", None, None);
+        assert!(history.iter().any(|c| c.field.as_deref() == Some("anti_dumping_rate")));
+        assert!(history.iter().any(|c| c.field.as_deref() == Some("ni_countervailing_rate")));
+        assert!(history.iter().any(|c| c.field.as_deref() == Some("trade_remedy_details")));
     }
 
     #[test]
