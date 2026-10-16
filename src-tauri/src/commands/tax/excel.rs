@@ -234,7 +234,7 @@ impl TaxExcelProcessor {
                 worksheet.write(row_num, 14, tariff.uk_source_version.as_deref().unwrap_or(""))?;
                 worksheet.write(row_num, 15, tariff.ni_source_version.as_deref().unwrap_or(""))?;
             } else {
-                worksheet.write(row_num, 9, "未找到")?;
+                worksheet.write(row_num, 11, "未找到")?;
             }
         }
 
