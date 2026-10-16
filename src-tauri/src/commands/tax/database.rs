@@ -107,7 +107,7 @@ impl TaxDatabase {
                     north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated,
                     uk_source_version, ni_source_version, uk_verified_at,
                     ni_verified_at, uk_rate_status, ni_rate_status,
-                    ni_anti_dumping_rate, ni_countervailing_rate, trade_remedy_details
+                    ni_anti_dumping_rate, ni_countervailing_rate, trade_remedy_details, rate_options
              FROM tariffs
              WHERE code = ?1",
         )?;
@@ -149,7 +149,7 @@ impl TaxDatabase {
                     north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated,
                     uk_source_version, ni_source_version, uk_verified_at,
                     ni_verified_at, uk_rate_status, ni_rate_status,
-                    ni_anti_dumping_rate, ni_countervailing_rate, trade_remedy_details
+                    ni_anti_dumping_rate, ni_countervailing_rate, trade_remedy_details, rate_options
              FROM tariffs",
         )?;
 
