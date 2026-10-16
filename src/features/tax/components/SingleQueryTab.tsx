@@ -259,7 +259,7 @@ export function SingleQueryTab() {
       <Card className="lt-tax-form">
         <CardHeader>
           <CardTitle>商品编码查询</CardTitle>
-          <CardDescription>查询英国与北爱尔兰本地税率；未提供的值显示为 —</CardDescription>
+          <CardDescription>默认查询中国原产商品进入英国的普通第三国进口税率；空值显示 —，特殊条件税率不自动套用</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="lt-tax-form-fields">
