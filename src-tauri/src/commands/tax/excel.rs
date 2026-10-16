@@ -117,8 +117,10 @@ impl TaxExcelProcessor {
             "英国URL",
             "北爱尔兰税率",
             "北爱尔兰URL",
-            "反倾销税率",
-            "反补贴税率",
+            "反倾销（英国GB）",
+            "反补贴（英国GB）",
+            "反倾销（北爱XI）",
+            "反补贴（北爱XI）",
             "查询状态",
             "英国数据状态",
             "北爱数据状态",
@@ -159,18 +161,20 @@ impl TaxExcelProcessor {
                     6,
                     tariff.countervailing_rate.as_deref().unwrap_or(""),
                 )?;
-                worksheet.write(row_num, 7, "成功")?;
-                worksheet.write(row_num, 8, tariff.uk_rate_status.as_deref().unwrap_or("legacy_unverified"))?;
-                worksheet.write(row_num, 9, tariff.ni_rate_status.as_deref().unwrap_or("legacy_unverified"))?;
-                worksheet.write(row_num, 10, tariff.uk_source_version.as_deref().unwrap_or(""))?;
-                worksheet.write(row_num, 11, tariff.ni_source_version.as_deref().unwrap_or(""))?;
+                worksheet.write(row_num, 7, tariff.ni_anti_dumping_rate.as_deref().unwrap_or(""))?;
+                worksheet.write(row_num, 8, tariff.ni_countervailing_rate.as_deref().unwrap_or(""))?;
+                worksheet.write(row_num, 9, "成功")?;
+                worksheet.write(row_num, 10, tariff.uk_rate_status.as_deref().unwrap_or(""))?;
+                worksheet.write(row_num, 11, tariff.ni_rate_status.as_deref().unwrap_or(""))?;
+                worksheet.write(row_num, 12, tariff.uk_source_version.as_deref().unwrap_or(""))?;
+                worksheet.write(row_num, 13, tariff.ni_source_version.as_deref().unwrap_or(""))?;
             } else {
-                worksheet.write(row_num, 7, "未找到")?;
+                worksheet.write(row_num, 9, "未找到")?;
             }
         }
 
-        // 自动调整列宽（现在是8列）
-        for col in 0..12 {
+        // GB 与北爱 XI 的附加税单独导出，避免混淆
+        for col in 0..14 {
             worksheet.set_column_width(col, 20)?;
         }
         
