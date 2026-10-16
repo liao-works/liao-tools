@@ -273,8 +273,8 @@ impl TaxDatabase {
         self.conn.execute(
             "INSERT OR REPLACE INTO tariffs
              (code, description, rate, url, north_ireland_rate,
-              north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))",
+              north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, rate_options, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, datetime('now'))",
             params![
                 tariff.code,
                 tariff.description,
@@ -285,6 +285,7 @@ impl TaxDatabase {
                 tariff.other_rate,
                 tariff.anti_dumping_rate,
                 tariff.countervailing_rate,
+                tariff.rate_options,
             ],
         )?;
         Ok(())
@@ -298,8 +299,8 @@ impl TaxDatabase {
             tx.execute(
                 "INSERT OR REPLACE INTO tariffs
                  (code, description, rate, url, north_ireland_rate,
-                  north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))",
+                  north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, rate_options, last_updated)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, datetime('now'))",
                 params![
                     tariff.code,
                     tariff.description,
