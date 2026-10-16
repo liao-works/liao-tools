@@ -311,6 +311,7 @@ impl TaxDatabase {
                     tariff.other_rate,
                     tariff.anti_dumping_rate,
                     tariff.countervailing_rate,
+                    tariff.rate_options,
                 ],
             )?;
         }
