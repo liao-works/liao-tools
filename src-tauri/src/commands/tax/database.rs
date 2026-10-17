@@ -52,6 +52,7 @@ impl TaxDatabase {
                 ni_anti_dumping_rate TEXT,
                 ni_countervailing_rate TEXT,
                 trade_remedy_details TEXT,
+                rate_options TEXT,
                 last_updated DATETIME
             )",
             [],
@@ -73,7 +74,8 @@ impl TaxDatabase {
         for field in [
             "uk_source_version", "ni_source_version", "uk_verified_at",
             "ni_verified_at", "uk_rate_status", "ni_rate_status",
-            "ni_anti_dumping_rate", "ni_countervailing_rate", "trade_remedy_details"
+            "ni_anti_dumping_rate", "ni_countervailing_rate", "trade_remedy_details",
+            "rate_options"
         ] {
             let statement = format!("ALTER TABLE tariffs ADD COLUMN {} TEXT", field);
             let _ = self.conn.execute(&statement, []);
@@ -106,7 +108,8 @@ impl TaxDatabase {
                     north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated,
                     uk_source_version, ni_source_version, uk_verified_at,
                     ni_verified_at, uk_rate_status, ni_rate_status,
-                    ni_anti_dumping_rate, ni_countervailing_rate, trade_remedy_details
+                    ni_anti_dumping_rate, ni_countervailing_rate, trade_remedy_details,
+                    rate_options
              FROM tariffs
              WHERE code = ?1",
         )?;
@@ -134,6 +137,7 @@ impl TaxDatabase {
                 ni_anti_dumping_rate: row.get(16)?,
                 ni_countervailing_rate: row.get(17)?,
                 trade_remedy_details: row.get(18)?,
+                rate_options: row.get(19)?,
                 similarity: None,
             }))
         } else {
@@ -148,7 +152,8 @@ impl TaxDatabase {
                     north_ireland_url, other_rate, anti_dumping_rate, countervailing_rate, last_updated,
                     uk_source_version, ni_source_version, uk_verified_at,
                     ni_verified_at, uk_rate_status, ni_rate_status,
-                    ni_anti_dumping_rate, ni_countervailing_rate, trade_remedy_details
+                    ni_anti_dumping_rate, ni_countervailing_rate, trade_remedy_details,
+                    rate_options
              FROM tariffs",
         )?;
 
@@ -173,6 +178,7 @@ impl TaxDatabase {
                 ni_anti_dumping_rate: row.get(16)?,
                 ni_countervailing_rate: row.get(17)?,
                 trade_remedy_details: row.get(18)?,
+                rate_options: row.get(19)?,
                 similarity: None,
             })
         })?;
@@ -207,7 +213,8 @@ impl TaxDatabase {
                     {}, {}, {} FROM tariffs",
             optional_col("ni_anti_dumping_rate"),
             optional_col("ni_countervailing_rate"),
-            optional_col("trade_remedy_details")
+            optional_col("trade_remedy_details"),
+            optional_col("rate_options")
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], |row| {
@@ -231,6 +238,7 @@ impl TaxDatabase {
                 ni_anti_dumping_rate: row.get(10)?, 
                 ni_countervailing_rate: row.get(11)?,
                 trade_remedy_details: row.get(12)?,
+                rate_options: row.get(13)?,
                 similarity: None,
             })
         })?;
