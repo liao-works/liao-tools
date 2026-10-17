@@ -108,8 +108,10 @@ impl TaxExcelProcessor {
         sheet.set_name("税率条件明细")?;
         let headers = [
             "商品编码", "地区", "措施类型", "措施类型说明", "适用地理范围",
-            "税率/税额表达式", "附加代码", "附加代码说明", "适用条件",
-            "排除地区", "生效日期", "截止日期", "来源措施ID",
+            "地理区域编码(JSON)", "税率/税额表达式", "全部表达式(JSON)", "表达式解析状态",
+            "附加代码", "附加代码说明", "适用条件", "条件关联ID(JSON)",
+            "附加代码关联ID(JSON)", "未解析关联项(JSON)", "排除地区",
+            "适用判定", "中国适用", "生效状态", "生效日期", "截止日期", "来源措施ID",
         ];
         for (col, header) in headers.iter().enumerate() {
             sheet.write_with_format(0, col as u16, *header, header_format)?;
@@ -121,10 +123,24 @@ impl TaxExcelProcessor {
             let Ok(Value::Array(options)) = serde_json::from_str::<Value>(raw) else { continue };
             for option in options {
                 let get = |name: &str| option.get(name).and_then(Value::as_str).unwrap_or("");
+                let get_json = |name: &str| option.get(name).map(Value::to_string).unwrap_or_default();
+                let get_bool = |name: &str| match option.get(name).and_then(Value::as_bool) {
+                    Some(true) => "是",
+                    Some(false) => "否",
+                    None => "",
+                };
+                let geography_ids = get_json("geography_ids");
+                let expression_options = get_json("expression_options");
+                let condition_ids = get_json("condition_ids");
+                let additional_code_ids = get_json("additional_code_ids");
+                let unresolved = get_json("unresolved_relationships");
                 let values = [
                     code.as_str(), get("region"), get("measure_type"), get("measure_type_description"),
-                    get("geography_description"), get("expression"), get("additional_code"),
-                    get("additional_description"), get("conditions"), get("excluded_areas"),
+                    get("geography_description"), geography_ids.as_str(), get("expression"),
+                    expression_options.as_str(), get("expression_resolution"), get("additional_code"),
+                    get("additional_description"), get("conditions"), condition_ids.as_str(),
+                    additional_code_ids.as_str(), unresolved.as_str(), get("excluded_areas"),
+                    get("applicability"), get_bool("china_applicable"), get("effective_status"),
                     get("effective_start"), get("effective_end"), get("source_id"),
                 ];
                 for (col, value) in values.iter().enumerate() {
