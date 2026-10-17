@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Search, Moon, Sun } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { CommandPalette } from './CommandPalette';
+import { BackgroundTaskIndicator } from './BackgroundTaskIndicator';
 import { UpdateDialog } from '@/components/UpdateDialog';
 import { checkForUpdates, loadUpdateSettings, updateLastCheckTime } from '@/lib/updater';
 import { useDarkMode } from '@/hooks/use-dark-mode';
@@ -77,6 +78,7 @@ export function MainLayout() {
             <Search size={17}/><span>搜索工具、查询 HS Code、快速打开功能…</span><kbd>Ctrl K</kbd>
           </button>
           <div className="lt-top-actions">
+            <BackgroundTaskIndicator />
             <span className="lt-local-note"><i/>本地桌面工具</span>
             <button type="button" className="lt-icon-button" title={isDark ? '切换到浅色模式' : '切换到深色模式'}
               onClick={toggleDarkMode}>{isDark ? <Sun size={18}/> : <Moon size={18}/>}</button>

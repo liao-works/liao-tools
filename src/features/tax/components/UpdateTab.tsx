@@ -8,20 +8,26 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { taxApi } from '@/lib/api/tax';
 import type { TaxPreviewRate, TaxPreviewSummary, TaxSignedReviewResult, NiReviewReport } from '@/lib/api/tax';
-import type { TaxTariff, TaxVersionInfo } from '@/types';
+import type { TaxTariff } from '@/types';
 import { openUpdateHistory } from '@/hooks/use-update-history';
+import { useTaxUpdateStore, formatBytes } from '@/stores/tax-update-store';
 
 export function UpdateTab() {
-  const [versionInfo, setVersionInfo] = useState<TaxVersionInfo | null>(null);
-  const [localVersion, setLocalVersion] = useState<TaxVersionInfo['local'] | null>(null);
-  const [offlineCheck, setOfflineCheck] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
-  const [checking, setChecking] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [downloadedBytes, setDownloadedBytes] = useState(0);
-  const [totalBytes, setTotalBytes] = useState(0);
-  const [logs, setLogs] = useState<string[]>([]);
+  // 更新任务状态在全局 store 中，切页后任务继续，回到本页即可看到进度。
+  const versionInfo = useTaxUpdateStore((s) => s.versionInfo);
+  const localVersion = useTaxUpdateStore((s) => s.localVersion);
+  const offlineCheck = useTaxUpdateStore((s) => s.offlineCheck);
+  const localError = useTaxUpdateStore((s) => s.localError);
+  const checking = useTaxUpdateStore((s) => s.checking);
+  const downloading = useTaxUpdateStore((s) => s.downloading);
+  const downloadProgress = useTaxUpdateStore((s) => s.downloadProgress);
+  const downloadedBytes = useTaxUpdateStore((s) => s.downloadedBytes);
+  const totalBytes = useTaxUpdateStore((s) => s.totalBytes);
+  const logs = useTaxUpdateStore((s) => s.logs);
+  const checkUpdate = useTaxUpdateStore((s) => s.checkUpdate);
+  const startDownload = useTaxUpdateStore((s) => s.startDownload);
+  const refreshLocalVersion = useTaxUpdateStore((s) => s.refreshLocalVersion);
+
   const [previewInfo, setPreviewInfo] = useState<TaxPreviewSummary | null>(null);
   const [previewRate, setPreviewRate] = useState<TaxPreviewRate | null>(null);
   const [productionRate, setProductionRate] = useState<TaxTariff | null>(null);
@@ -36,118 +42,12 @@ export function UpdateTab() {
 
   const { toast } = useToast();
 
-  const addLog = (message: string) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setLogs((prev) => [...prev, `[${timestamp}] ${message}`]);
+  const handleCheckUpdate = () => {
+    void checkUpdate();
   };
 
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-  };
-
-  const handleCheckUpdate = async () => {
-    setChecking(true);
-    setLogs([]);
-    addLog('开始检查更新...');
-    // Local metadata is independent of the online update check.
-    try {
-      setLocalVersion(await taxApi.getLocalVersion());
-      setLocalError(null);
-    } catch (error) {
-      setLocalError(String(error));
-      addLog(`本地版本读取失败: ${String(error)}`);
-    }
-
-    try {
-      const data = await taxApi.checkUpdate();
-      setVersionInfo(data);
-      setLocalVersion(data.local);
-      setOfflineCheck(false);
-      addLog('检查完成');
-      
-      if (data.has_update) {
-        addLog(`发现新版本: ${data.remote.version}`);
-        addLog(`记录总量变化: ${data.remote.records - data.local.records} 条（不是新增记录数）`);
-        // 更新前预览（来自服务端 data_changes）
-        if (data.data_changes?.summary) {
-          const s = data.data_changes.summary;
-          addLog(`本次预计变动: 新增 ${s.added} / 删除 ${s.removed} / 修改 ${s.modified}`);
-        }
-        toast({
-          title: '发现新版本',
-          description: data.data_changes?.summary
-            ? `新增 ${data.data_changes.summary.added} / 删除 ${data.data_changes.summary.removed} / 修改 ${data.data_changes.summary.modified}`
-            : `版本 ${data.remote.version} 可用`,
-        });
-      } else {
-        addLog('当前已是最新版本');
-        toast({
-          title: '已是最新版本',
-          description: '无需更新',
-        });
-      }
-    } catch (error) {
-      const errorMsg = String(error);
-      setVersionInfo(null);
-      setOfflineCheck(true);
-      addLog(`未能连接远程数据源，仍可使用已有本地数据库: ${errorMsg}`);
-      toast({
-        title: '无法联网检查最新版本',
-        description: '本地已安装的数据仍可离线查询，请注意版本日期。',
-      });
-    } finally {
-      setChecking(false);
-    }
-  };
-
-  const handleDownloadUpdate = async () => {
-    setDownloading(true);
-    setDownloadProgress(0);
-    setDownloadedBytes(0);
-    setTotalBytes(0);
-    addLog('开始下载更新...');
-
-    try {
-      const installed = await taxApi.downloadUpdate((downloaded, total) => {
-        setDownloadedBytes(downloaded);
-        setTotalBytes(total);
-        const percentage = total > 0 ? (downloaded / total) * 100 : 0;
-        setDownloadProgress(percentage);
-        
-        if (Math.floor(percentage) % 25 === 0 && percentage > 0 && percentage < 100) {
-          addLog(`下载进度: ${percentage.toFixed(1)}% (${formatBytes(downloaded)} / ${formatBytes(total)})`);
-        }
-      });
-      
-      if (!installed) throw new Error('更新命令未确认安装成功，本地税率数据未判定为已更新');
-      addLog('税率更新命令已确认成功');
-      setVersionInfo(null); // Previous remote comparison is no longer valid after installation.
-      try {
-        setLocalVersion(await taxApi.getLocalVersion());
-        setLocalError(null);
-      } catch (error) {
-        setLocalError(String(error));
-        addLog(`更新后本地版本读取失败：${String(error)}`);
-      }
-      toast({
-        title: '税率数据更新已完成',
-        description: '请查看本地版本；需要最新远程对比可再次点击检查更新。',
-      });
-    } catch (error) {
-      const errorMsg = String(error);
-      addLog(`更新失败: ${errorMsg}`);
-      toast({
-        title: '更新失败',
-        description: errorMsg,
-        variant: 'destructive',
-      });
-    } finally {
-      setDownloading(false);
-    }
+  const handleDownloadUpdate = () => {
+    void startDownload();
   };
 
   const handleReadNiReview = async () => {
@@ -263,12 +163,8 @@ export function UpdateTab() {
 
   // Only read local metadata on entry. Remote checks are explicit, not duplicated on every visit.
   useEffect(() => {
-    let active = true;
-    taxApi.getLocalVersion()
-      .then((info) => { if (active) setLocalVersion(info); })
-      .catch((error) => { if (active) setLocalError(String(error)); });
-    return () => { active = false; };
-  }, []);
+    void refreshLocalVersion();
+  }, [refreshLocalVersion]);
 
   return (
     <div className="space-y-4">
