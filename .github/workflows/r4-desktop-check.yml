@@ -37,6 +37,38 @@ jobs:
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib sticky_notes::todo_store_integrity_tests -- --nocapture
       - name: Build unsigned Windows NSIS acceptance candidate
         run: pnpm tauri build --bundles nsis
+      - name: Verify executable icon matches checked-in Windows ICO
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.Drawing
+          $exe = (Resolve-Path 'src-tauri/target/release/liao-tools.exe').Path
+          $source = (Resolve-Path 'src-tauri/icons/icon.ico').Path
+          $actual = [System.Drawing.Icon]::ExtractAssociatedIcon($exe)
+          if ($null -eq $actual) { throw 'Windows executable has no extractable icon' }
+          $expected = [System.Drawing.Icon]::new($source, 32, 32)
+          try {
+            $a = $actual.ToBitmap()
+            $b = $expected.ToBitmap()
+            try {
+              if ($a.Width -ne $b.Width -or $a.Height -ne $b.Height) {
+                throw 'Embedded icon dimensions differ from packaged icon'
+              }
+              $diff = 0
+              for ($y = 0; $y -lt $a.Height; $y++) {
+                for ($x = 0; $x -lt $a.Width; $x++) {
+                  if ($a.GetPixel($x, $y).ToArgb() -ne $b.GetPixel($x, $y).ToArgb()) { $diff++ }
+                }
+              }
+              if ($diff -gt 0) { throw "Embedded EXE icon differs from icons/icon.ico ($diff pixels)" }
+              Write-Host 'Executable icon matches the shipped ICO at 32x32'
+            } finally {
+              $a.Dispose()
+              $b.Dispose()
+            }
+          } finally {
+            $actual.Dispose()
+            $expected.Dispose()
+          }
       - name: Upload Windows acceptance installer
         uses: actions/upload-artifact@v4
         with:

@@ -531,6 +531,14 @@ fn create_or_show_note_window(
         .build()
         .map_err(|e| format!("Failed to create window: {e}"))?;
 
+    // The Todo window can have its own Windows taskbar button.
+    #[cfg(target_os = "windows")]
+    if let Some(icon) = app.default_window_icon().cloned() {
+        if let Err(error) = window.set_icon(icon) {
+            log::warn!("Failed to apply native Todo window icon: {error}");
+        }
+    }
+
     let _ = apply_window_geometry(&window, &window_state);
 
     #[cfg(target_os = "windows")]
