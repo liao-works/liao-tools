@@ -1,18 +1,22 @@
-import { Copy, ExternalLink, RefreshCw, Loader2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Copy, ExternalLink, RefreshCw, Loader2, AlertTriangle, ShieldCheck, Database } from 'lucide-react';
+import { useState } from 'react';
 import { displayedRate, displayedRateStatus, rateNeedsAttention } from '@/lib/tariff-display';
 import type { TaxTariff } from '@/types';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 interface Props {
   tariff: TaxTariff;
   onCopy: (value: string) => void;
   onOpenSource: (url: string) => Promise<void>;
-  onCompare: (tariff: TaxTariff) => Promise<void>;
+  onCompare: (tariff: TaxTariff, applyToDb: boolean) => Promise<void>;
   comparing: boolean;
 }
 
 
 export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, comparing }: Props) {
+  const [applyToDb, setApplyToDb] = useState(false);
   const needsReview =
     rateNeedsAttention(tariff.rate, tariff.uk_rate_status) ||
     rateNeedsAttention(tariff.north_ireland_rate || tariff.northIrelandRate, tariff.ni_rate_status);
@@ -141,9 +145,27 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
           <div><dt>最后记录日期</dt><dd>{tariff.last_updated || '未记录'}</dd></div>
         </dl>
         <p className="lt-tax-facts-warning">显示的是本地普通第三国税率。空值表示暂无可显示的普通税率，不表示 0%，特殊用途和优惠税率需另行确认。</p>
-        <Button variant="outline" disabled={comparing} onClick={() => {void onCompare(tariff);}}>
-          {comparing ? <Loader2 size={16} className="mr-2 animate-spin"/> : <RefreshCw size={16} className="mr-2"/>}
-          网页临时比对（不修改数据库）
+        <div className="flex items-start gap-2">
+          <Checkbox id={`lt-apply-to-db-${tariff.code}`} checked={applyToDb}
+            onCheckedChange={(checked) => setApplyToDb(checked === true)}
+            disabled={comparing}/>
+          <div className="space-y-0.5">
+            <Label htmlFor={`lt-apply-to-db-${tariff.code}`}
+              className="flex items-center gap-1.5 text-sm font-normal cursor-pointer">
+              <Database size={14} aria-hidden="true"/>
+              比对后把差异写入本地数据库
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              不勾选时仅比对。写入是手动修改，下次官方数据快照更新时会被覆盖；写入前请核对官方页面。
+            </p>
+          </div>
+        </div>
+        <Button variant={applyToDb ? 'default' : 'outline'} disabled={comparing}
+          onClick={() => {void onCompare(tariff, applyToDb);}}>
+          {comparing ? <Loader2 size={16} className="mr-2 animate-spin"/> : applyToDb
+            ? <Database size={16} className="mr-2"/>
+            : <RefreshCw size={16} className="mr-2"/>}
+          {applyToDb ? '更新并写入本地数据库' : '网页临时比对（不修改数据库）'}
         </Button>
       </section>
       {conditionalOptions.length > 0 && <section className="lt-tax-facts" aria-labelledby="lt-rate-options-heading">

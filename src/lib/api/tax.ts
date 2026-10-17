@@ -223,11 +223,11 @@ export const taxApi = {
   },
 
   /**
-   * 更新单行税率数据
+   * 单行更新：默认只做网页比对；applyToDb 为 true 时把发现的差异写入本地数据库
    */
-  async updateSingleRow(code: string): Promise<UpdateResult> {
+  async updateSingleRow(code: string, applyToDb?: boolean): Promise<UpdateResult> {
     try {
-      const result = await invoke<UpdateResult>('tax_update_single_row', { code });
+      const result = await invoke<UpdateResult>('tax_update_single_row', { code, applyToDb });
       return result;
     } catch (error) {
       console.error('更新单行数据失败:', error);
@@ -249,4 +249,6 @@ export interface UpdateResult {
   oldNiRate?: string;
   newNiRate?: string;
   newDescription?: string;
+  /** 用户选择写入时，本次是否已实际写进本地数据库 */
+  appliedToDb?: boolean;
 }
