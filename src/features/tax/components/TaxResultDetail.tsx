@@ -31,6 +31,12 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
     effective_start: string; effective_end: string; source_id: string;
     quota_order_number?: string; footnotes?: string; regulation_id?: string;
     source_relationship_ids?: Record<string, string[]>;
+    expression_options?: Array<{ id: string; type: string; expression: string; resolved: boolean }>;
+    expression_count?: number;
+    expression_resolution?: 'resolved_single' | 'source_scalar' | 'multiple' | 'unresolved_link' | 'missing';
+    single_expression_available?: boolean;
+    unresolved_relationships?: Array<{ relationship: string; id: string }>;
+    geography_ids?: string[];
     special_use?: boolean; conditional?: boolean; china_applicable?: boolean;
     applicability?: string;
     effective_status?: 'active' | 'expired' | 'future' | 'unknown';
@@ -123,14 +129,36 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
             <div className="font-medium">
               {option.region} · {option.measure_type}
               {option.measure_type_description ? ' · ' + option.measure_type_description : ''}
-              {' · '}{option.expression || '官方未提供税率表达式'}
+              {' · '}{option.expression_resolution === 'multiple'
+                ? `多个官方税率表达式（${option.expression_count || option.expression_options?.length || 0} 项）`
+                : option.expression || (option.expression_resolution === 'unresolved_link'
+                  ? '官方税率关联未解析' : '官方未提供税率表达式')}
               {' · '}{effectiveStatusLabel(option.effective_status)}
+              {' · '}{option.applicability === 'unresolved' ? '关联信息未完全解析' : ''}
             </div>
             <div className="text-muted-foreground">
               适用范围：{option.geography_description || option.geography || '未提供'}
               {option.china_applicable ? ' · 中国原产可适用范围' : ''}
               {option.special_use ? ' · 特殊用途' : ''}
             </div>
+            {option.expression_options && option.expression_options.length > 1 && <div>
+              **全部官方税率表达式**
+              <ul className="list-disc pl-5">
+                {option.expression_options.map((item, expressionIndex) => <li key={item.id || expressionIndex}>
+                  {item.expression || '表达式未解析'}{item.id ? ` · ${item.id}` : ''}
+                  {!item.resolved ? ' · 未解析' : ''}
+                </li>)}
+              </ul>
+            </div>}
+            {option.unresolved_relationships && option.unresolved_relationships.length > 0 && <div className="text-amber-700">
+              官方关联记录未能在当前快照中解析，不能把这条记录当作确定的默认税率：
+              {option.unresolved_relationships.map((item, unresolvedIndex) =>
+                <span key={item.relationship + item.id + unresolvedIndex}>
+                  {unresolvedIndex ? '；' : ' '}{item.relationship} / {item.id || '无编号'}
+                </span>)}
+            </div>}
+            {option.geography_ids && option.geography_ids.length > 1 &&
+              <div>适用地理区域编码：{option.geography_ids.join(', ')}</div>}
             {option.additional_code && <div>附加代码：<span className="font-mono">{option.additional_code}</span>
               {option.additional_description ? <> · {option.additional_description}</> : ''}</div>}
             {option.conditions && <div>适用条件：{option.conditions}</div>}
