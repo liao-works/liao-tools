@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, Keyboard, Monitor, Palette, Check, Pencil } from 'lucide-react';
+import { X, Keyboard, Monitor, Palette, Pencil } from 'lucide-react';
 import { useTodoStore } from '../store/todoStore';
-import type { WidgetTheme, ThemeColors, TodoConfig } from '../types';
-import { DEFAULT_CONFIG, THEME_LABELS, WIDGET_THEMES } from '../types';
+import type { TodoConfig } from '../types';
+import { DEFAULT_CONFIG } from '../types';
 import { isMac } from '@/lib/platform';
 
 interface SettingsModalProps {
@@ -252,106 +252,11 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           <div>
             <label className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
               <Palette className="h-4 w-4 text-muted-foreground" />
-              外观主题
+              外观
             </label>
-            <div className="mb-3 grid grid-cols-3 gap-2">
-              {(Object.keys(WIDGET_THEMES) as Array<Exclude<WidgetTheme, 'custom'>>).map((theme) => (
-                <button
-                  key={theme}
-                  onClick={() => saveWidgetConfig({ widget: { ...widgetConfig, theme } })}
-                  className={`relative rounded-lg border-2 p-3 transition-all ${
-                    widgetConfig.theme === theme
-                      ? 'border-primary ring-2 ring-primary/20'
-                      : 'border-border hover:border-muted-foreground/50'
-                  }`}
-                  style={{
-                    backgroundColor: WIDGET_THEMES[theme].background,
-                    borderColor: widgetConfig.theme === theme ? undefined : WIDGET_THEMES[theme].border,
-                  }}
-                >
-                  {widgetConfig.theme === theme && (
-                    <Check className="absolute right-1 top-1 h-4 w-4" style={{ color: WIDGET_THEMES[theme].accent }} />
-                  )}
-                  <div className="text-center">
-                    <div
-                      className="mx-auto mb-1 h-6 w-6 rounded-full border"
-                      style={{
-                        backgroundColor: WIDGET_THEMES[theme].accent,
-                        borderColor: WIDGET_THEMES[theme].border,
-                      }}
-                    />
-                    <span className="text-xs font-medium" style={{ color: WIDGET_THEMES[theme].text }}>
-                      {THEME_LABELS[theme]}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => saveWidgetConfig({ widget: { ...widgetConfig, theme: 'custom' } })}
-              className={`w-full rounded-lg border-2 p-3 transition-all ${
-                widgetConfig.theme === 'custom'
-                  ? 'border-primary ring-2 ring-primary/20'
-                  : 'border-border hover:border-muted-foreground/50'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-foreground">自定义颜色</span>
-                {widgetConfig.theme === 'custom' && <Check className="h-4 w-4 text-primary" />}
-              </div>
-            </button>
-
-            {widgetConfig.theme === 'custom' && (
-              <div className="mt-3 space-y-3 rounded-lg bg-muted p-3">
-                {[
-                  { key: 'background', label: '背景色' },
-                  { key: 'text', label: '文字颜色' },
-                  { key: 'textSecondary', label: '次要文字' },
-                  { key: 'border', label: '边框颜色' },
-                  { key: 'accent', label: '强调色' },
-                ].map(({ key, label }) => (
-                  <div key={key} className="flex items-center justify-between">
-                    <span className="text-sm text-foreground">{label}</span>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={(widgetConfig.customColors as ThemeColors | undefined)?.[key as keyof ThemeColors] || ''}
-                        onChange={(event) =>
-                          saveWidgetConfig({
-                            widget: {
-                              ...widgetConfig,
-                              customColors: {
-                                ...(widgetConfig.customColors || WIDGET_THEMES.dark),
-                                [key]: event.target.value,
-                              },
-                            },
-                          })
-                        }
-                        className="w-24 rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
-                        placeholder="#000000"
-                      />
-                      <input
-                        type="color"
-                        value={(widgetConfig.customColors as ThemeColors | undefined)?.[key as keyof ThemeColors] || '#000000'}
-                        onChange={(event) =>
-                          saveWidgetConfig({
-                            widget: {
-                              ...widgetConfig,
-                              customColors: {
-                                ...(widgetConfig.customColors || WIDGET_THEMES.dark),
-                                [key]: event.target.value,
-                              },
-                            },
-                          })
-                        }
-                        className="h-8 w-8 cursor-pointer rounded border border-border"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <p className="rounded-lg bg-muted p-3 text-sm leading-6 text-muted-foreground">
+              桌面小部件跟随应用主题与深浅色模式，在「偏好设置」中调整后实时联动。
+            </p>
           </div>
 
           <div>

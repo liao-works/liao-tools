@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { APP_APPEARANCE_EVENT } from '@/lib/themes';
 
 export type DarkModeType = 'system' | 'light' | 'dark';
 
@@ -38,6 +39,12 @@ export function useDarkMode() {
     }
 
     localStorage.setItem(DARK_MODE_KEY, mode);
+
+    // 广播给其他窗口（桌面小组件等），实现深浅色实时联动。
+    // 非 Tauri 环境（纯浏览器开发）下 emit 会失败，静默忽略。
+    void import('@tauri-apps/api/event')
+      .then(({ emit }) => emit(APP_APPEARANCE_EVENT, { dark: isDark }))
+      .catch(() => undefined);
   }, [isDark, mode]);
 
   // 监听系统主题变化
