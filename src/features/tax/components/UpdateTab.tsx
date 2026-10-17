@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { RefreshCw, Download, Loader2, CheckCircle, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,12 @@ export function UpdateTab() {
   const [readingNiReview, setReadingNiReview] = useState(false);
 
   const { toast } = useToast();
+
+  // 日志区高度固定，内容超出后内部滚动，并自动滚到最新一条。
+  const logEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    logEndRef.current?.scrollTo({ top: logEndRef.current.scrollHeight });
+  }, [logs]);
 
   const handleCheckUpdate = () => {
     void checkUpdate();
@@ -499,7 +505,7 @@ export function UpdateTab() {
           </CardHeader>
           <CardContent>
             <div className="rounded-lg bg-muted p-4">
-              <div className="space-y-1 font-mono text-sm">
+              <div ref={logEndRef} className="max-h-64 space-y-1 overflow-y-auto font-mono text-sm">
                 {logs.map((log, index) => (
                   <div key={index} className="text-muted-foreground">
                     {log}
