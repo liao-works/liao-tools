@@ -512,6 +512,10 @@ fn create_or_show_note_window(
         let _ = window.show();
         if focus_window {
             let _ = window.set_focus();
+            if note_id == "todo-widget" {
+                // 打开即进入快速记录状态：聚焦输入框
+                emit_todo_widget_focus_input(app);
+            }
         }
         return Ok(());
     }
@@ -525,6 +529,7 @@ fn create_or_show_note_window(
     .inner_size(window_state.width as f64, window_state.height as f64)
     .position(window_state.x as f64, window_state.y as f64)
     .decorations(false)
+    .resizable(true)
     .always_on_top(window_state.is_pinned)
     .skip_taskbar(window_state.is_desktop_mode);
 
@@ -546,6 +551,10 @@ fn create_or_show_note_window(
 
     if focus_window {
         let _ = window.set_focus();
+        if note_id == "todo-widget" {
+            // 打开即进入快速记录状态：聚焦输入框
+            emit_todo_widget_focus_input(app);
+        }
     }
 
     if let Some(manager) = app.try_state::<NoteWindowManager>() {

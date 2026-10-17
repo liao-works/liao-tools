@@ -495,14 +495,16 @@ export function TodoWidget() {
     setActiveTaskId(displayTasks[nextIndex].id);
   };
 
+  // 活动任务仅由方向键导航或进入编辑时设置，绝不自动选中，
+  // 鼠标悬停也不再改变：避免焦点在输入框外按 Enter 意外勾选任务。
   useEffect(() => {
     if (displayTasks.length === 0) {
       setActiveTaskId(null);
       return;
     }
 
-    if (!activeTaskId || !displayTasks.some((task) => task.id === activeTaskId)) {
-      setActiveTaskId(displayTasks[0].id);
+    if (activeTaskId && !displayTasks.some((task) => task.id === activeTaskId)) {
+      setActiveTaskId(null);
     }
   }, [activeTaskId, displayTasks]);
 
@@ -695,7 +697,6 @@ export function TodoWidget() {
                     if (element) taskRefs.current.set(task.id, element);
                     else taskRefs.current.delete(task.id);
                   }}
-                  onMouseEnter={() => setActiveTaskId(task.id)}
                   className={`group flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors ${
                     activeTaskId === task.id ? 'bg-primary-subtle' : 'hover:bg-muted'
                   }`}
