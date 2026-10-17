@@ -192,8 +192,10 @@ impl TaxDataDownloader {
     }
 
     async fn fetch_remote_metadata() -> Result<RemoteMetadata> {
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30)).build()?;
+        let client = crate::core::http::apply_system_proxy(
+            reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)),
+        )
+        .build()?;
         let metadata = client.get(METADATA_URL).send().await?
             .error_for_status()?
             .json::<RemoteMetadata>().await?;
@@ -215,8 +217,10 @@ impl TaxDataDownloader {
             "Invalid snapshot SHA-256 value");
         ensure!(metadata.file_size > 0, "Metadata file_size must be positive");
         let url = Self::release_url(&metadata.version)?;
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(300)).build()?;
+        let client = crate::core::http::apply_system_proxy(
+            reqwest::Client::builder().timeout(std::time::Duration::from_secs(300)),
+        )
+        .build()?;
         let response = client.get(&url).send().await?.error_for_status()?;
         let total = response.content_length().unwrap_or(metadata.file_size);
         let mut file = tempfile::Builder::new()

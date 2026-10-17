@@ -175,11 +175,13 @@ pub async fn download_update(url: String, version: String, app: tauri::AppHandle
     println!("开始下载更新: {}", url);
     println!("版本: {}", version);
     
-    let client = reqwest::Client::builder()
-        .user_agent("liao-tools")
-        .timeout(std::time::Duration::from_secs(300))
-        .build()
-        .map_err(|e| CommandError::new(format!("创建 HTTP 客户端失败: {}", e), "NETWORK_ERROR"))?;
+    let client = crate::core::http::apply_system_proxy(
+        reqwest::Client::builder()
+            .user_agent("liao-tools")
+            .timeout(std::time::Duration::from_secs(300)),
+    )
+    .build()
+    .map_err(|e| CommandError::new(format!("创建 HTTP 客户端失败: {}", e), "NETWORK_ERROR"))?;
 
     // 发送请求
     let response = client
@@ -607,11 +609,13 @@ fn install_linux_deb(path: &Path, _silent: bool) -> Result<(), CommandError> {
 /// 从 GitHub 检查更新
 #[tauri::command]
 pub async fn check_for_updates() -> Result<UpdateInfo, CommandError> {
-    let client = reqwest::Client::builder()
-        .user_agent("liao-tools")
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(|e| CommandError::new(format!("创建 HTTP 客户端失败: {}", e), "NETWORK_ERROR"))?;
+    let client = crate::core::http::apply_system_proxy(
+        reqwest::Client::builder()
+            .user_agent("liao-tools")
+            .timeout(std::time::Duration::from_secs(10)),
+    )
+    .build()
+    .map_err(|e| CommandError::new(format!("创建 HTTP 客户端失败: {}", e), "NETWORK_ERROR"))?;
 
     println!("正在从 GitHub 检查新版本...");
     println!("仓库: {}", GITHUB_REPO);
