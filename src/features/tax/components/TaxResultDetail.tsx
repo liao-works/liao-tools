@@ -259,7 +259,9 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
                       </td>
                       <td className="px-3 py-2 font-mono">{entry.additional_code || '—'}</td>
                       <td className="px-3 py-2 font-medium">
-                        {entry.expression || '官方未提供独立税率'}
+                        {entry.expression || (entry.region === 'GB' && entry.condition_required
+                          ? '英国条件税率尚未完成关联采集'
+                          : '当前数据未获得税率表达式（不表示 0%）')}
                         {entry.expression_origin === 'condition' && <span className="block text-muted-foreground font-normal">条件税率</span>}
                       </td>
                       <td className="px-3 py-2">
