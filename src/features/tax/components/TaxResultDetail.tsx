@@ -30,6 +30,7 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
     effective_start: string; effective_end: string; source_id: string;
     special_use?: boolean; conditional?: boolean; china_applicable?: boolean;
     applicability?: string;
+    effective_status?: 'active' | 'expired' | 'future' | 'unknown';
   };
   let remedies: TradeRemedyDetail[] = [];
   try {
@@ -59,8 +60,15 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
     // Older databases have no rate_options column/data.
   }
   const conditionalOptions = rateOptions.filter(option =>
-    option.applicability !== 'default' || !option.expression_available
+    option.china_applicable === true &&
+    (option.applicability !== 'default' || !option.expression_available)
   );
+  const effectiveStatusLabel = (status?: RateOption['effective_status']) => {
+    if (status === 'active') return '当前有效';
+    if (status === 'expired') return '已过期';
+    if (status === 'future') return '尚未生效';
+    return '生效日期不明确';
+  };
 
   const sources = [
     { name: '英国税率来源', url: tariff.url, rate: tariff.rate, status: tariff.uk_rate_status,
@@ -112,6 +120,7 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
               {option.region} · {option.measure_type}
               {option.measure_type_description ? ' · ' + option.measure_type_description : ''}
               {' · '}{option.expression || '官方未提供税率表达式'}
+              {' · '}{effectiveStatusLabel(option.effective_status)}
             </div>
             <div className="text-muted-foreground">
               适用范围：{option.geography_description || option.geography || '未提供'}
