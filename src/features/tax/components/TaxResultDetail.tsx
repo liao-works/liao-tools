@@ -21,6 +21,7 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
     measure_type: string; geography: string; expression: string;
     additional_code: string; additional_description: string;
     conditions: string; effective_start: string; effective_end: string;
+    effective_status?: 'active' | 'expired' | 'future' | 'unknown';
   };
   type RateOption = {
     region: 'GB' | 'XI'; measure_type: string; measure_type_description: string;
@@ -28,6 +29,8 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
     expression_available?: boolean; additional_code: string;
     additional_description: string; conditions: string; excluded_areas: string;
     effective_start: string; effective_end: string; source_id: string;
+    quota_order_number?: string; footnotes?: string; regulation_id?: string;
+    source_relationship_ids?: Record<string, string[]>;
     special_use?: boolean; conditional?: boolean; china_applicable?: boolean;
     applicability?: string;
     effective_status?: 'active' | 'expired' | 'future' | 'unknown';
@@ -106,13 +109,14 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
       {conditionalOptions.length > 0 && <section className="lt-tax-facts" aria-labelledby="lt-rate-options-heading">
         <div className="lt-tax-panel-heading">
           <div>
-            <span className="lt-kicker">CONDITIONAL DUTY OPTIONS</span>
-            <h3 id="lt-rate-options-heading">条件税率与特殊用途税率</h3>
+            <span className="lt-kicker">OFFICIAL DUTY MEASURES</span>
+            <h3 id="lt-rate-options-heading">条件税率与其他官方措施</h3>
           </div>
         </div>
         <p className="text-sm text-muted-foreground mb-3">
-          默认税率之外的官方 103/105 措施全部保留。满足附加代码、证书、地理范围或特殊用途条件时，
-          才可使用对应税率；这里不把条件税率强行替换成默认税率。
+          保留明确适用于中国或 Erga Omnes 的官方措施，包括条件税率、特殊用途及其他税种措施；
+          当前、过期、未来和生效日期不明的记录都会标注。只有可确定的无条件普通税率进入默认栏，
+          其他税率不会被自动套用。反倾销和反补贴在下方独立列出。
         </p>
         <div className="max-h-96 overflow-y-auto space-y-2">
           {conditionalOptions.map((option, index) => <div key={index} className="rounded-lg border p-3 text-sm space-y-1">
@@ -131,6 +135,15 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
               {option.additional_description ? <> · {option.additional_description}</> : ''}</div>}
             {option.conditions && <div>适用条件：{option.conditions}</div>}
             {option.excluded_areas && <div>排除地区：{option.excluded_areas}</div>}
+            {option.quota_order_number && <div>配额订单号：{option.quota_order_number}</div>}
+            {option.regulation_id && <div>法规编号：{option.regulation_id}</div>}
+            {option.footnotes && <div>官方脚注：{option.footnotes}</div>}
+            {option.source_relationship_ids && Object.entries(option.source_relationship_ids).some(([, ids]) => ids.length > 0) &&
+              <details className="text-muted-foreground">
+                <summary className="cursor-pointer">官方关联记录编号</summary>
+                {Object.entries(option.source_relationship_ids).filter(([, ids]) => ids.length > 0).map(([name, ids]) =>
+                  <div key={name}>{name}：{ids.join(', ')}</div>)}
+              </details>}
             <div className="text-muted-foreground">
               {option.effective_start ? '生效：' + option.effective_start : '生效日期未记录'}
               {option.effective_end ? ' · 截止：' + option.effective_end : ''}
@@ -157,6 +170,7 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
               {r.region} · {r.type === 'anti_dumping' ? '反倾销' : '反补贴'}
               {r.measure_type === '551' || r.measure_type === '553' ? '（临时）' : '（最终）'}
               {' · '}{r.expression || '税率需查看官方条件'}
+              {' · '}{effectiveStatusLabel(r.effective_status)}
             </div>
             {r.additional_code && <div>附加代码：<span className="font-mono">{r.additional_code}</span>
               {r.additional_description && <> · {r.additional_description}</>}</div>}
