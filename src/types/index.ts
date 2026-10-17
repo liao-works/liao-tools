@@ -147,6 +147,7 @@ export interface TaxTariff {
   ni_anti_dumping_rate?: string | null; // 北爱 XI 反倾销
   ni_countervailing_rate?: string | null; // 北爱 XI 反补贴
   trade_remedy_details?: string | null; // GB/XI 企业代码、税率、条件及生效日期原始措施摘要
+  rate_options?: string | null; // 普通、条件、特殊用途税率选项及官方生效日期
   last_updated?: string;
   uk_source_version?: string | null;
   ni_source_version?: string | null;
