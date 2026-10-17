@@ -18,10 +18,30 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
     rateNeedsAttention(tariff.north_ireland_rate || tariff.northIrelandRate, tariff.ni_rate_status);
   type TradeRemedyDetail = {
     region: 'GB' | 'XI'; type: 'anti_dumping' | 'countervailing';
-    measure_type: string; geography: string; expression: string;
-    additional_code: string; additional_description: string;
+    measure_type: string; geography: string; geography_description?: string; expression: string;
+    additional_code: string; additional_description: string; additional_code_ids?: string[];
     conditions: string; effective_start: string; effective_end: string;
     effective_status?: 'active' | 'expired' | 'future' | 'unknown';
+    applicability?: string; unresolved_exclusion?: boolean; source_id?: string;
+    expression_resolution?: 'source_value' | 'source_scalar' | 'resolved_single' | 'linked_but_empty' | 'unresolved_link' | 'multiple' | 'source_blank' | 'missing';
+    expression_options?: Array<{ id: string; type: string; expression: string; resolved: boolean; link_resolved?: boolean }>;
+    condition_details?: Array<{
+      id: string; resolved: boolean; condition_code?: string; condition?: string;
+      action_code?: string; action?: string; certificate_code?: string; certificate_description?: string;
+      duty_expression?: string; condition_duty_amount?: string; condition_monetary_unit_code?: string;
+      condition_measurement_unit_code?: string; condition_measurement_unit_qualifier_code?: string;
+      requirement?: string; group_ids?: string[];
+    }>;
+    condition_rates?: Array<{
+      condition_id: string; group_ids?: string[]; condition_code?: string; condition?: string;
+      action_code?: string; action?: string; certificate_code?: string; certificate_description?: string;
+      expression: string; requirement?: string;
+    }>;
+    condition_groups?: Array<{ id: string; resolved: boolean; condition_code?: string; condition_ids: string[] }>;
+    footnotes?: string; footnote_ids?: string[]; regulation_id?: string; regulation_url?: string;
+    legal_acts?: Array<{ id: string; regulation_id: string; regulation_url: string; description?: string; resolved: boolean }>;
+    source_relationship_ids?: Record<string, string[]>;
+    unresolved_relationships?: Array<{ relationship: string; id: string }>;
   };
   type RateOption = {
     region: 'GB' | 'XI'; measure_type: string; measure_type_description: string;
@@ -31,9 +51,9 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
     effective_start: string; effective_end: string; source_id: string;
     quota_order_number?: string; footnotes?: string; regulation_id?: string;
     source_relationship_ids?: Record<string, string[]>;
-    expression_options?: Array<{ id: string; type: string; expression: string; resolved: boolean }>;
+    expression_options?: Array<{ id: string; type: string; expression: string; resolved: boolean; link_resolved?: boolean }>;
     expression_count?: number;
-    expression_resolution?: 'resolved_single' | 'source_scalar' | 'multiple' | 'unresolved_link' | 'missing';
+    expression_resolution?: 'resolved_single' | 'source_scalar' | 'multiple' | 'unresolved_link' | 'linked_but_empty' | 'source_blank' | 'missing';
     single_expression_available?: boolean;
     unresolved_relationships?: Array<{ relationship: string; id: string }>;
     geography_ids?: string[];
@@ -193,20 +213,98 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
           请按实际生产商选择，不能把“其他企业”的税率套用到所有企业。
         </p>
         <div className="max-h-80 overflow-y-auto space-y-2">
-          {remedies.map((r, index) => <div key={index} className="rounded-lg border p-3 text-sm space-y-1">
+          {remedies.map((r, index) => <div key={index} className="rounded-lg border p-3 text-sm space-y-2">
             <div className="font-medium">
               {r.region} · {r.type === 'anti_dumping' ? '反倾销' : '反补贴'}
               {r.measure_type === '551' || r.measure_type === '553' ? '（临时）' : '（最终）'}
-              {' · '}{r.expression || '税率需查看官方条件'}
+              {' · '}{r.expression || (r.condition_rates && r.condition_rates.length > 0
+                ? '主税率表达式为空；条件税率见下方'
+                : r.expression_resolution === 'linked_but_empty'
+                  ? '官方关联税率表达式为空'
+                  : r.expression_resolution === 'unresolved_link'
+                    ? '官方税率关联未解析'
+                    : r.expression_resolution === 'multiple'
+                      ? '存在多个官方税率表达式'
+                      : r.region === 'GB' && r.expression_resolution === 'source_blank'
+                        ? 'GB 条件税率表达式尚未采集到（不表示 0%）'
+                        : '官方原始措施未提供税率表达式（不表示 0%）')}
               {' · '}{effectiveStatusLabel(r.effective_status)}
             </div>
+            {r.applicability === 'unresolved' && <div className="text-amber-700">
+              官方排除地区关联未完全解析；本条不计入汇总税率，请核对原始措施。
+            </div>}
             {r.additional_code && <div>附加代码：<span className="font-mono">{r.additional_code}</span>
               {r.additional_description && <> · {r.additional_description}</>}</div>}
             {r.conditions && <div>适用条件：{r.conditions}</div>}
+            {r.condition_rates && r.condition_rates.length > 0 && <div>
+              <strong>条件税率表达式</strong>
+              <ul className="list-disc pl-5">
+                {r.condition_rates.map((rate, rateIndex) => <li key={rate.condition_id || rateIndex}>
+                  {rate.expression}
+                  {rate.condition_code ? ' · 条件 ' + rate.condition_code : ''}
+                  {rate.certificate_code ? ' · 凭证 ' + rate.certificate_code : ''}
+                  {rate.certificate_description ? ' · ' + rate.certificate_description : ''}
+                  {rate.action ? ' · ' + rate.action : ''}
+                  {rate.requirement ? ' · ' + rate.requirement : ''}
+                  {rate.group_ids && rate.group_ids.length > 0 ? ' · 条件组 ' + rate.group_ids.join(', ') : ''}
+                </li>)}
+              </ul>
+            </div>}
+            {r.condition_details && r.condition_details.length > 0 && <details>
+              <summary className="cursor-pointer">官方条件明细（{r.condition_details.length}）</summary>
+              <ul className="list-disc pl-5 mt-1">
+                {r.condition_details.map((condition, conditionIndex) => <li key={condition.id || conditionIndex}>
+                  {condition.condition_code ? '条件 ' + condition.condition_code + '：' : ''}
+                  {condition.condition || '官方未提供条件描述'}
+                  {condition.duty_expression ? ' · 税率 ' + condition.duty_expression : ' · 此条件没有单独的税率表达式'}
+                  {condition.certificate_code ? ' · 凭证 ' + condition.certificate_code : ''}
+                  {condition.certificate_description ? ' · ' + condition.certificate_description : ''}
+                  {condition.action ? ' · ' + condition.action : ''}
+                  {condition.requirement ? ' · ' + condition.requirement : ''}
+                  {condition.group_ids && condition.group_ids.length > 0 ? ' · 条件组 ' + condition.group_ids.join(', ') : ''}
+                  {!condition.resolved ? ' · 官方条件关联未解析' : ''}
+                </li>)}
+              </ul>
+            </details>}
+            {r.expression_options && r.expression_options.length > 0 &&
+              r.expression_resolution !== 'resolved_single' && r.expression_resolution !== 'source_scalar' && <div>
+                <strong>主税率表达式关联</strong>
+                <ul className="list-disc pl-5">
+                  {r.expression_options.map((option, optionIndex) => <li key={option.id || optionIndex}>
+                    {option.expression || '表达式为空或未解析'}{option.id ? ' · ' + option.id : ''}
+                    {!option.resolved ? ' · 未解析' : ''}
+                  </li>)}
+                </ul>
+            </div>}
+            {r.regulation_id && <div>法规编号：{r.regulation_id}</div>}
+            {r.regulation_url && <div className="flex flex-wrap gap-2">
+              {r.regulation_url.split('|').filter(Boolean).map((url, urlIndex) =>
+                <button key={url + urlIndex} type="button" className="lt-tax-source-link"
+                  onClick={() => { void onOpenSource(url); }}>
+                  查看官方法规 <ExternalLink size={13}/>
+                </button>)}
+            </div>}
+            {r.footnotes && <div>官方脚注：{r.footnotes}</div>}
+            {r.source_id && <div className="text-muted-foreground">来源措施 ID：{r.source_id}</div>}
+            {r.unresolved_relationships && r.unresolved_relationships.length > 0 && <div className="text-amber-700">
+              官方关联记录未能解析：
+              {r.unresolved_relationships.map((item, unresolvedIndex) =>
+                <span key={item.relationship + item.id + unresolvedIndex}>
+                  {unresolvedIndex ? '；' : ' '}{item.relationship} / {item.id || '无编号'}
+                </span>)}
+            </div>}
+            {r.source_relationship_ids && Object.entries(r.source_relationship_ids).some(([, ids]) => ids.length > 0) &&
+              <details className="text-muted-foreground">
+                <summary className="cursor-pointer">官方关联记录编号</summary>
+                {Object.entries(r.source_relationship_ids).filter(([, ids]) => ids.length > 0).map(([name, ids]) =>
+                  <div key={name}>{name}：{ids.join(', ')}</div>)}
+              </details>}
             <div className="text-muted-foreground">
-              {r.effective_start ? `生效：${r.effective_start}` : '生效日期未记录'}
-              {r.effective_end ? ` · 截止：${r.effective_end}` : ''}
-              {' · '}中国适用范围：{r.geography === 'CN' ? '中国' : '包括中国的所有国家'}
+              {r.effective_start ? '生效：' + r.effective_start : '生效日期未记录'}
+              {r.effective_end ? ' · 截止：' + r.effective_end : ''}
+              {' · '}适用范围：{r.applicability === 'unresolved'
+                ? '适用性未完全解析（不计入汇总）'
+                : (r.geography_description || (r.geography === 'CN' ? '中国' : '包括中国的所有国家'))}
             </div>
           </div>)}
         </div>
