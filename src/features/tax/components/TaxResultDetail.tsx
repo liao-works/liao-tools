@@ -142,7 +142,7 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
               {option.special_use ? ' · 特殊用途' : ''}
             </div>
             {option.expression_options && option.expression_options.length > 1 && <div>
-              **全部官方税率表达式**
+              <strong>全部官方税率表达式</strong>
               <ul className="list-disc pl-5">
                 {option.expression_options.map((item, expressionIndex) => <li key={item.id || expressionIndex}>
                   {item.expression || '表达式未解析'}{item.id ? ` · ${item.id}` : ''}
