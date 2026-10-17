@@ -19,6 +19,20 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
   type TradeRemedyDetail = {
     region: 'GB' | 'XI'; type: 'anti_dumping' | 'countervailing';
     measure_type: string; geography: string; geography_description?: string; expression: string;
+    enterprise_rates?: Array<{
+      region: 'GB' | 'XI'; type: 'anti_dumping' | 'countervailing'; measure_type: string;
+      enterprise: string; enterprise_description?: string;
+      additional_code: string; additional_code_resolved: boolean;
+      other_enterprises: boolean; expression: string;
+      expression_origin: 'measure' | 'condition' | 'unavailable';
+      condition?: string; condition_id?: string; condition_code?: string;
+      certificate_code?: string; certificate_description?: string;
+      action_code?: string; action?: string; condition_group_ids?: string[];
+      condition_required?: boolean; effective_status?: 'active' | 'expired' | 'future' | 'unknown';
+      applicability?: string; source_id?: string;
+      selection_status?: 'exact_official_expression' | 'requires_condition' |
+        'expression_unavailable' | 'unresolved_applicability' | 'enterprise_or_condition_unresolved';
+    }>;
     additional_code: string; additional_description: string; additional_code_ids?: string[];
     conditions: string; effective_start: string; effective_end: string;
     effective_status?: 'active' | 'expired' | 'future' | 'unknown';
@@ -212,6 +226,64 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
           附加税与普通进口关税分开计算。不同生产商、附加代码和条件可能有不同税率，
           请按实际生产商选择，不能把“其他企业”的税率套用到所有企业。
         </p>
+        {remedies.some(r => (r.enterprise_rates?.length || 0) > 0) && <div className="mb-4">
+          <h4 className="font-medium mb-2">企业／出口商对应税率</h4>
+          <p className="text-sm text-muted-foreground mb-2">
+            按官方附加代码区分具体企业与 Other（其他企业），分别列出反倾销、反补贴税率。
+            同一企业若有多条条件税率会逐条列出；此表是官方措施记录，不是自动算出的应缴税额。
+          </p>
+          <div className="max-h-96 overflow-auto rounded-lg border">
+            <table className="w-full min-w-[820px] text-left text-sm">
+              <thead className="sticky top-0 bg-background">
+                <tr className="border-b">
+                  <th scope="col" className="px-3 py-2">地区／税种</th>
+                  <th scope="col" className="px-3 py-2">企业／出口商</th>
+                  <th scope="col" className="px-3 py-2">附加代码</th>
+                  <th scope="col" className="px-3 py-2">税率</th>
+                  <th scope="col" className="px-3 py-2">适用条件</th>
+                  <th scope="col" className="px-3 py-2">生效状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {remedies.flatMap((r, remedyIndex) =>
+                  (r.enterprise_rates || []).map((entry, entryIndex) => (
+                    <tr key={`${remedyIndex}-${entryIndex}`} className="border-b align-top last:border-0">
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {entry.region === 'GB' ? '英国' : '北爱尔兰'} ·
+                        {entry.type === 'anti_dumping' ? '反倾销' : '反补贴'}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="font-medium">{entry.enterprise || '官方未提供企业名称'}</span>
+                        {entry.other_enterprises && <span className="block text-muted-foreground">其他企业税率，非所有企业统一税率</span>}
+                        {!entry.additional_code_resolved && <span className="block text-amber-700">企业与税率关联需确认</span>}
+                      </td>
+                      <td className="px-3 py-2 font-mono">{entry.additional_code || '—'}</td>
+                      <td className="px-3 py-2 font-medium">
+                        {entry.expression || '官方未提供独立税率'}
+                        {entry.expression_origin === 'condition' && <span className="block text-muted-foreground font-normal">条件税率</span>}
+                      </td>
+                      <td className="px-3 py-2">
+                        {entry.certificate_code ? '凭证 ' + entry.certificate_code : ''}
+                        {entry.certificate_description ? ' · ' + entry.certificate_description : ''}
+                        {entry.condition_code ? ' · 条件 ' + entry.condition_code : ''}
+                        {entry.condition ? ' · ' + entry.condition : ''}
+                        {entry.action ? ' · ' + entry.action : ''}
+                        {entry.condition_group_ids?.length ? ' · 条件组 ' + entry.condition_group_ids.join(', ') : ''}
+                        {entry.selection_status === 'unresolved_applicability' && <span className="block text-amber-700">对中国的适用性尚未解析</span>}
+                        {entry.selection_status === 'enterprise_or_condition_unresolved' && <span className="block text-amber-700">不能自动绑定到单一企业</span>}
+                        {entry.condition_required && !(entry.condition || entry.certificate_code || entry.condition_code) && <span>存在官方适用条件，详见下方</span>}
+                        {!entry.condition_required && !entry.condition && !entry.certificate_code ? '无附加条件记录' : ''}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">{effectiveStatusLabel(entry.effective_status)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>}
+        {remedies.length > 0 && !remedies.some(r => (r.enterprise_rates?.length || 0) > 0) &&
+          <p className="text-sm text-muted-foreground mb-3">当前本地税率数据库尚未提供企业与税率对应表；请更新关税数据。下方仍可查看已保存的官方措施。</p>}
         <div className="max-h-80 overflow-y-auto space-y-2">
           {remedies.map((r, index) => <div key={index} className="rounded-lg border p-3 text-sm space-y-2">
             <div className="font-medium">
