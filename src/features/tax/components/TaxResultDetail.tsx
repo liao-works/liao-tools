@@ -22,6 +22,15 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
     additional_code: string; additional_description: string;
     conditions: string; effective_start: string; effective_end: string;
   };
+  type RateOption = {
+    region: 'GB' | 'XI'; measure_type: string; measure_type_description: string;
+    geography: string; geography_description: string; expression: string;
+    expression_available?: boolean; additional_code: string;
+    additional_description: string; conditions: string; excluded_areas: string;
+    effective_start: string; effective_end: string; source_id: string;
+    special_use?: boolean; conditional?: boolean; china_applicable?: boolean;
+    applicability?: string;
+  };
   let remedies: TradeRemedyDetail[] = [];
   try {
     const parsed: unknown = JSON.parse(tariff.trade_remedy_details || '[]');
@@ -35,6 +44,24 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
   } catch {
     // Old database metadata has no detail column. The summary remains usable.
   }
+  let rateOptions: RateOption[] = [];
+  try {
+    const parsed: unknown = JSON.parse(tariff.rate_options || '[]');
+    if (Array.isArray(parsed)) {
+      rateOptions = parsed.filter((item): item is RateOption =>
+        !!item && typeof item === 'object' &&
+        (item.region === 'GB' || item.region === 'XI') &&
+        typeof item.measure_type === 'string' &&
+        typeof item.expression === 'string'
+      );
+    }
+  } catch {
+    // Older databases have no rate_options column/data.
+  }
+  const conditionalOptions = rateOptions.filter(option =>
+    option.applicability !== 'default' || !option.expression_available
+  );
+
   const sources = [
     { name: '英国税率来源', url: tariff.url, rate: tariff.rate, status: tariff.uk_rate_status,
       version: tariff.uk_source_version, verified: tariff.uk_verified_at },
@@ -68,6 +95,42 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
           网页临时比对（不修改数据库）
         </Button>
       </section>
+      {conditionalOptions.length > 0 && <section className="lt-tax-facts" aria-labelledby="lt-rate-options-heading">
+        <div className="lt-tax-panel-heading">
+          <div>
+            <span className="lt-kicker">CONDITIONAL DUTY OPTIONS</span>
+            <h3 id="lt-rate-options-heading">条件税率与特殊用途税率</h3>
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground mb-3">
+          默认税率之外的官方 103/105 措施全部保留。满足附加代码、证书、地理范围或特殊用途条件时，
+          才可使用对应税率；这里不把条件税率强行替换成默认税率。
+        </p>
+        <div className="max-h-96 overflow-y-auto space-y-2">
+          {conditionalOptions.map((option, index) => <div key={index} className="rounded-lg border p-3 text-sm space-y-1">
+            <div className="font-medium">
+              {option.region} · {option.measure_type}
+              {option.measure_type_description ? ' · ' + option.measure_type_description : ''}
+              {' · '}{option.expression || '官方未提供税率表达式'}
+            </div>
+            <div className="text-muted-foreground">
+              适用范围：{option.geography_description || option.geography || '未提供'}
+              {option.china_applicable ? ' · 中国原产可适用范围' : ''}
+              {option.special_use ? ' · 特殊用途' : ''}
+            </div>
+            {option.additional_code && <div>附加代码：<span className="font-mono">{option.additional_code}</span>
+              {option.additional_description ? <> · {option.additional_description}</> : ''}</div>}
+            {option.conditions && <div>适用条件：{option.conditions}</div>}
+            {option.excluded_areas && <div>排除地区：{option.excluded_areas}</div>}
+            <div className="text-muted-foreground">
+              {option.effective_start ? '生效：' + option.effective_start : '生效日期未记录'}
+              {option.effective_end ? ' · 截止：' + option.effective_end : ''}
+              {option.source_id ? ' · 来源措施：' + option.source_id : ''}
+            </div>
+          </div>)}
+        </div>
+      </section>}
+
       {remedies.length > 0 && <section className="lt-tax-facts" aria-labelledby="lt-remedies-heading">
         <div className="lt-tax-panel-heading">
           <div>

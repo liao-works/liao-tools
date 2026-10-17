@@ -17,7 +17,7 @@ pub fn diff_tariffs(
     let mut out = Vec::new();
 
     // tax 对比的共有字段：(字段名, 取值函数)
-    let fields: [(&str, fn(&TaxTariff) -> Option<String>); 9] = [
+    let fields: [(&str, fn(&TaxTariff) -> Option<String>); 10] = [
         ("rate", |t| Some(t.rate.clone())),
         ("north_ireland_rate", |t| t.north_ireland_rate.clone()),
         ("description", |t| t.description.clone()),
@@ -27,6 +27,7 @@ pub fn diff_tariffs(
         ("ni_anti_dumping_rate", |t| t.ni_anti_dumping_rate.clone()),
         ("ni_countervailing_rate", |t| t.ni_countervailing_rate.clone()),
         ("trade_remedy_details", |t| t.trade_remedy_details.clone()),
+        ("rate_options", |t| t.rate_options.clone()),
     ];
 
     let mk = |code: &str, field: Option<&str>, old_v: Option<String>,
@@ -143,6 +144,7 @@ mod tests {
             ni_anti_dumping_rate: None,
             ni_countervailing_rate: None,
             trade_remedy_details: None,
+            rate_options: None,
             last_updated: None,
             uk_source_version: None,
             ni_source_version: None,
@@ -186,6 +188,10 @@ mod tests {
         assert!(history.iter().any(|c| c.field.as_deref() == Some("anti_dumping_rate")));
         assert!(history.iter().any(|c| c.field.as_deref() == Some("ni_countervailing_rate")));
         assert!(history.iter().any(|c| c.field.as_deref() == Some("trade_remedy_details")));
+        let mut options_changed = old.clone();
+        options_changed[0].rate_options = Some(r#"[{"region":"GB","expression":"5%","applicability":"default"}]"#.into());
+        let option_history = diff_tariffs(&old, &options_changed, "options", None, None);
+        assert!(option_history.iter().any(|c| c.field.as_deref() == Some("rate_options")));
     }
 
     #[test]

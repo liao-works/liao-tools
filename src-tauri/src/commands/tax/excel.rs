@@ -4,6 +4,7 @@ use crate::models::tax::BatchResult;
 use anyhow::{Context, Result};
 use calamine::{open_workbook, Data, Reader, Xlsx};
 use rust_xlsxwriter::{Format, Workbook};
+use serde_json::Value;
 
 /// Excel批量处理器
 pub struct TaxExcelProcessor;
@@ -97,6 +98,47 @@ impl TaxExcelProcessor {
         }
     }
 
+    /// 将完整税率选项写入独立明细工作表，避免主表丢失条件/特殊用途数据。
+    fn write_rate_option_details(
+        workbook: &mut Workbook,
+        results: &[(String, Option<crate::models::tax::TaxTariff>)],
+        header_format: &Format,
+    ) -> Result<()> {
+        let sheet = workbook.add_worksheet();
+        sheet.set_name("税率条件明细")?;
+        let headers = [
+            "商品编码", "地区", "措施类型", "措施类型说明", "适用地理范围",
+            "税率/税额表达式", "附加代码", "附加代码说明", "适用条件",
+            "排除地区", "生效日期", "截止日期", "来源措施ID",
+        ];
+        for (col, header) in headers.iter().enumerate() {
+            sheet.write_with_format(0, col as u16, *header, header_format)?;
+        }
+        let mut row_num = 1u32;
+        for (code, tariff_opt) in results {
+            let Some(tariff) = tariff_opt else { continue };
+            let Some(raw) = tariff.rate_options.as_deref() else { continue };
+            let Ok(Value::Array(options)) = serde_json::from_str::<Value>(raw) else { continue };
+            for option in options {
+                let get = |name: &str| option.get(name).and_then(Value::as_str).unwrap_or("");
+                let values = [
+                    code.as_str(), get("region"), get("measure_type"), get("measure_type_description"),
+                    get("geography_description"), get("expression"), get("additional_code"),
+                    get("additional_description"), get("conditions"), get("excluded_areas"),
+                    get("effective_start"), get("effective_end"), get("source_id"),
+                ];
+                for (col, value) in values.iter().enumerate() {
+                    sheet.write(row_num, col as u16, *value)?;
+                }
+                row_num += 1;
+            }
+        }
+        for col in 0..headers.len() as u16 {
+            sheet.set_column_width(col, 24)?;
+        }
+        Ok(())
+    }
+
     /// 写入查询结果到Excel
     fn write_results(
         output_path: &str,
@@ -121,6 +163,8 @@ impl TaxExcelProcessor {
             "反补贴（英国GB）",
             "反倾销（北爱XI）",
             "反补贴（北爱XI）",
+            "英国条件/特殊税率",
+            "北爱条件/特殊税率",
             "查询状态",
             "英国数据状态",
             "北爱数据状态",
@@ -163,21 +207,44 @@ impl TaxExcelProcessor {
                 )?;
                 worksheet.write(row_num, 7, tariff.ni_anti_dumping_rate.as_deref().unwrap_or(""))?;
                 worksheet.write(row_num, 8, tariff.ni_countervailing_rate.as_deref().unwrap_or(""))?;
-                worksheet.write(row_num, 9, "成功")?;
-                worksheet.write(row_num, 10, tariff.uk_rate_status.as_deref().unwrap_or(""))?;
-                worksheet.write(row_num, 11, tariff.ni_rate_status.as_deref().unwrap_or(""))?;
-                worksheet.write(row_num, 12, tariff.uk_source_version.as_deref().unwrap_or(""))?;
-                worksheet.write(row_num, 13, tariff.ni_source_version.as_deref().unwrap_or(""))?;
+                let option_summary = |region: &str| -> String {
+                    let Ok(Value::Array(options)) = serde_json::from_str::<Value>(
+                        tariff.rate_options.as_deref().unwrap_or("[]")) else { return String::new() };
+                    options.iter()
+                        .filter(|o| o.get("region").and_then(Value::as_str) == Some(region))
+                        .filter(|o| o.get("applicability").and_then(Value::as_str) != Some("default"))
+                        .filter_map(|o| {
+                            let expr=o.get("expression").and_then(Value::as_str).unwrap_or("");
+                            let code=o.get("additional_code").and_then(Value::as_str).unwrap_or("");
+                            let cond=o.get("conditions").and_then(Value::as_str).unwrap_or("");
+                            let mut parts=Vec::new();
+                            if !expr.is_empty() { parts.push(expr.to_string()); }
+                            if !code.is_empty() { parts.push(format!("附加代码 {}",code)); }
+                            if !cond.is_empty() { parts.push(format!("条件 {}",cond)); }
+                            if parts.is_empty() { None } else { Some(parts.join("；")) }
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                };
+                worksheet.write(row_num, 9, option_summary("GB"))?;
+                worksheet.write(row_num, 10, option_summary("XI"))?;
+                worksheet.write(row_num, 11, "成功")?;
+                worksheet.write(row_num, 12, tariff.uk_rate_status.as_deref().unwrap_or(""))?;
+                worksheet.write(row_num, 13, tariff.ni_rate_status.as_deref().unwrap_or(""))?;
+                worksheet.write(row_num, 14, tariff.uk_source_version.as_deref().unwrap_or(""))?;
+                worksheet.write(row_num, 15, tariff.ni_source_version.as_deref().unwrap_or(""))?;
             } else {
-                worksheet.write(row_num, 9, "未找到")?;
+                worksheet.write(row_num, 11, "未找到")?;
             }
         }
 
         // GB 与北爱 XI 的附加税单独导出，避免混淆
-        for col in 0..14 {
+        for col in 0..16 {
             worksheet.set_column_width(col, 20)?;
         }
         
+        Self::write_rate_option_details(&mut workbook, results, &header_format)?;
+
         workbook
             .save(output_path)
             .context("Failed to save output Excel file")?;
