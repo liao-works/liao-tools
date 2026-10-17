@@ -35,6 +35,37 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
   } catch {
     // Old database metadata has no detail column. The summary remains usable.
   }
+  type RateOption = {
+    region: 'GB' | 'XI'; measure_type: string; measure_type_description: string;
+    geography: string; geography_description: string; expression: string;
+    additional_code: string; additional_description: string; conditions: string;
+    excluded_areas: string; effective_start: string; effective_end: string;
+    effective_status: 'active' | 'expired' | 'future' | 'unknown';
+    condition_ids?: string[]; additional_code_ids?: string[];
+    expression_available: boolean; special_use: boolean; conditional: boolean;
+    china_applicable: boolean; applicability: string; source_id: string;
+  };
+  let rateOptions: RateOption[] = [];
+  try {
+    const parsed: unknown = JSON.parse(tariff.rate_options || '[]');
+    if (Array.isArray(parsed)) {
+      rateOptions = parsed.filter((item): item is RateOption =>
+        !!item && typeof item === 'object' &&
+        (item.region === 'GB' || item.region === 'XI') &&
+        item.china_applicable === true
+      );
+    }
+  } catch {
+    // Older local database snapshots do not contain rate options.
+  }
+  const optionStatus = (status: RateOption['effective_status']) => ({
+    active: '当前有效', expired: '已过期', future: '尚未生效', unknown: '生效日期不明确'
+  }[status] || '生效日期不明确');
+  const applicabilityLabel = (option: RateOption) => {
+    if (option.applicability === 'default') return '普通适用税率';
+    if (option.applicability === 'authorised_use') return '特殊用途税率';
+    return '条件/附加代码税率';
+  };
   const sources = [
     { name: '英国税率来源', url: tariff.url, rate: tariff.rate, status: tariff.uk_rate_status,
       version: tariff.uk_source_version, verified: tariff.uk_verified_at },
@@ -93,6 +124,41 @@ export function TaxResultDetail({ tariff, onCopy, onOpenSource, onCompare, compa
               {r.effective_start ? `生效：${r.effective_start}` : '生效日期未记录'}
               {r.effective_end ? ` · 截止：${r.effective_end}` : ''}
               {' · '}中国适用范围：{r.geography === 'CN' ? '中国' : '包括中国的所有国家'}
+            </div>
+          </div>)}
+        </div>
+      </section>}
+      {rateOptions.length > 0 && <section className="lt-tax-facts" aria-labelledby="lt-rate-options-heading">
+        <div className="lt-tax-panel-heading">
+          <div>
+            <span className="lt-kicker">CONDITIONAL DUTY OPTIONS</span>
+            <h3 id="lt-rate-options-heading">普通、条件与特殊用途税率</h3>
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground mb-3">
+          以下是官方记录中适用于中国原产范围的税率选项。只有“普通适用税率”可作为一般场景参考；
+          条件税率、附加代码和特殊用途税率需满足对应要求。过期或日期不明的记录不会作为当前税率推荐。
+        </p>
+        <div className="max-h-96 overflow-y-auto space-y-2">
+          {rateOptions.map((option, index) => <div key={`${option.region}-${option.source_id}-${index}`}
+            className="rounded-lg border p-3 text-sm space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <strong>{option.region === 'GB' ? '英国 GB' : '北爱尔兰 XI'} · {applicabilityLabel(option)}</strong>
+              <span className="lt-tax-source-meta">{optionStatus(option.effective_status)}</span>
+            </div>
+            <div className="text-base font-semibold">
+              {option.expression_available ? option.expression : '官网未提供可直接显示的税额表达式'}
+            </div>
+            {option.additional_code && <div>
+              附加代码：<span className="font-mono">{option.additional_code}</span>
+              {option.additional_description && <> · {option.additional_description}</>}
+            </div>}
+            {option.conditions && <div>适用条件：{option.conditions}</div>}
+            {option.excluded_areas && <div>排除地区：{option.excluded_areas}</div>}
+            <div className="text-muted-foreground">
+              {option.effective_start ? `生效：${option.effective_start}` : '生效日期未记录'}
+              {option.effective_end ? ` · 截止：${option.effective_end}` : ''}
+              {option.source_id ? ` · 官方措施 ID：${option.source_id}` : ''}
             </div>
           </div>)}
         </div>
