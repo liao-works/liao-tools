@@ -115,7 +115,9 @@ export const DEFAULT_CONFIG: TodoConfig = {
     width: 360,
     height: 460,
     opacity: 0.9,
-    isDesktopMode: true,
+    // 与后端 default_config 保持一致：桌面嵌入默认关闭，
+    // 保证"桌面小部件"打开的一定是可见的浮动窗口。
+    isDesktopMode: false,
     isPinned: false,
     theme: 'dark',
   },
