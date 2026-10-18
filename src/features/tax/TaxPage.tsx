@@ -2,11 +2,12 @@ import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
 import { SingleQueryTab } from './components/SingleQueryTab';
+import { CalcTab } from './components/CalcTab';
 import { BatchQueryTab } from './components/BatchQueryTab';
 import { UpdateTab } from './components/UpdateTab';
 import { DataStatsTab } from './components/DataStatsTab';
 
-const validTabs = ['single', 'batch', 'update', 'stats'];
+const validTabs = ['single', 'calc', 'batch', 'update', 'stats'];
 export function TaxPage() {
   const [params, setParams] = useSearchParams();
   const requested = params.get('tab') || 'single';
@@ -19,11 +20,13 @@ export function TaxPage() {
       <Tabs value={tab} onValueChange={value => setParams(value === 'single' ? {} : { tab: value })} className="space-y-4">
         <TabsList>
           <TabsTrigger value="single">单码查询</TabsTrigger>
+          <TabsTrigger value="calc">成本试算</TabsTrigger>
           <TabsTrigger value="batch">批量 Excel 查询</TabsTrigger>
           <TabsTrigger value="update">数据更新与审核</TabsTrigger>
           <TabsTrigger value="stats">数据统计</TabsTrigger>
         </TabsList>
         <TabsContent value="single" className="space-y-4"><SingleQueryTab /></TabsContent>
+        <TabsContent value="calc" className="space-y-4"><CalcTab /></TabsContent>
         <TabsContent value="batch" className="space-y-4"><BatchQueryTab /></TabsContent>
         <TabsContent value="update" className="space-y-4"><UpdateTab /></TabsContent>
         <TabsContent value="stats" className="space-y-4"><DataStatsTab /></TabsContent>

@@ -239,7 +239,139 @@ export const taxApi = {
       throw error;
     }
   },
+
+  /**
+   * 关税成本试算（单码）。基于本地离线税率估算，非申报依据。
+   */
+  async calcEstimate(request: TaxCalcRequest): Promise<TaxCalcResult> {
+    try {
+      return await withUsage({ tool: 'tax', action: 'query', items: 1 },
+        () => invoke<TaxCalcResult>('tax_calc_estimate', { request }));
+    } catch (error) {
+      console.error('关税试算失败:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 批量关税成本试算（Excel 文件）
+   */
+  async calcBatch(
+    inputPath: string,
+    params: TaxCalcBatchParams,
+    onProgress?: (current: number, total: number) => void,
+  ): Promise<TaxCalcBatchResult> {
+    const unlisten = await listen<{ current: number; total: number }>(
+      'calc-batch-progress',
+      (event) => {
+        if (onProgress) {
+          onProgress(event.payload.current, event.payload.total);
+        }
+      },
+    );
+    try {
+      const result = await withUsage(
+        { tool: 'tax', action: 'query' },
+        () => invoke<{
+          total: number;
+          success: number;
+          failed: number;
+          errors: string[];
+          output_path: string;
+        }>('tax_calc_batch', { inputPath, params }),
+        (result) => result.total,
+      );
+      return {
+        total: result.total,
+        success: result.success,
+        failed: result.failed,
+        errors: result.errors,
+        outputPath: result.output_path,
+      };
+    } catch (error) {
+      console.error('批量关税试算失败:', error);
+      throw error;
+    } finally {
+      unlisten();
+    }
+  },
+
+  /**
+   * 下载批量试算 Excel 模板
+   */
+  async downloadCalcTemplate(outputPath: string): Promise<void> {
+    try {
+      await invoke('tax_calc_template', { outputPath });
+    } catch (error) {
+      console.error('下载试算模板失败:', error);
+      throw error;
+    }
+  },
 };
+
+// ============ 关税成本试算 ============
+
+/** 单码试算请求：金额按 currency 填写，换算完全依赖 exchangeRate（1 币种 = ? GBP） */
+export interface TaxCalcRequest {
+  code: string;
+  destination: 'GB' | 'XI';
+  chinaOrigin: boolean;
+  goodsValue: number;
+  freight: number;
+  insurance: number;
+  /** 计税数量：税率表达式含按量计税时必填 */
+  quantity?: number | null;
+  currency: string;
+  exchangeRate: number;
+  /** 进口 VAT 百分比，20 表示 20% */
+  vatRate: number;
+}
+
+/** 试算中的一项税费构成；amount 为 null 表示该构成项无法自动试算 */
+export interface TaxCalcLine {
+  label: string;
+  expression: string;
+  amount: number | null;
+  computable: boolean;
+  note: string;
+}
+
+/** 试算结果：金额均为 GBP；totals 为 null 表示合计不完整 */
+export interface TaxCalcResult {
+  code: string;
+  description: string | null;
+  destination: string;
+  currency: string;
+  customsValue: number;
+  expression: string;
+  rateStatus: string | null;
+  lines: TaxCalcLine[];
+  dutyTotal: number | null;
+  vatRate: number;
+  vatTotal: number | null;
+  grandTotal: number | null;
+  dutyRateEffective: number | null;
+  totalRateEffective: number | null;
+  fullyComputed: boolean;
+  warnings: string[];
+}
+
+/** 批量试算的全局参数（模板金额按此币种填写） */
+export interface TaxCalcBatchParams {
+  destination: 'GB' | 'XI';
+  chinaOrigin: boolean;
+  currency: string;
+  exchangeRate: number;
+  vatRate: number;
+}
+
+export interface TaxCalcBatchResult {
+  total: number;
+  success: number;
+  failed: number;
+  errors: string[];
+  outputPath: string;
+}
 
 /**
  * 单行更新结果
