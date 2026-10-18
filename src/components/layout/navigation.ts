@@ -6,6 +6,7 @@ import {
   FileBarChart,
   FileSpreadsheet,
   Home,
+  Languages,
   Percent,
   Search,
   Settings,
@@ -54,6 +55,7 @@ export const navGroups: ToolNavigationGroup[] = [
     items: [
       { title: '系统工具', href: '/system-tools', icon: Wrench, description: '启动系统程序与自定义工具', keywords: ['系统', '软件', '程序', '启动'] },
       { title: 'Todo 清单', href: '/todo', icon: CheckCircle2, description: '记录任务与桌面小组件', keywords: ['todo', '待办', '任务', '小组件'] },
+      { title: '翻译', href: '/translate', icon: Languages, description: '邮件翻译、润色与语气解读', keywords: ['翻译', 'translate', '邮件', '润色', '解释', 'deepseek', 'gemini'] },
     ],
   },
   {

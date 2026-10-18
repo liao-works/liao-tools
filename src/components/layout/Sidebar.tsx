@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import {
   BarChart3,
   Home, Search, ShieldCheck, FileSpreadsheet, Wrench,
-  CheckCheck, Settings, Database, Calculator, PanelLeftClose, PanelLeftOpen, RefreshCw
+  CheckCheck, Languages, Settings, Database, Calculator, PanelLeftClose, PanelLeftOpen, RefreshCw
 } from 'lucide-react';
 
 interface SidebarProps { collapsed: boolean; onToggle: () => void; onNavigate?: () => void }
@@ -20,6 +20,7 @@ const groups = [
   { label: '效率工具', items: [
     { label: '系统工具', href: '/system-tools', icon: Wrench },
     { label: 'Todo 清单', href: '/todo', icon: CheckCheck },
+    { label: '翻译', href: '/translate', icon: Languages },
   ] },
 ];
 

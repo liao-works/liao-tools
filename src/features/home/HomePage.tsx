@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import {
   ArrowRight, Search, ShieldCheck, Boxes, FileSpreadsheet,
-  Wrench, CheckCheck, Database, Clock3, ArrowUpRight, BookOpen, Info,
+  Wrench, CheckCheck, Languages, Database, Clock3, ArrowUpRight, BookOpen, Info,
 } from 'lucide-react';
 import { taxApi } from '@/lib/api/tax';
 import { altaApi } from '@/lib/api/alta';
@@ -14,6 +14,7 @@ const tools = [
   { name: 'Excel 数据拆分', text: '海铁、空运表格处理', to: '/excel', icon: FileSpreadsheet, accent: 'green' },
   { name: '系统工具', text: '快速启动常用应用', to: '/system-tools', icon: Wrench, accent: 'green' },
   { name: 'Todo 清单', text: '记录与整理待办任务', to: '/todo', icon: CheckCheck, accent: 'amber' },
+  { name: '翻译', text: '邮件翻译、润色与语气解读', to: '/translate', icon: Languages, accent: 'blue' },
 ];
 
 type Snapshot = { kind: 'loading' | 'ready' | 'unavailable'; label: string };
@@ -55,7 +56,7 @@ export function HomePage() {
     <section className="lt-home-section" aria-labelledby="tools-title">
       <div className="lt-section-heading">
         <div><h2 id="tools-title">快速开始 · 常用工具</h2><p>选择一个工具，直接进入工作流程</p></div>
-        <span className="lt-section-count">6 个核心工具</span>
+        <span className="lt-section-count">7 个核心工具</span>
       </div>
       <div className="lt-tools-grid lt-tools-grid--balanced">
         {tools.map(({ name, text, to, icon: Icon, accent }) =>

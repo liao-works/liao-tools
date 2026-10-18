@@ -15,6 +15,7 @@ import { DataMaintenancePage } from './features/data-maintenance/DataMaintenance
 import { UsageStatsPage } from './features/usage/UsageStatsPage';
 import { TodoPage } from './features/todo/TodoPage';
 import { TodoWidget } from './features/todo/TodoWidget';
+import { TranslatePage } from './features/translate/TranslatePage';
 import { Toaster } from './components/ui/toaster';
 import { UpdateHistoryHost } from './components/update-history/UpdateHistoryHost';
 import { useDarkMode } from './hooks/use-dark-mode';
@@ -70,6 +71,7 @@ function App() {
           <Route path="cbm" element={<CbmPage />} />
           <Route path="excel" element={<ExcelPage />} />
           <Route path="revcal" element={<RevCalPage />} />
+          <Route path="translate" element={<TranslatePage />} />
           <Route path="system-tools" element={<SystemToolsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="data-maintenance" element={<DataMaintenancePage />} />
