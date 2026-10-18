@@ -16,6 +16,7 @@ use commands::tax::*;
 use commands::update_history::commands::*;
 use commands::ups_dpd::commands::*;
 use commands::updater::*;
+use commands::usage_stats::*;
 use commands::user_tools::*;
 use log::info;
 use std::path::PathBuf;
@@ -105,6 +106,9 @@ pub fn run() {
             tax_batch_query,
             tax_download_template,
             tax_check_update,
+            tax_get_data_stats,
+            tax_get_update_events,
+            tax_clear_update_events,
             tax_has_local_data,
             tax_get_local_version,
             tax_download_update,
@@ -178,6 +182,9 @@ pub fn run() {
             sticky_notes::toggle_todo_widget_visibility,
             sticky_notes::show_todo_widget_and_focus_input,
             sticky_notes::toggle_todo_widget_pin,
+            // Usage stats commands
+            usage_record,
+            usage_summary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

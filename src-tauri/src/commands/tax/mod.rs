@@ -7,5 +7,7 @@ pub mod preview;
 pub mod ni_review;
 pub mod scraper;
 pub mod signed;
+pub mod stats;
+pub mod update_log;
 
 pub use commands::*;

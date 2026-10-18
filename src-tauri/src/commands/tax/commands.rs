@@ -1,5 +1,7 @@
 use crate::commands::tax::database::TaxDatabase;
 use crate::commands::tax::downloader::TaxDataDownloader;
+use crate::commands::tax::stats::{self, TaxDataStats};
+use crate::commands::tax::update_log::{self, UpdateEventKind};
 use crate::commands::tax::excel::TaxExcelProcessor;
 use crate::commands::tax::query::TaxQuery;
 use crate::commands::tax::scraper::TaxScraper;
@@ -146,21 +148,55 @@ pub async fn tax_read_ni_review(path: String) -> Result<NiReviewReport, String> 
         .await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())
 }
 
-/// 检查更新
+/// 检查更新（记录事件日志）
 #[tauri::command]
 pub async fn tax_check_update(app_handle: tauri::AppHandle) -> Result<TaxVersionInfo, String> {
-    TaxDataDownloader::check_update(&app_handle)
-        .await
-        .map_err(|e| e.to_string())
+    match TaxDataDownloader::check_update(&app_handle).await {
+        Ok(info) => {
+            update_log::append(&app_handle, UpdateEventKind::Check {
+                ok: true,
+                has_update: info.has_update,
+                remote_version: Some(info.remote.version.clone()),
+                detail: None,
+            });
+            Ok(info)
+        }
+        Err(err) => {
+            update_log::append(&app_handle, UpdateEventKind::Check {
+                ok: false,
+                has_update: false,
+                remote_version: None,
+                detail: Some(err.to_string()),
+            });
+            Err(err.to_string())
+        }
+    }
 }
 
-/// 下载并安装更新
+/// 下载并安装更新（记录事件日志）
 #[tauri::command]
 pub async fn tax_download_update(
     app_handle: tauri::AppHandle,
     window: tauri::Window,
 ) -> Result<bool, String> {
-    TaxDataDownloader::download_and_install(&app_handle, |downloaded, total| {
+    let started = std::time::Instant::now();
+    let local = TaxDataDownloader::get_local_version(&app_handle)
+        .map_err(|e| e.to_string())?;
+    let remote = TaxDataDownloader::check_update(&app_handle)
+        .await
+        .map_err(|e| {
+            update_log::append(&app_handle, UpdateEventKind::Failure {
+                stage: "检查远程版本".into(),
+                detail: e.to_string(),
+            });
+            e.to_string()
+        })?;
+    let to_version = remote.remote.version.clone();
+    update_log::append(&app_handle, UpdateEventKind::DownloadStart {
+        from_version: local.version.clone(),
+        to_version: to_version.clone(),
+    });
+    let result = TaxDataDownloader::download_and_install(&app_handle, |downloaded, total| {
         // 发送进度事件
         let _ = window.emit(
             "download-progress",
@@ -170,8 +206,64 @@ pub async fn tax_download_update(
             }),
         );
     })
-    .await
-    .map_err(|e| e.to_string())
+    .await;
+    match result {
+        Ok(true) => {
+            let installed = TaxDataDownloader::get_local_version(&app_handle)
+                .map_err(|e| e.to_string())?;
+            let size_bytes = tauri::Manager::path(&app_handle)
+                .app_data_dir()
+                .ok()
+                .and_then(|dir| std::fs::metadata(dir.join("tariffs.db")).ok())
+                .map(|meta| meta.len())
+                .unwrap_or(0);
+            update_log::append(&app_handle, UpdateEventKind::DownloadComplete {
+                to_version: installed.version.clone(),
+                size_bytes,
+                duration_ms: started.elapsed().as_millis() as u64,
+            });
+            update_log::append(&app_handle, UpdateEventKind::Install {
+                from_version: local.version.clone(),
+                to_version: installed.version.clone(),
+                record_count: installed.records,
+            });
+            Ok(true)
+        }
+        Ok(false) => Ok(false),
+        Err(err) => {
+            update_log::append(&app_handle, UpdateEventKind::Failure {
+                stage: "下载或安装".into(),
+                detail: err.to_string(),
+            });
+            Err(err.to_string())
+        }
+    }
+}
+
+/// 数据统计视图（本地清单 + 实时校验）
+#[tauri::command]
+pub async fn tax_get_data_stats(
+    app_handle: tauri::AppHandle,
+) -> Result<TaxDataStats, String> {
+    tauri::async_runtime::spawn_blocking(move || stats::collect(&app_handle))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+/// 数据更新事件日志（最近 N 条，新→旧）
+#[tauri::command]
+pub async fn tax_get_update_events(
+    limit: Option<usize>,
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<update_log::UpdateEvent>, String> {
+    update_log::read_events(&app_handle, limit.unwrap_or(50)).map_err(|e| e.to_string())
+}
+
+/// 清空数据更新事件日志
+#[tauri::command]
+pub async fn tax_clear_update_events(app_handle: tauri::AppHandle) -> Result<usize, String> {
+    update_log::clear_events(&app_handle).map_err(|e| e.to_string())
 }
 
 /// 打开URL（使用系统默认浏览器）

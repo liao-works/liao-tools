@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { withUsage } from '@/lib/api/usage';
 import type { TaxTariff, TaxVersionInfo } from '@/types';
 
 
@@ -89,8 +90,8 @@ export const taxApi = {
    */
   async exactSearch(code: string): Promise<TaxTariff | null> {
     try {
-      const result = await invoke<TaxTariff | null>('tax_exact_search', { code });
-      return result;
+      return await withUsage({ tool: 'tax', action: 'query', items: 1 },
+        () => invoke<TaxTariff | null>('tax_exact_search', { code }));
     } catch (error) {
       console.error('精确查询失败:', error);
       throw error;
@@ -102,8 +103,8 @@ export const taxApi = {
    */
   async fuzzySearch(query: string, limit = 10): Promise<TaxTariff[]> {
     try {
-      const results = await invoke<TaxTariff[]>('tax_fuzzy_search', { query, limit });
-      return results;
+      return await withUsage({ tool: 'tax', action: 'query', items: 1 },
+        () => invoke<TaxTariff[]>('tax_fuzzy_search', { query, limit }));
     } catch (error) {
       console.error('模糊查询失败:', error);
       throw error;
@@ -128,13 +129,17 @@ export const taxApi = {
     );
 
     try {
-      const result = await invoke<{
-        total: number;
-        success: number;
-        errors: string[];
-        output_path: string;
-      }>('tax_batch_query', { inputPath });
-      
+      const result = await withUsage(
+        { tool: 'tax', action: 'query' },
+        () => invoke<{
+          total: number;
+          success: number;
+          errors: string[];
+          output_path: string;
+        }>('tax_batch_query', { inputPath }),
+        (result) => result.total,
+      );
+
       return {
         total: result.total,
         success: result.success,
@@ -252,3 +257,73 @@ export interface UpdateResult {
   /** 用户选择写入时，本次是否已实际写进本地数据库 */
   appliedToDb?: boolean;
 }
+
+// ============ 数据统计视图 ============
+
+export interface RegionDefaultCoverage {
+  catalogueCodes: number;
+  codesWithDefaultDuty: number;
+  codesWithoutDefaultDuty: number;
+}
+
+export interface RegionRemedyCoverage {
+  sourceRows: number;
+  projectedRows: number;
+  antiDumpingCodes: number;
+  countervailingCodes: number;
+  conditionRateExpressions: number;
+}
+
+export interface TaxDataStats {
+  available: boolean;
+  version: string;
+  timestamp: string;
+  fileSizeBytes: number;
+  recordCount: number;
+  liveRecordCount: number;
+  liveRecordsMatch: boolean;
+  liveGbWithRate: number;
+  liveXiWithRate: number;
+  gbSourceVersion: string;
+  gbAsOf: string;
+  xiAsOf: string;
+  gbDefault: RegionDefaultCoverage;
+  xiDefault: RegionDefaultCoverage;
+  gbRateOptionRows: number;
+  xiRateOptionRows: number;
+  conditionalRateOptions: number;
+  unresolvedRateOptions: number;
+  missingRateExpressions: number;
+  gbRemedy: RegionRemedyCoverage;
+  xiRemedy: RegionRemedyCoverage;
+  gapAuditRecordCount: number;
+  gapByRegionReason: Record<string, number>;
+  rateScope: string;
+}
+
+// ============ 数据更新事件日志 ============
+
+export type TaxUpdateEvent =
+  | { type: 'check'; timestamp: string; ok: boolean; hasUpdate: boolean; remoteVersion?: string | null; detail?: string | null }
+  | { type: 'downloadStart'; timestamp: string; fromVersion: string; toVersion: string }
+  | { type: 'downloadComplete'; timestamp: string; toVersion: string; sizeBytes: number; durationMs: number }
+  | { type: 'install'; timestamp: string; fromVersion: string; toVersion: string; recordCount: number }
+  | { type: 'failure'; timestamp: string; stage: string; detail: string };
+
+export interface TaxUpdateStatsApi {
+  getDataStats(): Promise<TaxDataStats>;
+  getUpdateEvents(limit?: number): Promise<TaxUpdateEvent[]>;
+  clearUpdateEvents(): Promise<number>;
+}
+
+export const taxStatsApi: TaxUpdateStatsApi = {
+  async getDataStats() {
+    return invoke<TaxDataStats>('tax_get_data_stats');
+  },
+  async getUpdateEvents(limit?: number) {
+    return invoke<TaxUpdateEvent[]>('tax_get_update_events', { limit });
+  },
+  async clearUpdateEvents() {
+    return invoke<number>('tax_clear_update_events');
+  },
+};

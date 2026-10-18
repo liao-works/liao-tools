@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
-import { RefreshCw, Download, Loader2, CheckCircle, History } from 'lucide-react';
+import { RefreshCw, Download, Loader2, CheckCircle, History, ListOrdered, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { taxApi } from '@/lib/api/tax';
+import { taxApi, taxStatsApi, type TaxUpdateEvent } from '@/lib/api/tax';
 import type { TaxPreviewRate, TaxPreviewSummary, TaxSignedReviewResult, NiReviewReport } from '@/lib/api/tax';
 import type { TaxTariff } from '@/types';
 import { openUpdateHistory } from '@/hooks/use-update-history';
@@ -39,6 +39,19 @@ export function UpdateTab() {
   const [verifiedReview, setVerifiedReview] = useState<TaxSignedReviewResult | null>(null);
   const [niReview, setNiReview] = useState<NiReviewReport | null>(null);
   const [readingNiReview, setReadingNiReview] = useState(false);
+  const [updateEvents, setUpdateEvents] = useState<TaxUpdateEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+
+  const loadUpdateEvents = async () => {
+    setEventsLoading(true);
+    try {
+      setUpdateEvents(await taxStatsApi.getUpdateEvents(50));
+    } catch {
+      setUpdateEvents([]);
+    } finally {
+      setEventsLoading(false);
+    }
+  };
 
   const { toast } = useToast();
 
@@ -171,6 +184,10 @@ export function UpdateTab() {
   useEffect(() => {
     void refreshLocalVersion();
   }, [refreshLocalVersion]);
+
+  useEffect(() => {
+    void loadUpdateEvents();
+  }, [downloading]);
 
   return (
     <div className="space-y-4">
@@ -496,6 +513,67 @@ export function UpdateTab() {
           </CardContent>
         </Card>
       )}
+
+      {/* 数据更新日志（事件流水） */}
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <div className="space-y-1.5">
+            <CardTitle className="flex items-center gap-2">
+              <ListOrdered className="h-4 w-4" />
+              数据更新日志
+            </CardTitle>
+            <CardDescription>
+              本机的检查 / 下载 / 安装 / 失败事件流水（最近 50 条）。逐字段的税率变化明细见「更新历史」。
+            </CardDescription>
+          </div>
+          <Button variant="ghost" size="sm" disabled={eventsLoading}
+            onClick={() => void loadUpdateEvents()}>
+            {eventsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {updateEvents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              暂无更新事件。执行「检查更新」或「立即更新」后，这里会记录每次操作的流水。
+            </p>
+          ) : (
+            <div className="max-h-80 space-y-2 overflow-y-auto">
+              {updateEvents.map((event, index) => <div key={index}
+                className="flex items-start gap-3 rounded-md border px-3 py-2 text-sm">
+                {event.type === 'failure'
+                  ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger-fg" aria-hidden="true" />
+                  : <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-success-fg" aria-hidden="true" />}
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="font-medium">
+                      {event.type === 'check' && (event.ok
+                        ? event.hasUpdate ? '检查更新：发现新版本' : '检查更新：已是最新'
+                        : '检查更新：失败')}
+                      {event.type === 'downloadStart' && '开始下载'}
+                      {event.type === 'downloadComplete' && '下载并校验完成'}
+                      {event.type === 'install' && '已安装新数据包'}
+                      {event.type === 'failure' && `更新失败（${event.stage}）`}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {event.timestamp.replace('T', ' ').slice(0, 19)}
+                    </span>
+                  </div>
+                  <div className="break-all text-xs text-muted-foreground">
+                    {event.type === 'check' && (event.remoteVersion ? `远程版本：${event.remoteVersion}` : '')
+                      + (event.detail ? ` · ${event.detail}` : '')}
+                    {event.type === 'downloadStart' && `${event.fromVersion} → ${event.toVersion}`}
+                    {event.type === 'downloadComplete' &&
+                      `${event.toVersion} · ${formatBytes(event.sizeBytes)} · 用时 ${(event.durationMs / 1000).toFixed(0)} 秒`}
+                    {event.type === 'install' &&
+                      `${event.fromVersion} → ${event.toVersion} · ${event.recordCount.toLocaleString()} 条记录`}
+                    {event.type === 'failure' && event.detail}
+                  </div>
+                </div>
+              </div>)}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 操作日志 */}
       {logs.length > 0 && (

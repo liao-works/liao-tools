@@ -12,6 +12,7 @@ import { RevCalPage } from './features/revcal/RevCalPage';
 import { SystemToolsPage } from './features/system-tools/SystemToolsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { DataMaintenancePage } from './features/data-maintenance/DataMaintenancePage';
+import { UsageStatsPage } from './features/usage/UsageStatsPage';
 import { TodoPage } from './features/todo/TodoPage';
 import { TodoWidget } from './features/todo/TodoWidget';
 import { Toaster } from './components/ui/toaster';
@@ -72,6 +73,7 @@ function App() {
           <Route path="system-tools" element={<SystemToolsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="data-maintenance" element={<DataMaintenancePage />} />
+          <Route path="usage" element={<UsageStatsPage />} />
           <Route path="updates" element={<UpdateCenter />} />
         </Route>
       </Routes>

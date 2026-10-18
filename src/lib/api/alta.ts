@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { withUsage } from '@/lib/api/usage';
 
 /// 类型定义
 export interface AltaQueryResult {
@@ -51,10 +52,11 @@ export const altaApi = {
     matchLength?: number
   ): Promise<AltaQueryResult> {
     try {
-      return await invoke<AltaQueryResult>('query_hs_code', {
+      return await withUsage({ tool: 'alta', action: 'query', items: 1 },
+        () => invoke<AltaQueryResult>('query_hs_code', {
         hsCode,
         matchLength,
-      });
+      }));
     } catch (error) {
       console.error('查询失败:', error);
       throw error;
@@ -83,10 +85,14 @@ export const altaApi = {
     matchLength?: number
   ): Promise<ExcelStats> {
     try {
-      return await invoke<ExcelStats>('batch_process_excel', {
+      return await withUsage(
+        { tool: 'alta', action: 'process' },
+        () => invoke<ExcelStats>('batch_process_excel', {
         inputPath,
         matchLength,
-      });
+      }),
+        (stats) => stats.total,
+      );
     } catch (error) {
       console.error('批量处理失败:', error);
       throw error;

@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   CheckCircle2,
   Database,
   FileBarChart,
@@ -59,6 +60,7 @@ export const navGroups: ToolNavigationGroup[] = [
     title: '管理',
     items: [
       { title: '数据维护', href: '/data-maintenance', icon: Database, description: '关税、Alta 数据版本、更新和历史', keywords: ['数据', '维护', '更新', '版本', '同步', '审核', '完整性', '历史'] },
+      { title: '使用统计', href: '/usage', icon: BarChart3, description: '查询次数、数据量与处理时长统计', keywords: ['统计', '使用', '查询次数', '数据量', '时长', '周', '月', '报表'] },
       { title: '偏好设置', href: '/settings', icon: Settings, description: '主题、更新与应用设置', keywords: ['设置', '主题', '更新', 'dark'] },
     ],
   },
