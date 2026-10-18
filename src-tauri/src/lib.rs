@@ -5,6 +5,7 @@ mod sticky_notes;
 
 use commands::alta::*;
 use commands::alta::database::DatabaseManager;
+use commands::cbm::commands::*;
 use commands::alta::matcher::HSCodeMatcher;
 use commands::excel::*;
 use commands::file_utils::open_file_with_default_app;
@@ -136,6 +137,10 @@ pub fn run() {
             tax_has_signed_review_trust_key,
             tax_open_url,
             tax_update_single_row,
+            // CBM commands
+            cbm_calculate,
+            cbm_batch,
+            cbm_template,
             // Update history commands
             get_update_sessions,
             get_update_details,

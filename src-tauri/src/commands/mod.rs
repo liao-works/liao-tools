@@ -1,4 +1,5 @@
 pub mod alta;
+pub mod cbm;
 pub mod error;
 pub mod excel;
 pub mod icon_extractor;
