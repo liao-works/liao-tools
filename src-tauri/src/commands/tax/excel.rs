@@ -83,7 +83,7 @@ impl TaxExcelProcessor {
     /// Excel frequently stores a 10-digit commodity code in a numeric cell.
     /// Preserve leading zeros when converting valid integers; reject fractions.
     /// Text cells retain their exact content for normalisation by TaxQuery.
-    fn parse_commodity_code(value: &Data) -> Option<String> {
+    pub(crate) fn parse_commodity_code(value: &Data) -> Option<String> {
         match value {
             Data::String(s) => {
                 let code = s.trim();
