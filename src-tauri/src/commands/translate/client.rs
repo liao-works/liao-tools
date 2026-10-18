@@ -149,14 +149,37 @@ pub async fn stream_chat(
         return Err(map_http_error(status.as_u16(), &text));
     }
 
-    let mut stream = response.bytes_stream();
+    let stream = response.bytes_stream().map(|chunk| match chunk {
+        Ok(bytes) => Ok(bytes.to_vec()),
+        Err(error) => Err(map_reqwest_error(error)),
+    });
+    read_stream(Box::pin(stream), on_delta, cancel).await
+}
+
+/// 消费已映射好错误的 SSE 字节流：每个增量文本回调 on_delta，
+/// 直到 [DONE]、流结束或取消。cancel 的 sender 全部丢弃后视为
+/// 不可能再取消，禁用取消分支继续读流直至完成。
+async fn read_stream(
+    mut stream: impl futures_util::Stream<Item = Result<Vec<u8>, String>> + Unpin,
+    mut on_delta: impl FnMut(&str),
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<StreamOutcome, String> {
     let mut buffer = LineBuffer::default();
+    let mut watch_alive = true;
     loop {
         tokio::select! {
             biased;
-            _ = cancel.changed() => {
-                if *cancel.borrow() {
-                    return Ok(StreamOutcome::Cancelled);
+            changed = cancel.changed(), if watch_alive => {
+                match changed {
+                    Ok(()) => {
+                        if *cancel.borrow() {
+                            return Ok(StreamOutcome::Cancelled);
+                        }
+                    }
+                    // sender 全部丢弃时 changed() 每次 select 都立即 Err，
+                    // biased 下该分支会永远先就绪、令流分支饥饿自旋。
+                    // 此时不可能再取消：置守卫禁用本分支，读完剩余流。
+                    Err(_) => watch_alive = false,
                 }
             }
             chunk = stream.next() => {
@@ -170,7 +193,7 @@ pub async fn stream_chat(
                             }
                         }
                     }
-                    Some(Err(error)) => return Err(map_reqwest_error(error)),
+                    Some(Err(error)) => return Err(error),
                     None => {
                         if let Some(line) = buffer.finish() {
                             if let SseLine::Delta(text) = parse_sse_line(&line)? {
@@ -245,5 +268,27 @@ mod tests {
         assert!(map_http_error(429, "{}").contains("频繁"));
         assert!(map_http_error(503, "upstream error").contains("供应商服务异常"));
         assert!(map_http_error(400, r#"{"error":{"message":"model not found"}}"#).contains("model not found"));
+    }
+
+    #[tokio::test]
+    async fn stream_completes_after_cancel_sender_dropped() {
+        // Task 5 swap-out 场景：旧任务状态先丢弃 sender，而旧流仍在跑。
+        // 守卫缺失时 changed() 每次 select 立即 Err、biased 下永远先就绪，
+        // 流分支被永久饥饿——用真实超时保证回归表现为失败而非挂死。
+        let (tx, mut rx) = watch::channel(false);
+        drop(tx);
+        let chunks: Vec<Result<Vec<u8>, String>> = vec![
+            Ok("data: {\"choices\":[{\"delta\":{\"content\":\"你\"}}]}\n\n".as_bytes().to_vec()),
+            Ok(b"data: [DONE]\n\n".to_vec()),
+        ];
+        let mut text = String::new();
+        let outcome = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            read_stream(futures_util::stream::iter(chunks), |delta| text.push_str(delta), &mut rx),
+        )
+        .await
+        .expect("sender 丢弃后流应能走完，而不是自旋挂起");
+        assert_eq!(outcome.unwrap(), StreamOutcome::Completed);
+        assert_eq!(text, "你");
     }
 }
