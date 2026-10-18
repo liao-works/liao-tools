@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Boxes,
   CheckCircle2,
   Database,
   FileBarChart,
@@ -40,6 +41,7 @@ export const navGroups: ToolNavigationGroup[] = [
       { title: '英国 / 北爱关税', href: '/tax', icon: Percent, description: 'HS 编码、英国及北爱税率', keywords: ['税率', '关税', 'hs', 'gb', 'ni', '批量'] },
       { title: 'Alta 禁运', href: '/alta', icon: FileBarChart, description: '匹配禁运清单及例外条目', keywords: ['alta', '禁运', '限制', 'hs'] },
       { title: 'Amazon 商品', href: '/revcal', icon: ShoppingBag, description: 'ASIN / UPC / EAN 信息查询', keywords: ['amazon', 'asin', 'upc', 'ean', '价格', '尺寸', '商品'] },
+      { title: '体积 / 计费重', href: '/cbm', icon: Boxes, description: 'CBM、体积重与计费重试算', keywords: ['cbm', '体积', '体积重', '计费重', '装柜', '柜型', '空运', '海运', '快递'] },
     ],
   },
   {

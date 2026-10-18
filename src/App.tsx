@@ -4,6 +4,7 @@ import { listen } from '@tauri-apps/api/event';
 import { MainLayout } from './components/layout/MainLayout';
 import { UpdateCenter } from './components/UpdateCenter';
 import { AltaPage } from './features/alta/AltaPage';
+import { CbmPage } from './features/cbm/CbmPage';
 import { HomePage } from './features/home/HomePage';
 import { TaxPage } from './features/tax/TaxPage';
 import { ExcelPage } from './features/excel/ExcelPage';
@@ -67,6 +68,7 @@ function App() {
           <Route path="todo" element={<TodoPage />} />
           <Route path="alta" element={<AltaPage />} />
           <Route path="tax" element={<TaxPage />} />
+          <Route path="cbm" element={<CbmPage />} />
           <Route path="excel" element={<ExcelPage />} />
           <Route path="ups-dpd" element={<UpsUpdPage />} />
           <Route path="revcal" element={<RevCalPage />} />
