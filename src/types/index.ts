@@ -285,3 +285,5 @@ export interface RevCalBatchProgress {
   code: string;
   status: string;
 }
+
+export * from './translate';
