@@ -55,7 +55,8 @@ export function Workbench({ mode, input, output, running, error, onInputChange, 
       </div>
       <div className="flex min-h-0 flex-col rounded-lg border border-border bg-card">
         <div ref={outputRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-2 text-sm whitespace-pre-wrap">
-          {error ? <span className="text-destructive">{error}</span> : output}
+          {error && <div className="mb-1 text-xs text-destructive">{error}（可重试）</div>}
+          {output}
           {running && <Loader2 size={14} className="ml-1 inline animate-spin text-muted-foreground" />}
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-border px-3 py-1.5">
