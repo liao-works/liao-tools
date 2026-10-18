@@ -226,3 +226,12 @@ CREATE INDEX IF NOT EXISTS idx_translate_history_created_at
 - 术语表/记忆库；
 - 非 OpenAI 兼容协议（如 Claude 原生 API）——将来需要时再引入 provider trait；
 - 多轮对话式翻译。
+
+## 12. 实施偏差记录（2026-10-18 实现完成后回写）
+
+实现与本文的最终差异（已在实施计划中声明并经审查确认）：
+
+1. **§8 历史表无 `custom_note` 列**——历史回填场景用不到自定义补充，YAGNI 裁剪；相应地历史回填只还原原文/译文/模式，不还原语气与语言设置。
+2. **§9 未配置 Key 的拦截方式**——实现为「输出区引导条 + 发起时后端中文报错 toast」，未做「自动打开配置弹窗」。
+3. **§5.3 连接超时**——通过给 `core/http.rs` 的 `HttpClientBuilder` 新增可选 `connect_timeout` builder 方法实现（15s），现有调用方行为不变。
+4. **取消信号实现**——`tokio::sync::watch` + select 臂前置条件守卫：取消通道所有 sender 被丢弃时安全走完流而非自旋（新增回归测试覆盖）。
