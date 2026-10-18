@@ -47,6 +47,20 @@ pub fn run() {
         .setup(|app| {
             info!("初始化应用...");
 
+            // On Windows, the taskbar button is backed by a native window icon,
+            // which is separate from the executable/installer shortcut icon.
+            // Explicitly apply the bundled default ICO at startup.
+            #[cfg(target_os = "windows")]
+            {
+                if let (Some(icon), Some(window)) =
+                    (app.default_window_icon().cloned(), app.get_webview_window("main"))
+                {
+                    window.set_icon(icon)?;
+                } else {
+                    log::warn!("Windows main window or bundled application icon is unavailable");
+                }
+            }
+
             // 获取应用数据目录
             let app_data_dir = app
                 .path()
