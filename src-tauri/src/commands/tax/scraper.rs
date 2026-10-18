@@ -36,11 +36,13 @@ pub struct TaxScraper {
 
 impl TaxScraper {
     pub fn new() -> Result<Self, ScraperError> {
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(30))
-            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-            .build()
-            .map_err(|e| ScraperError::NetworkError(e.to_string()))?;
+        let client = crate::core::http::apply_system_proxy(
+            reqwest::Client::builder()
+                .timeout(Duration::from_secs(30))
+                .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"),
+        )
+        .build()
+        .map_err(|e| ScraperError::NetworkError(e.to_string()))?;
 
         Ok(Self {
             client,

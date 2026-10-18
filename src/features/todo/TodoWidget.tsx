@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -15,9 +15,27 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-import type { ThemeColors, TodoConfig, TodoPriority, TodoStatus, TodoTask, TodoStoreData } from './types';
-import { DEFAULT_CONFIG, PRIORITY_COLORS, PRIORITY_LABELS, WIDGET_THEMES } from './types';
+import type { TodoConfig, TodoPriority, TodoStatus, TodoTask, TodoStoreData } from './types';
+import { DEFAULT_CONFIG, PRIORITY_LABELS } from './types';
 import { groupTasksByCreatedDate } from './utils/taskGroups';
+
+/** 优先级圆点：使用应用语义色 token，自动跟随深浅色主题 */
+const PRIORITY_DOT_CLASSES: Record<TodoPriority, string> = {
+  low: 'text-success-fg',
+  medium: 'text-warning-fg',
+  high: 'text-danger-fg',
+};
+
+const PRIORITY_BADGE_CLASSES: Record<TodoPriority, string> = {
+  low: 'bg-success-subtle text-success-fg',
+  medium: 'bg-warning-subtle text-warning-fg',
+  high: 'bg-danger-subtle text-danger-fg',
+};
+
+const iconButtonClass = (active: boolean) =>
+  `rounded-md p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+    active ? 'bg-primary-subtle text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+  }`;
 
 export function TodoWidget() {
   const [tasks, setTasks] = useState<TodoTask[]>([]);
@@ -51,15 +69,6 @@ export function TodoWidget() {
     });
   };
 
-  const themeColors = useMemo((): ThemeColors => {
-    if (!config?.widget) return WIDGET_THEMES.dark;
-    if (config.widget.theme === 'custom' && config.widget.customColors) {
-      return config.widget.customColors;
-    }
-    const themeKey = config.widget.theme === 'custom' ? 'dark' : config.widget.theme;
-    return WIDGET_THEMES[themeKey] || WIDGET_THEMES.dark;
-  }, [config?.widget]);
-
   const opacity = config?.widget?.opacity ?? DEFAULT_CONFIG.widget.opacity;
 
   useEffect(() => {
@@ -77,33 +86,6 @@ export function TodoWidget() {
       root?.classList.remove('todo-widget-window');
     };
   }, []);
-
-  const parseColor = (color: string): { r: number; g: number; b: number } => {
-    const rgbaMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    if (rgbaMatch) {
-      return {
-        r: parseInt(rgbaMatch[1], 10),
-        g: parseInt(rgbaMatch[2], 10),
-        b: parseInt(rgbaMatch[3], 10),
-      };
-    }
-
-    const hexMatch = color.match(/^#([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
-    if (hexMatch) {
-      return {
-        r: parseInt(hexMatch[1], 16),
-        g: parseInt(hexMatch[2], 16),
-        b: parseInt(hexMatch[3], 16),
-      };
-    }
-
-    return { r: 30, g: 30, b: 30 };
-  };
-
-  const getBackgroundColor = () => {
-    const { r, g, b } = parseColor(themeColors.background);
-    return isDesktopMode ? `rgba(${r}, ${g}, ${b}, ${opacity})` : `rgb(${r}, ${g}, ${b})`;
-  };
 
   const syncFromRust = async () => {
     try {
@@ -513,14 +495,16 @@ export function TodoWidget() {
     setActiveTaskId(displayTasks[nextIndex].id);
   };
 
+  // 活动任务仅由方向键导航或进入编辑时设置，绝不自动选中，
+  // 鼠标悬停也不再改变：避免焦点在输入框外按 Enter 意外勾选任务。
   useEffect(() => {
     if (displayTasks.length === 0) {
       setActiveTaskId(null);
       return;
     }
 
-    if (!activeTaskId || !displayTasks.some((task) => task.id === activeTaskId)) {
-      setActiveTaskId(displayTasks[0].id);
+    if (activeTaskId && !displayTasks.some((task) => task.id === activeTaskId)) {
+      setActiveTaskId(null);
     }
   }, [activeTaskId, displayTasks]);
 
@@ -591,69 +575,56 @@ export function TodoWidget() {
 
   return (
     <div
-      className="flex h-screen flex-col overflow-hidden select-none"
+      className="flex h-screen flex-col overflow-hidden rounded-xl border border-border text-foreground select-none shadow-lg"
       style={{
-        backgroundColor: getBackgroundColor(),
-        backdropFilter: isDesktopMode ? 'blur(12px)' : 'none',
-        color: themeColors.text,
+        // 桌面嵌入模式下按配置的透明度混合卡片色，浮动模式不透明
+        backgroundColor: `color-mix(in srgb, var(--card) ${Math.round((isDesktopMode ? opacity : 1) * 100)}%, transparent)`,
+        backdropFilter: isDesktopMode ? 'blur(14px)' : undefined,
       }}
     >
       <div
-        className="flex cursor-move items-center justify-between border-b px-3 py-2"
-        style={{ borderColor: themeColors.border }}
+        className="flex cursor-move items-center justify-between border-b border-border px-3 py-2"
         onMouseDown={handleDragStart}
       >
         <div className="flex items-center gap-2">
-          <GripVertical className="h-4 w-4" style={{ color: themeColors.textSecondary }} />
-          <CheckCircle2 className="h-4 w-4" style={{ color: themeColors.accent }} />
-          <span className="text-sm font-medium">Todo List</span>
-          <span className="text-xs" style={{ color: themeColors.textSecondary }}>
-            ({pendingTasks.length})
-          </span>
+          <GripVertical className="h-4 w-4 text-muted-foreground/70" aria-hidden="true" />
+          <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden="true" />
+          <span className="text-sm font-medium">Todo 清单</span>
+          <span className="text-xs text-muted-foreground">({pendingTasks.length})</span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <button
             onClick={() => void toggleDesktopMode()}
-            className="rounded p-1.5 transition-colors"
-            style={{ backgroundColor: isDesktopMode ? `${themeColors.accent}30` : 'transparent' }}
+            className={iconButtonClass(isDesktopMode)}
             title={isDesktopMode ? '退出桌面嵌入' : '嵌入桌面'}
           >
             {isDesktopMode ? <Monitor className="h-3.5 w-3.5" /> : <MonitorOff className="h-3.5 w-3.5" />}
           </button>
           <button
             onClick={() => void togglePin()}
-            className="rounded p-1.5 transition-colors"
-            style={{ backgroundColor: isPinned ? `${themeColors.accent}30` : 'transparent' }}
+            className={iconButtonClass(isPinned)}
             title={isPinned ? '取消置顶' : '置顶'}
           >
             {isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
           </button>
-          <button
-            onClick={() => void minimize()}
-            className="rounded p-1.5 transition-colors hover:opacity-80"
-            title="最小化"
-          >
+          <button onClick={() => void minimize()} className={iconButtonClass(false)} title="最小化">
             <Minus className="h-3.5 w-3.5" />
           </button>
-          <button
-            onClick={() => void closeWindow()}
-            className="rounded p-1.5 transition-colors hover:opacity-80"
-            title="关闭"
-          >
+          <button onClick={() => void closeWindow()} className={iconButtonClass(false)} title="关闭">
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
 
       {saveError && (
-        <div role="alert" className="flex items-start justify-between gap-2 border-b px-3 py-2 text-xs" style={{ borderColor: themeColors.border, color: themeColors.text }}>
+        <div role="alert" className="flex items-start justify-between gap-2 border-b border-border bg-danger-subtle px-3 py-2 text-xs text-danger-fg">
           <span className="min-w-0 flex-1 break-words">{saveError}</span>
-          <button type="button" onClick={() => void syncFromRust()} className="shrink-0 rounded px-2 py-1 underline hover:opacity-75">同步最新数据</button>
-          <button type="button" aria-label="关闭保存错误" onClick={() => setSaveError(null)} className="shrink-0 rounded p-1 hover:opacity-75"><X className="h-3.5 w-3.5" /></button>
+          <button type="button" onClick={() => void syncFromRust()} className="shrink-0 rounded px-2 py-1 underline transition-colors hover:text-foreground">同步最新数据</button>
+          <button type="button" aria-label="关闭保存错误" onClick={() => setSaveError(null)} className="shrink-0 rounded p-1 transition-colors hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
         </div>
       )}
-      <div className="border-b p-3" style={{ borderColor: themeColors.border }}>
+      <div className="border-b border-border p-3">
         <div className="flex gap-2">
           <input
             ref={inputRef}
@@ -661,39 +632,30 @@ export function TodoWidget() {
             value={newTaskTitle}
             onChange={(event) => setNewTaskTitle(event.target.value)}
             placeholder="添加新任务..."
-            className="flex-1 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1"
-            style={{
-              backgroundColor: `${themeColors.text}10`,
-              color: themeColors.text,
-              borderColor: 'transparent',
-            }}
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary"
             autoFocus
           />
           <select
             value={newTaskPriority}
             onChange={(event) => setNewTaskPriority(event.target.value as TodoPriority)}
-            className="rounded px-2 py-1.5 text-sm focus:outline-none"
-            style={{
-              backgroundColor: `${themeColors.text}10`,
-              color: themeColors.text,
-            }}
+            className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <option value="low" style={{ backgroundColor: themeColors.background }}>低</option>
-            <option value="medium" style={{ backgroundColor: themeColors.background }}>中</option>
-            <option value="high" style={{ backgroundColor: themeColors.background }}>高</option>
+            <option value="low">低</option>
+            <option value="medium">中</option>
+            <option value="high">高</option>
           </select>
           <button
             onClick={() => void handleAddTask()}
             disabled={!newTaskTitle.trim()}
-            className="rounded p-1.5 transition-colors disabled:opacity-50"
-            style={{ backgroundColor: themeColors.accent, color: '#ffffff' }}
+            className="rounded-lg bg-primary p-2 text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50"
+            title="添加任务"
           >
             <Plus className="h-4 w-4" />
           </button>
         </div>
       </div>
 
-      <div className="flex gap-2 border-b px-3 py-2" style={{ borderColor: themeColors.border }}>
+      <div className="flex gap-1.5 border-b border-border px-3 py-2">
         {[
           ['pending', `待办 (${pendingTasks.length})`],
           ['completed', `已完成 (${completedTasks.length})`],
@@ -702,11 +664,11 @@ export function TodoWidget() {
           <button
             key={value}
             onClick={() => setFilter(value as 'all' | 'pending' | 'completed')}
-            className="rounded px-2 py-1 text-xs transition-colors"
-            style={{
-              backgroundColor: filter === value ? themeColors.accent : 'transparent',
-              color: filter === value ? '#ffffff' : themeColors.textSecondary,
-            }}
+            className={`rounded-full px-2.5 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+              filter === value
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
           >
             {label}
           </button>
@@ -716,17 +678,17 @@ export function TodoWidget() {
       <div className="flex-1 space-y-1 overflow-y-auto p-2">
         {displayTasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8">
-            <Circle className="mb-2 h-8 w-8" style={{ color: themeColors.textSecondary, opacity: 0.3 }} />
-            <p className="text-xs" style={{ color: themeColors.textSecondary }}>暂无任务</p>
+            <Circle className="mb-2 h-8 w-8 text-muted-foreground/40" aria-hidden="true" />
+            <p className="text-xs text-muted-foreground">暂无任务</p>
           </div>
         ) : (
           groupedTasks.map((group) => (
             <section key={group.label} className="space-y-1">
               <div className="flex items-center gap-2 px-2 py-1">
-                <span className="text-[11px] font-medium" style={{ color: themeColors.textSecondary }}>
+                <span className="text-[11px] font-medium text-muted-foreground">
                   {group.label}
                 </span>
-                <div className="h-px flex-1" style={{ backgroundColor: themeColors.border }} />
+                <div className="h-px flex-1 bg-border" />
               </div>
               {group.tasks.map((task) => (
                 <div
@@ -735,29 +697,25 @@ export function TodoWidget() {
                     if (element) taskRefs.current.set(task.id, element);
                     else taskRefs.current.delete(task.id);
                   }}
-                  onMouseEnter={() => setActiveTaskId(task.id)}
-                  className="group flex items-center gap-2 rounded px-2 py-2 transition-colors"
-                  style={{
-                    backgroundColor: activeTaskId === task.id ? `${themeColors.accent}36` : 'transparent',
-                    outline: activeTaskId === task.id ? `1px solid ${themeColors.accent}aa` : 'none',
-                    boxShadow:
-                      activeTaskId === task.id
-                        ? `0 0 0 1px ${themeColors.accent}33, inset 3px 0 0 ${themeColors.accent}`
-                        : 'none',
-                    opacity: task.status === 'completed' ? 0.5 : 1,
-                  }}
+                  className={`group flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors ${
+                    activeTaskId === task.id ? 'bg-primary-subtle' : 'hover:bg-muted'
+                  }`}
+                  style={
+                    activeTaskId === task.id
+                      ? { boxShadow: 'inset 2px 0 0 var(--primary)' }
+                      : undefined
+                  }
                 >
                   <button
                     onClick={() => void toggleTask(task.id)}
-                    className="flex-shrink-0"
+                    className="flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
                     disabled={editingTaskId === task.id}
                   >
                     {task.status === 'completed' ? (
-                      <CheckCircle2 className="h-4 w-4" style={{ color: '#22c55e' }} />
+                      <CheckCircle2 className="h-4 w-4 text-success-fg" />
                     ) : (
                       <Circle
-                        className="h-4 w-4 transition-opacity hover:opacity-80"
-                        style={{ color: PRIORITY_COLORS[task.priority] }}
+                        className={`h-4 w-4 transition-opacity hover:opacity-80 ${PRIORITY_DOT_CLASSES[task.priority]}`}
                       />
                     )}
                   </button>
@@ -787,20 +745,14 @@ export function TodoWidget() {
                           cancelEditingTask();
                         }
                       }}
-                      className="flex-1 rounded px-1.5 py-0.5 text-sm focus:outline-none focus:ring-1"
-                      style={{
-                        backgroundColor: `${themeColors.text}12`,
-                        color: themeColors.text,
-                        outlineColor: themeColors.accent,
-                      }}
+                      className="min-w-0 flex-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     />
                   ) : (
                     <span
                       onDoubleClick={() => startEditingTask(task)}
-                      className={`flex-1 truncate text-sm ${task.status === 'completed' ? 'line-through' : ''}`}
-                      style={{
-                        color: task.status === 'completed' ? themeColors.textSecondary : themeColors.text,
-                      }}
+                      className={`min-w-0 flex-1 truncate text-sm ${
+                        task.status === 'completed' ? 'text-muted-foreground line-through' : ''
+                      }`}
                       title="双击编辑"
                     >
                       {task.title}
@@ -808,11 +760,7 @@ export function TodoWidget() {
                   )}
 
                   <span
-                    className="rounded px-1 py-0.5 text-xs opacity-0 transition-opacity group-hover:opacity-100"
-                    style={{
-                      backgroundColor: `${PRIORITY_COLORS[task.priority]}30`,
-                      color: PRIORITY_COLORS[task.priority],
-                    }}
+                    className={`shrink-0 rounded px-1 py-0.5 text-xs opacity-0 transition-opacity group-hover:opacity-100 ${PRIORITY_BADGE_CLASSES[task.priority]}`}
                   >
                     {PRIORITY_LABELS[task.priority]}
                   </span>
@@ -821,16 +769,14 @@ export function TodoWidget() {
                     <>
                       <button
                         onClick={() => startEditingTask(task)}
-                        className="rounded p-1 opacity-0 transition-all group-hover:opacity-100"
-                        style={{ color: themeColors.textSecondary }}
+                        className="rounded p-1 text-muted-foreground opacity-0 transition-all hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
                         title="编辑任务"
                       >
                         <Pencil className="h-3 w-3" />
                       </button>
                       <button
                         onClick={() => void deleteTask(task.id)}
-                        className="rounded p-1 opacity-0 transition-all group-hover:opacity-100"
-                        style={{ color: themeColors.textSecondary }}
+                        className="rounded p-1 text-muted-foreground opacity-0 transition-all hover:text-danger-fg focus-visible:opacity-100 group-hover:opacity-100"
                         title="删除任务"
                       >
                         <X className="h-3 w-3" />

@@ -192,8 +192,10 @@ impl TaxDataDownloader {
     }
 
     async fn fetch_remote_metadata() -> Result<RemoteMetadata> {
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30)).build()?;
+        let client = crate::core::http::apply_system_proxy(
+            reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)),
+        )
+        .build()?;
         let metadata = client.get(METADATA_URL).send().await?
             .error_for_status()?
             .json::<RemoteMetadata>().await?;
@@ -219,8 +221,10 @@ impl TaxDataDownloader {
         // request timeout rejects valid, slowly streaming downloads. Keep a
         // bounded connect timeout, plus an independent idle timeout for each
         // streamed chunk; always enforce the manifest size and SHA-256 below.
-        let client = reqwest::Client::builder()
-            .connect_timeout(std::time::Duration::from_secs(45)).build()?;
+        let client = crate::core::http::apply_system_proxy(
+            reqwest::Client::builder().connect_timeout(std::time::Duration::from_secs(45)),
+        )
+        .build()?;
         let response = client.get(&url).send().await?.error_for_status()?;
         let total = response.content_length().unwrap_or(metadata.file_size);
         let mut file = tempfile::Builder::new()

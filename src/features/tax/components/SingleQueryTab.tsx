@@ -203,14 +203,24 @@ export function SingleQueryTab() {
     }
   };
 
-  const handleAutoUpdate = async (tariff: TaxTariff) => {
+  const handleAutoUpdate = async (tariff: TaxTariff, applyToDb: boolean) => {
     setUpdatingCode(tariff.code);
     setUpdateLogs([]); // 清空之前的日志
-    
+
     try {
-      const result = await taxApi.updateSingleRow(tariff.code);
-      
-      if (result.success) {
+      const result = await taxApi.updateSingleRow(tariff.code, applyToDb);
+
+      if (result.appliedToDb) {
+        toast({
+          title: '已更新并写入本地数据库',
+          description: '手动写入的值会在下次官方数据快照更新时被覆盖。',
+        });
+        // 写库后重新查询，让界面立刻显示新税率
+        if (!fuzzyMode) {
+          const fresh = await taxApi.exactSearch(tariff.code);
+          if (fresh) setResults((prev) => prev.map((item) => (item.code === fresh.code ? fresh : item)));
+        }
+      } else if (result.success) {
         // HTML parsing is comparison only; never replace a verified local rate.
         toast({
           title: '网页比对完成（未修改本地数据）',
@@ -318,8 +328,7 @@ export function SingleQueryTab() {
             {results.length === 1 && !fuzzyMode &&
               <TaxResultDetail tariff={results[0]} onCopy={copyToClipboard}
                 onOpenSource={openUrl} onCompare={handleAutoUpdate}
-                comparing={updatingCode === results[0].code}/>}
-            {(fuzzyMode || results.length !== 1) && <div className="lt-result-table"><Table>
+                comparing={updatingCode === results[0].code}/>}            {(fuzzyMode || results.length !== 1) && <div className="lt-result-table"><Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>商品编码</TableHead>
@@ -459,7 +468,7 @@ export function SingleQueryTab() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => handleAutoUpdate(result)}
+                          onClick={() => handleAutoUpdate(result, false)}
                           disabled={updatingCode === result.code}
                           title="网页临时比对（不修改本地数据）"
                         >

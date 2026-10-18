@@ -137,6 +137,7 @@ pub struct DownloadUrls {
 
 /// 单行更新结果
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateResult {
     pub success: bool,
     pub message: String,
@@ -147,4 +148,7 @@ pub struct UpdateResult {
     pub old_ni_rate: Option<String>,
     pub new_ni_rate: Option<String>,
     pub new_description: Option<String>,
+    /// 用户选择写入时，本次是否已实际写进本地数据库
+    #[serde(default)]
+    pub applied_to_db: bool,
 }

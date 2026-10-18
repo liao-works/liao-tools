@@ -187,13 +187,19 @@ pub async fn tax_open_url(
 }
 
 /// 更新单行税率数据
+///
+/// 默认只做网页比对、不修改本地库；`apply_to_db = true` 时用户已明确
+/// 选择把抓取到的差异写入本地数据库。HTML 不是权威数据源，写入永远是
+/// 用户的显式决定，且会在下次官方数据快照更新时被覆盖。
 #[tauri::command]
 pub async fn tax_update_single_row(
     code: String,
+    apply_to_db: Option<bool>,
     app_handle: tauri::AppHandle,
     window: tauri::Window,
 ) -> Result<UpdateResult, String> {
-    info!("开始更新单行数据: {}", code);
+    let apply_to_db = apply_to_db.unwrap_or(false);
+    info!("开始更新单行数据: {} (apply_to_db={})", code, apply_to_db);
     
     // 发送日志事件
     let _ = window.emit("update-log", serde_json::json!({
@@ -233,6 +239,7 @@ pub async fn tax_update_single_row(
                 old_ni_rate: None,
                 new_ni_rate: None,
                 new_description: None,
+                applied_to_db: false,
             });
         }
     };
@@ -398,11 +405,41 @@ pub async fn tax_update_single_row(
         }
     }
     
-    // 7. Read-only comparison only. Never let an HTML parser mutate
-    // the immutable/validated offline snapshot; HTML is NOT authoritative
-    // validation. A future HMRC API-backed gateway can supply verified values.
+    // 7. 默认只读比对：HTML 解析结果不自动覆盖经过校验的离线快照。
+    // 用户勾选"写入本地数据库"时，才把上面识别出的差异显式落库。
     let any_updated = uk_updated || ni_updated;
-    if any_updated {
+    let mut applied_to_db = false;
+    let mut write_error: Option<String> = None;
+    if apply_to_db && any_updated {
+        let _ = window.emit("update-progress", serde_json::json!({
+            "code": code,
+            "progress": 85,
+            "stage": "写入本地数据库"
+        }));
+        match db.update_tariff_fields(
+            &code,
+            new_uk_rate.as_deref(),
+            new_ni_rate.as_deref(),
+            new_description.as_deref(),
+        ) {
+            Ok(()) => {
+                applied_to_db = true;
+                let _ = window.emit("update-log", serde_json::json!({
+                    "code": code,
+                    "message": "差异已写入本地数据库（按你的选择；下次官方快照更新会覆盖手动修改）",
+                    "level": "success"
+                }));
+            }
+            Err(e) => {
+                write_error = Some(e.to_string());
+                let _ = window.emit("update-log", serde_json::json!({
+                    "code": code,
+                    "message": format!("写入本地数据库失败: {}", e),
+                    "level": "error"
+                }));
+            }
+        }
+    } else if any_updated {
         let _ = window.emit("update-log", serde_json::json!({
             "code": code,
             "message": "发现网页差异；未修改本地数据。请核对官方页面。",
@@ -411,29 +448,36 @@ pub async fn tax_update_single_row(
     }
 
     // 8. 构建返回结果
-    let success = uk_success || ni_success;
-    
+    let success = (uk_success || ni_success) && write_error.is_none();
+
     // 进度 100%
     let _ = window.emit("update-progress", serde_json::json!({
         "code": code,
         "progress": 100,
         "stage": "完成"
     }));
-    let message = if any_updated {
+    let message = if let Some(error) = write_error.as_deref() {
+        format!("❌ 网页差异已发现，但写入本地数据库失败: {} | {}", error, status_messages.join(" | "))
+    } else if applied_to_db {
+        format!("已写入本地数据库: {}", status_messages.join(" | "))
+    } else if any_updated {
         format!("仅网页比对，未更新本地库: {}", status_messages.join(" | "))
     } else if success {
         format!("网页比对未发现差异: {}", status_messages.join(" | "))
     } else {
         format!("❌ {}", status_messages.join(" | "))
     };
-    
+
     // 发送最终完成日志
     let _ = window.emit("update-log", serde_json::json!({
         "code": code,
-        "message": if any_updated { "网页比对有差异，未覆盖本地数据" } else { "网页比对完成，未修改本地数据" },
-        "level": if any_updated { "success" } else { "info" }
+        "message": if applied_to_db { "差异已写入本地数据库" }
+            else if write_error.is_some() { "写入本地数据库失败" }
+            else if any_updated { "网页比对有差异，未覆盖本地数据" }
+            else { "网页比对完成，未修改本地数据" },
+        "level": if applied_to_db || any_updated { "success" } else { "info" }
     }));
-    
+
     Ok(UpdateResult {
         success,
         message,
@@ -444,5 +488,6 @@ pub async fn tax_update_single_row(
         old_ni_rate: old_tariff.north_ireland_rate,
         new_ni_rate,
         new_description,
+        applied_to_db,
     })
 }

@@ -40,6 +40,21 @@ export interface InstallCompleteEvent {
 }
 
 /**
+ * 提取 Tauri 命令错误的具体信息。
+ * Rust 侧的 CommandError 序列化为 {message, code} 对象、部分命令直接
+ * reject 字符串，都不是 Error 实例；不做此转换界面只能显示笼统的兜底文案。
+ */
+export function extractCommandErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error === 'string' && error.trim()) return error;
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) return message;
+  }
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return fallback;
+}
+
+/**
  * 检查更新
  */
 export async function checkForUpdates(): Promise<UpdateInfo> {

@@ -162,14 +162,16 @@ export function TodoPage() {
     void useTodoStore.getState().toggleTask(activeTaskId).catch(() => undefined);
   };
 
+  // 活动任务仅由方向键导航或进入编辑时设置，绝不自动选中：
+  // 否则焦点在输入框外时按 Enter 会意外勾选任务。
   useEffect(() => {
     if (visibleTasks.length === 0) {
       setActiveTaskId(null);
       return;
     }
 
-    if (!activeTaskId || !visibleTasks.some((task) => task.id === activeTaskId)) {
-      setActiveTaskId(visibleTasks[0].id);
+    if (activeTaskId && !visibleTasks.some((task) => task.id === activeTaskId)) {
+      setActiveTaskId(null);
     }
   }, [activeTaskId, visibleTasks]);
 
@@ -410,8 +412,6 @@ function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
   return (
     <div
       ref={setTaskRef}
-      onMouseEnter={onActivate}
-      onMouseDown={onActivate}
       className={`group flex items-center gap-3 rounded-lg border p-3 transition-all duration-150 ${
         task.status === 'completed' ? 'opacity-60' : ''
       }`}

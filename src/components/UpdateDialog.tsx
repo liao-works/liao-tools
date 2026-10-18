@@ -15,6 +15,7 @@ import { Progress } from '@/components/ui/progress';
 import { CheckCircle2, Download, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import {
   checkForUpdates,
+  extractCommandErrorMessage,
   loadUpdateSettings,
   saveUpdateSettings,
   updateLastCheckTime,
@@ -64,7 +65,7 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
       setUpdateInfo(info);
       await updateLastCheckTime();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '检查更新失败');
+      setError(extractCommandErrorMessage(err, '检查更新失败'));
     } finally {
       setChecking(false);
     }
@@ -92,7 +93,7 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
       );
       setDownloadPath(filePath);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '下载失败');
+      setError(extractCommandErrorMessage(err, '下载失败'));
     } finally {
       unlistenFn?.();
       setDownloading(false);
@@ -117,7 +118,7 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
       setInstallStatus('已提交安装命令；请根据系统安装程序完成操作。');
     } catch (err) {
       setInstallRequested(false);
-      setError(err instanceof Error ? err.message : '安装失败');
+      setError(extractCommandErrorMessage(err, '安装失败'));
     } finally {
       setInstalling(false);
     }

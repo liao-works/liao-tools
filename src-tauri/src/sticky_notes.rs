@@ -319,7 +319,9 @@ fn default_config() -> TodoConfig {
             width: 360,
             height: 460,
             opacity: 0.9,
-            is_desktop_mode: true,
+            // 桌面嵌入会让小组件贴在桌面图标层、被普通窗口遮挡；
+            // 默认必须是可见的浮动窗口，嵌入改为小组件内的主动选择。
+            is_desktop_mode: false,
             is_pinned: false,
             theme: WidgetTheme::Dark,
             custom_colors: None,
@@ -492,7 +494,6 @@ fn create_or_show_note_window(
     if let Some(window) = app.get_webview_window(&label) {
         let _ = window.set_always_on_top(window_state.is_pinned);
         let _ = window.set_skip_taskbar(window_state.is_desktop_mode);
-        let _ = apply_window_geometry(&window, &window_state);
 
         #[cfg(target_os = "windows")]
         {
@@ -505,9 +506,16 @@ fn create_or_show_note_window(
             }
         }
 
+        // SetParent 改变坐标系，几何位置必须在嵌入/脱离之后落位。
+        let _ = apply_window_geometry(&window, &window_state);
+
         let _ = window.show();
         if focus_window {
             let _ = window.set_focus();
+            if note_id == "todo-widget" {
+                // 打开即进入快速记录状态：聚焦输入框
+                emit_todo_widget_focus_input(app);
+            }
         }
         return Ok(());
     }
@@ -521,6 +529,7 @@ fn create_or_show_note_window(
     .inner_size(window_state.width as f64, window_state.height as f64)
     .position(window_state.x as f64, window_state.y as f64)
     .decorations(false)
+    .resizable(true)
     .always_on_top(window_state.is_pinned)
     .skip_taskbar(window_state.is_desktop_mode);
 
@@ -531,8 +540,6 @@ fn create_or_show_note_window(
         .build()
         .map_err(|e| format!("Failed to create window: {e}"))?;
 
-    let _ = apply_window_geometry(&window, &window_state);
-
     #[cfg(target_os = "windows")]
     if window_state.is_desktop_mode {
         if let Ok(hwnd) = window.hwnd() {
@@ -540,8 +547,14 @@ fn create_or_show_note_window(
         }
     }
 
+    let _ = apply_window_geometry(&window, &window_state);
+
     if focus_window {
         let _ = window.set_focus();
+        if note_id == "todo-widget" {
+            // 打开即进入快速记录状态：聚焦输入框
+            emit_todo_widget_focus_input(app);
+        }
     }
 
     if let Some(manager) = app.try_state::<NoteWindowManager>() {
@@ -585,13 +598,25 @@ fn apply_window_geometry(
 }
 
 fn show_todo_widget(app: &AppHandle, focus_window: bool) -> Result<(), String> {
-    let config = load_config_from_store(app)?;
+    let config = ensure_todo_widget_floating(app)?;
     create_or_show_note_window(
         app,
         "todo-widget",
         &widget_config_to_window_state(&config.widget),
         focus_window,
     )
+}
+
+/// 显式唤出小组件时必须得到一个可见的窗口。桌面嵌入的小组件贴在桌面
+/// 图标层，会被普通窗口完全遮住，看起来就像"没有打开"；因此从主窗口
+/// 或快捷键唤出时先退出嵌入并持久化，嵌入仍可在小组件内主动开启。
+fn ensure_todo_widget_floating(app: &AppHandle) -> Result<TodoConfig, String> {
+    let config = load_config_from_store(app)?;
+    if config.widget.is_desktop_mode {
+        mutate_config_in_store(app, |config| config.widget.is_desktop_mode = false)
+    } else {
+        Ok(config)
+    }
 }
 
 fn emit_todo_widget_focus_input(app: &AppHandle) {
@@ -969,7 +994,7 @@ pub async fn detach_note_window(
     window_state: NoteWindowState,
 ) -> Result<(), String> {
     if note_id == "todo-widget" {
-        let config = load_config_from_store(&app)?;
+        let config = ensure_todo_widget_floating(&app)?;
         let persisted_state = widget_config_to_window_state(&config.widget);
         return create_or_show_note_window(&app, &note_id, &persisted_state, true);
     }

@@ -4,17 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { altaApi } from '@/lib/api/alta';
 import type { AltaDbStats } from '@/types';
-import { useToast } from '@/hooks/use-toast';
 import { openUpdateHistory } from '@/hooks/use-update-history';
+import { useAltaUpdateStore } from '@/stores/alta-update-store';
 
 export function DataManageTab() {
-  const [updating, setUpdating] = useState(false);
+  // 更新任务状态在全局 store 中，切页后任务继续，回到本页即可看到进度。
+  const updating = useAltaUpdateStore((s) => s.updating);
+  const logs = useAltaUpdateStore((s) => s.logs);
+  const updateError = useAltaUpdateStore((s) => s.updateError);
+  const startUpdate = useAltaUpdateStore((s) => s.startUpdate);
   const [loading, setLoading] = useState(true);
-  const [logs, setLogs] = useState<string[]>([]);
   const [dbStats, setDbStats] = useState<AltaDbStats | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
-  const [updateError, setUpdateError] = useState<string | null>(null);
-  const { toast } = useToast();
 
   async function loadDbInfo() {
     setLoading(true);
@@ -32,30 +33,9 @@ export function DataManageTab() {
 
   async function handleUpdate() {
     if (updating) return;
-    setUpdating(true);
-    setUpdateError(null);
-    setLogs(['开始更新禁运清单…']);
-    try {
-      const result = await altaApi.updateDatabase();
-      if (!result.success) {
-        throw new Error(result.message || '更新命令未确认成功');
-      }
-      setLogs([
-        '禁运清单更新命令已确认成功',
-        '本次更新报告记录数：' + result.items_count.toLocaleString(),
-        result.message,
-      ].filter(Boolean));
-      toast({ title: '禁运清单更新完成', description: result.message });
-      // Status refresh failure should not turn a successful update into a failed one.
-      await loadDbInfo();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setUpdateError(message);
-      setLogs((prev) => [...prev, '更新失败：' + message]);
-      toast({ title: '禁运清单更新失败', description: message, variant: 'destructive' });
-    } finally {
-      setUpdating(false);
-    }
+    const success = await startUpdate();
+    // Status refresh failure should not turn a successful update into a failed one.
+    if (success) await loadDbInfo();
   }
 
   const dateText = dbStats?.last_update

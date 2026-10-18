@@ -22,6 +22,23 @@ npm run dev
 npm run tauri build
 ```
 
+### Rust 本地编译环境要求
+
+`wreq`（revcal 的 Chrome TLS 指纹客户端）依赖 BoringSSL（`btls-sys`），在 Windows 本机编译时有额外要求：
+
+- **rustc ≥ 1.98**（`rustup update stable`），旧工具链会在依赖解析阶段直接报 MSRV 错误；
+- **NASM**：BoringSSL 原生 Windows 编译需要汇编器，未安装时 CMake 报
+  `No CMAKE_ASM_NASM_COMPILER could be found`，并需在构建前将其加入 `PATH`；
+- **libclang**：`btls-sys` 的 bindgen 需要 `LIBCLANG_PATH` 指向 `libclang.dll` 所在目录
+  （例如可通过 `pip install libclang` 获得，路径形如
+  `...\site-packages\clang\native`）。
+
+```bash
+export PATH="/c/Users/A/AppData/Local/nasm/nasm-2.16.03:$PATH"
+export LIBCLANG_PATH=".../site-packages/clang/native"
+pnpm tauri dev
+```
+
 ## 开发指南
 
 ### 项目架构

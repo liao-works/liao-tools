@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { themes, applyTheme, getThemeById, migrateTheme, type Theme } from '@/lib/themes';
+import { listen } from '@tauri-apps/api/event';
+import { themes, applyTheme, getThemeById, migrateTheme, APP_APPEARANCE_EVENT, type Theme } from '@/lib/themes';
 
 interface ThemeStore {
   currentTheme: Theme;
@@ -9,6 +10,17 @@ interface ThemeStore {
 }
 
 const DEFAULT_THEME_ID = 'warm-coral';
+
+/** 把外观变更应用到本窗口的 <html>（供跨窗口广播使用） */
+const applyAppearanceToDocument = (appearance: { accent?: string; dark?: boolean }) => {
+  const root = document.documentElement;
+  if (appearance.accent) {
+    root.dataset.accent = appearance.accent;
+  }
+  if (typeof appearance.dark === 'boolean') {
+    root.classList.toggle('dark', appearance.dark);
+  }
+};
 
 export const useThemeStore = create<ThemeStore>()(
   persist(
@@ -20,6 +32,10 @@ export const useThemeStore = create<ThemeStore>()(
         if (theme) {
           applyTheme(theme);
           set({ currentTheme: theme });
+          // 广播给其他窗口（桌面小组件等），实现外观联动
+          import('@tauri-apps/api/event').then(({ emit }) =>
+            emit(APP_APPEARANCE_EVENT, { accent: theme.accent })
+          ).catch(() => undefined);
         }
       },
     }),
@@ -50,3 +66,11 @@ export const useThemeStore = create<ThemeStore>()(
     }
   )
 );
+
+// 每个窗口（主窗口、桌面小组件）都会加载本模块：监听任意窗口发出的
+// 外观变更事件并立即应用，实现主题与深浅色的实时联动。
+if (typeof window !== 'undefined') {
+  listen<{ accent?: string; dark?: boolean }>(APP_APPEARANCE_EVENT, (event) => {
+    applyAppearanceToDocument(event.payload ?? {});
+  }).catch(() => undefined);
+}

@@ -1,5 +1,8 @@
 export type AccentId = 'terracotta' | 'blue' | 'sky' | 'purple' | 'green' | 'rose' | 'slate' | 'clay';
 
+/** 外观（强调色/深浅色）变更时广播给所有窗口的 Tauri 事件名 */
+export const APP_APPEARANCE_EVENT = 'app-appearance-changed';
+
 export interface Theme {
   id: string;          // 沿用旧 id,保证持久化兼容
   name: string;
