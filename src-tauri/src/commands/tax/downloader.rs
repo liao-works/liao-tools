@@ -217,8 +217,12 @@ impl TaxDataDownloader {
             "Invalid snapshot SHA-256 value");
         ensure!(metadata.file_size > 0, "Metadata file_size must be positive");
         let url = Self::release_url(&metadata.version)?;
+        // A complete tariff snapshot can exceed 400 MB. A five-minute *total*
+        // request timeout rejects valid, slowly streaming downloads. Keep a
+        // bounded connect timeout, plus an independent idle timeout for each
+        // streamed chunk; always enforce the manifest size and SHA-256 below.
         let client = crate::core::http::apply_system_proxy(
-            reqwest::Client::builder().timeout(std::time::Duration::from_secs(300)),
+            reqwest::Client::builder().connect_timeout(std::time::Duration::from_secs(45)),
         )
         .build()?;
         let response = client.get(&url).send().await?.error_for_status()?;
@@ -229,7 +233,9 @@ impl TaxDataDownloader {
         let mut received: u64 = 0;
         let mut hash = Sha256::new();
         let mut stream = response.bytes_stream();
-        while let Some(chunk) = stream.next().await {
+        while let Some(chunk) = tokio::time::timeout(
+            std::time::Duration::from_secs(150), stream.next()
+        ).await.context("Tariff data download stalled for 150 seconds")? {
             let bytes = chunk.context("Download stream failed")?;
             received += bytes.len() as u64;
             ensure!(received <= metadata.file_size, "Snapshot larger than manifest");
