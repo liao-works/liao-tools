@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   BarChart3,
-  Home, Search, ShieldCheck, Package, FileSpreadsheet, Wrench,
+  Home, Search, ShieldCheck, FileSpreadsheet, Wrench,
   CheckCheck, Settings, Database, Calculator, PanelLeftClose, PanelLeftOpen, RefreshCw
 } from 'lucide-react';
 
@@ -16,7 +16,6 @@ const groups = [
   ] },
   { label: '文件处理', items: [
     { label: 'Excel 数据拆分', href: '/excel', icon: FileSpreadsheet },
-    { label: 'UPS / DPD', href: '/ups-dpd', icon: Package },
   ] },
   { label: '效率工具', items: [
     { label: '系统工具', href: '/system-tools', icon: Wrench },

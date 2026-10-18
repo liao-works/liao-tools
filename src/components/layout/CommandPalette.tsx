@@ -8,7 +8,6 @@ const commands = [
   { label:'Alta 禁运查询', detail:'禁运条目及例外', path:'/alta', keywords:'禁止 出口 合规' },
   { label:'Amazon 商品查询', detail:'ASIN、尺寸与价格', path:'/revcal', keywords:'亚马逊 收益 计算器' },
   { label:'Excel 数据拆分', detail:'海铁、空运工作簿', path:'/excel', keywords:'表格 图片 合并单元格' },
-  { label:'UPS / DPD 模板处理', detail:'物流模板填充', path:'/ups-dpd', keywords:'快递 预报 单件明细' },
   { label:'系统工具', detail:'常用及自定义程序', path:'/system-tools', keywords:'工具箱 launcher' },
   { label:'Todo 清单', detail:'待办与桌面小组件', path:'/todo', keywords:'task 任务' },
   { label:'数据维护', detail:'税率数据库与审计', path:'/tax?tab=update', keywords:'同步 更新 审计' },

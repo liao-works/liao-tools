@@ -69,7 +69,7 @@ export function GlobalCommand() {
                 go(items[selected].href);
               }
             }}
-            placeholder="搜索工具，例如关税、Amazon、DPD..."
+            placeholder="搜索工具，例如关税、Excel、Amazon..."
             className="h-14 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
           <kbd className="rounded border border-border px-2 py-1 text-xs text-muted-foreground">Esc</kbd>

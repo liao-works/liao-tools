@@ -8,7 +8,6 @@ import { CbmPage } from './features/cbm/CbmPage';
 import { HomePage } from './features/home/HomePage';
 import { TaxPage } from './features/tax/TaxPage';
 import { ExcelPage } from './features/excel/ExcelPage';
-import { UpsUpdPage } from './features/ups-dpd/UpsUpdPage';
 import { RevCalPage } from './features/revcal/RevCalPage';
 import { SystemToolsPage } from './features/system-tools/SystemToolsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
@@ -70,7 +69,6 @@ function App() {
           <Route path="tax" element={<TaxPage />} />
           <Route path="cbm" element={<CbmPage />} />
           <Route path="excel" element={<ExcelPage />} />
-          <Route path="ups-dpd" element={<UpsUpdPage />} />
           <Route path="revcal" element={<RevCalPage />} />
           <Route path="system-tools" element={<SystemToolsPage />} />
           <Route path="settings" element={<SettingsPage />} />

@@ -6,7 +6,6 @@ import {
   FileBarChart,
   FileSpreadsheet,
   Home,
-  Package,
   Percent,
   Search,
   Settings,
@@ -48,7 +47,6 @@ export const navGroups: ToolNavigationGroup[] = [
     title: '文件处理',
     items: [
       { title: 'Excel 拆分', href: '/excel', icon: FileSpreadsheet, description: '海铁有图、无图及空运处理', keywords: ['excel', 'xlsx', '海铁', '空运', '拆分'] },
-      { title: 'UPS / DPD', href: '/ups-dpd', icon: Package, description: '物流数据与模板填充', keywords: ['ups', 'dpd', '物流', '模板'] },
     ],
   },
   {

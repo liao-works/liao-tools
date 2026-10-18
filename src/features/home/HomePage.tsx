@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import {
-  ArrowRight, Search, ShieldCheck, Boxes, FileSpreadsheet, Package,
+  ArrowRight, Search, ShieldCheck, Boxes, FileSpreadsheet,
   Wrench, CheckCheck, Database, Clock3, ArrowUpRight, BookOpen, Info,
 } from 'lucide-react';
 import { taxApi } from '@/lib/api/tax';
@@ -12,7 +12,6 @@ const tools = [
   { name: 'Alta 禁运查询', text: '查看限制条目及适用例外', to: '/alta', icon: ShieldCheck, accent: 'blue' },
   { name: 'Amazon 商品查询', text: '商品价格、尺寸与重量信息', to: '/revcal', icon: Boxes, accent: 'blue' },
   { name: 'Excel 数据拆分', text: '海铁、空运表格处理', to: '/excel', icon: FileSpreadsheet, accent: 'green' },
-  { name: 'UPS / DPD', text: '物流数据与模板填充', to: '/ups-dpd', icon: Package, accent: 'amber' },
   { name: '系统工具', text: '快速启动常用应用', to: '/system-tools', icon: Wrench, accent: 'green' },
   { name: 'Todo 清单', text: '记录与整理待办任务', to: '/todo', icon: CheckCheck, accent: 'amber' },
 ];
@@ -56,7 +55,7 @@ export function HomePage() {
     <section className="lt-home-section" aria-labelledby="tools-title">
       <div className="lt-section-heading">
         <div><h2 id="tools-title">快速开始 · 常用工具</h2><p>选择一个工具，直接进入工作流程</p></div>
-        <span className="lt-section-count">7 个核心工具</span>
+        <span className="lt-section-count">6 个核心工具</span>
       </div>
       <div className="lt-tools-grid lt-tools-grid--balanced">
         {tools.map(({ name, text, to, icon: Icon, accent }) =>
@@ -75,11 +74,6 @@ export function HomePage() {
           <Link to="/tax?tab=batch" className="lt-workflow-item">
             <span className="lt-workflow-glyph"><FileSpreadsheet size={18}/></span>
             <span><strong>批量税率查询</strong><small>导入 Excel，生成包含状态的查询结果</small></span>
-            <ArrowUpRight size={16}/>
-          </Link>
-          <Link to="/ups-dpd" className="lt-workflow-item">
-            <span className="lt-workflow-glyph"><Package size={18}/></span>
-            <span><strong>处理物流总结单</strong><small>选择 UPS / DPD 模板及源文件</small></span>
             <ArrowUpRight size={16}/>
           </Link>
           <Link to="/alta?tab=batch" className="lt-workflow-item">
