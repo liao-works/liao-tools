@@ -10,5 +10,6 @@ pub mod updater;
 
 pub mod file_utils;
 pub mod system_tools;
+pub mod usage_stats;
 pub mod user_tools;
 pub mod revcal;

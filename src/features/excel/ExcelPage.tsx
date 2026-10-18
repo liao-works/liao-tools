@@ -2,6 +2,7 @@ import { FeatureHeader } from '@/components/layout/FeatureHeader';
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
+import { withUsage } from '@/lib/api/usage';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ProcessConfigPanel } from './components/ProcessConfigPanel';
@@ -76,7 +77,10 @@ export function ExcelPage() {
         config,
       };
 
-      const result = await invoke<ProcessResponse>('process_excel_file', { request });
+      const result = await withUsage(
+        { tool: 'excel', action: 'process', items: 1 },
+        () => invoke<ProcessResponse>('process_excel_file', { request }),
+      );
 
       setLogs(result.logs);
 

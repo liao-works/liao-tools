@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { withUsage } from '@/lib/api/usage';
 import type {
   RevCalBatchProgress,
   RevCalBatchResult,
@@ -12,7 +13,8 @@ export const revCalApi = {
    * 单码查询（ASIN/UPC/EAN/ISBN/标题关键词）
    */
   async search(keywords: string, countryCode: string): Promise<RevCalProduct[]> {
-    return invoke<RevCalProduct[]>('revcal_search', { keywords, countryCode });
+    return withUsage({ tool: 'revcal', action: 'query', items: 1 },
+      () => invoke<RevCalProduct[]>('revcal_search', { keywords, countryCode }));
   },
 
   /**
@@ -28,7 +30,8 @@ export const revCalApi = {
     });
 
     try {
-      return await invoke<RevCalBatchResult>('revcal_batch_search', { codes, countryCode });
+      return await withUsage({ tool: 'revcal', action: 'query', items: codes.length },
+        () => invoke<RevCalBatchResult>('revcal_batch_search', { codes, countryCode }));
     } finally {
       unlisten();
     }

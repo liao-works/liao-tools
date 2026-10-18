@@ -16,6 +16,7 @@ use commands::tax::*;
 use commands::update_history::commands::*;
 use commands::ups_dpd::commands::*;
 use commands::updater::*;
+use commands::usage_stats::*;
 use commands::user_tools::*;
 use log::info;
 use std::path::PathBuf;
@@ -181,6 +182,9 @@ pub fn run() {
             sticky_notes::toggle_todo_widget_visibility,
             sticky_notes::show_todo_widget_and_focus_input,
             sticky_notes::toggle_todo_widget_pin,
+            // Usage stats commands
+            usage_record,
+            usage_summary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

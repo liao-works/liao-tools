@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
+  BarChart3,
   Home, Search, ShieldCheck, Package, FileSpreadsheet, Wrench,
   CheckCheck, Settings, Database, Calculator, PanelLeftClose, PanelLeftOpen, RefreshCw
 } from 'lucide-react';
@@ -54,6 +55,8 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
           {!collapsed && <div className="lt-nav-label">管理</div>}
           <NavLink to="/data-maintenance" onClick={onNavigate} className="lt-nav-item"
             title={collapsed ? '数据维护' : undefined}><Database size={18}/>{!collapsed && '数据维护'}</NavLink>
+          <NavLink to="/usage" onClick={onNavigate} className="lt-nav-item"
+            title={collapsed ? '使用统计' : undefined}><BarChart3 size={18}/>{!collapsed && '使用统计'}</NavLink>
           <NavLink to="/updates" onClick={onNavigate}
             className={({ isActive }) => ['lt-nav-item', isActive ? 'is-active' : ''].join(' ')}
             title={collapsed ? '应用更新' : undefined}><RefreshCw size={18}/>{!collapsed && '应用更新'}</NavLink>

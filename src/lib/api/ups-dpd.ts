@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { withUsage } from '@/lib/api/usage';
 
 export type TemplateType = 'ups' | 'dpd';
 
@@ -32,7 +33,9 @@ export const TemplateTypeLabels: Record<TemplateType, string> = {
 export async function processUpsDpdFile(
   request: ProcessRequest
 ): Promise<ProcessResponse> {
-  return invoke('process_ups_dpd_file', { request });
+  return withUsage({ tool: 'upsdpd', action: 'process', items: 1 }, () =>
+    invoke('process_ups_dpd_file', { request })
+  );
 }
 
 /**

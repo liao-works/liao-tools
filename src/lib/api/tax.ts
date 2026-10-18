@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { withUsage } from '@/lib/api/usage';
 import type { TaxTariff, TaxVersionInfo } from '@/types';
 
 
@@ -89,8 +90,8 @@ export const taxApi = {
    */
   async exactSearch(code: string): Promise<TaxTariff | null> {
     try {
-      const result = await invoke<TaxTariff | null>('tax_exact_search', { code });
-      return result;
+      return await withUsage({ tool: 'tax', action: 'query', items: 1 },
+        () => invoke<TaxTariff | null>('tax_exact_search', { code }));
     } catch (error) {
       console.error('精确查询失败:', error);
       throw error;
@@ -102,8 +103,8 @@ export const taxApi = {
    */
   async fuzzySearch(query: string, limit = 10): Promise<TaxTariff[]> {
     try {
-      const results = await invoke<TaxTariff[]>('tax_fuzzy_search', { query, limit });
-      return results;
+      return await withUsage({ tool: 'tax', action: 'query', items: 1 },
+        () => invoke<TaxTariff[]>('tax_fuzzy_search', { query, limit }));
     } catch (error) {
       console.error('模糊查询失败:', error);
       throw error;
@@ -128,13 +129,17 @@ export const taxApi = {
     );
 
     try {
-      const result = await invoke<{
-        total: number;
-        success: number;
-        errors: string[];
-        output_path: string;
-      }>('tax_batch_query', { inputPath });
-      
+      const result = await withUsage(
+        { tool: 'tax', action: 'query' },
+        () => invoke<{
+          total: number;
+          success: number;
+          errors: string[];
+          output_path: string;
+        }>('tax_batch_query', { inputPath }),
+        (result) => result.total,
+      );
+
       return {
         total: result.total,
         success: result.success,
@@ -252,6 +257,7 @@ export interface UpdateResult {
   /** 用户选择写入时，本次是否已实际写进本地数据库 */
   appliedToDb?: boolean;
 }
+
 // ============ 数据统计视图 ============
 
 export interface RegionDefaultCoverage {
