@@ -4,6 +4,7 @@ use std::time::Duration;
 /// 通用 HTTP 客户端构建器
 pub struct HttpClientBuilder {
     timeout: Duration,
+    connect_timeout: Option<Duration>,
     user_agent: String,
 }
 
@@ -11,6 +12,7 @@ impl HttpClientBuilder {
     pub fn new() -> Self {
         Self {
             timeout: Duration::from_secs(30),
+            connect_timeout: None,
             user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36".to_string(),
         }
     }
@@ -20,17 +22,27 @@ impl HttpClientBuilder {
         self
     }
 
+    /// TCP 连接建立超时；不设置时沿用 reqwest 默认（受系统 TCP 超时约束）。
+    pub fn connect_timeout(mut self, duration: Duration) -> Self {
+        self.connect_timeout = Some(duration);
+        self
+    }
+
     pub fn user_agent(mut self, ua: impl Into<String>) -> Self {
         self.user_agent = ua.into();
         self
     }
 
     pub fn build(self) -> Result<Client, reqwest::Error> {
-        apply_system_proxy(
+        let builder = apply_system_proxy(
             Client::builder()
                 .user_agent(self.user_agent)
                 .timeout(self.timeout),
-        )
+        );
+        match self.connect_timeout {
+            Some(duration) => builder.connect_timeout(duration),
+            None => builder,
+        }
         .build()
     }
 }
