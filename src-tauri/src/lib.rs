@@ -14,6 +14,11 @@ use commands::installed_apps::get_installed_apps;
 use commands::revcal::commands::*;
 use commands::system_tools::*;
 use commands::tax::*;
+use commands::translate::commands::{
+    translate_abort, translate_clear_history, translate_delete_history,
+    translate_get_provider_status, translate_list_history, translate_run,
+    translate_save_provider,
+};
 use commands::update_history::commands::*;
 use commands::ups_dpd::commands::*;
 use commands::updater::*;
@@ -99,6 +104,7 @@ pub fn run() {
             // 设置状态
             app.manage(state);
             app.manage(sticky_notes::NoteWindowManager::new());
+            app.manage(commands::translate::commands::TranslateRunState::default());
 
             if let Err(error) = sticky_notes::register_global_shortcuts(app.handle()) {
                 log::warn!("注册 Todo 全局快捷键失败: {}", error);
@@ -207,6 +213,14 @@ pub fn run() {
             // Usage stats commands
             usage_record,
             usage_summary,
+            // Translate commands
+            translate_run,
+            translate_abort,
+            translate_get_provider_status,
+            translate_save_provider,
+            translate_list_history,
+            translate_delete_history,
+            translate_clear_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
