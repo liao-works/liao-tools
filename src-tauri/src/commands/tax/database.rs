@@ -253,6 +253,20 @@ impl TaxDatabase {
             .query_row("SELECT COUNT(*) FROM tariffs", [], |row| row.get(0))?;
         Ok(count)
     }
+
+    /// 统计摘要列非空的行数：(GB rate, XI north_ireland_rate)。
+    /// 只做展示用的快速校验，不重算采集端指标。
+    pub fn count_populated_rates(&self) -> Result<(i64, i64)> {
+        let counts = self.conn.query_row(
+            "SELECT
+               SUM(CASE WHEN rate IS NOT NULL AND TRIM(rate) != '' THEN 1 ELSE 0 END),
+               SUM(CASE WHEN north_ireland_rate IS NOT NULL AND TRIM(north_ireland_rate) != '' THEN 1 ELSE 0 END)
+             FROM tariffs",
+            [],
+            |row| Ok((row.get::<_, Option<i64>>(0)?, row.get::<_, Option<i64>>(1)?)),
+        )?;
+        Ok((counts.0.unwrap_or(0), counts.1.unwrap_or(0)))
+    }
     
     /// 检查数据库是否有数据
     pub fn has_data(&self) -> Result<bool> {

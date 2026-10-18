@@ -4,8 +4,9 @@ import { FeatureHeader } from '@/components/layout/FeatureHeader';
 import { SingleQueryTab } from './components/SingleQueryTab';
 import { BatchQueryTab } from './components/BatchQueryTab';
 import { UpdateTab } from './components/UpdateTab';
+import { DataStatsTab } from './components/DataStatsTab';
 
-const validTabs = ['single', 'batch', 'update'];
+const validTabs = ['single', 'batch', 'update', 'stats'];
 export function TaxPage() {
   const [params, setParams] = useSearchParams();
   const requested = params.get('tab') || 'single';
@@ -20,10 +21,12 @@ export function TaxPage() {
           <TabsTrigger value="single">单码查询</TabsTrigger>
           <TabsTrigger value="batch">批量 Excel 查询</TabsTrigger>
           <TabsTrigger value="update">数据更新与审核</TabsTrigger>
+          <TabsTrigger value="stats">数据统计</TabsTrigger>
         </TabsList>
         <TabsContent value="single" className="space-y-4"><SingleQueryTab /></TabsContent>
         <TabsContent value="batch" className="space-y-4"><BatchQueryTab /></TabsContent>
         <TabsContent value="update" className="space-y-4"><UpdateTab /></TabsContent>
+        <TabsContent value="stats" className="space-y-4"><DataStatsTab /></TabsContent>
       </Tabs>
     </div>
   );
