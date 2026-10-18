@@ -170,15 +170,26 @@ fn build_chat_request(request: &TranslateRequest, config: &ProviderConfig) -> Re
     } else {
         credentials.model.trim().to_string()
     };
+    let system_prompt = request
+        .custom_system_prompt
+        .as_deref()
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map_or_else(
+            || {
+                prompt::build_system_prompt(
+                    request.mode,
+                    request.tone,
+                    request.custom_note.as_deref(),
+                )
+            },
+            str::to_string,
+        );
     Ok(ChatRequest {
         base_url,
         api_key: credentials.api_key.trim().to_string(),
         model,
-        system_prompt: prompt::build_system_prompt(
-            request.mode,
-            request.tone,
-            request.custom_note.as_deref(),
-        ),
+        system_prompt,
         user_prompt: prompt::build_user_prompt(request),
     })
 }
@@ -220,4 +231,47 @@ fn save_history(
     })?;
     db.enforce_limit()?;
     Ok(id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::translate::{TonePreset, TranslateMode};
+
+    fn request(custom: Option<&str>) -> TranslateRequest {
+        TranslateRequest {
+            mode: TranslateMode::Translate,
+            source_lang: "auto".into(),
+            target_lang: "en".into(),
+            tone: Some(TonePreset::Natural),
+            custom_note: Some("老客户".into()),
+            custom_system_prompt: custom.map(Into::into),
+            text: "你好".into(),
+        }
+    }
+
+    fn config() -> ProviderConfig {
+        let mut config = ProviderConfig::default();
+        config.deepseek.api_key = "sk-test".into();
+        config
+    }
+
+    #[test]
+    fn custom_system_prompt_overrides_builtin() {
+        let chat = build_chat_request(&request(Some("你是海盗语翻译官")), &config()).unwrap();
+        assert_eq!(chat.system_prompt, "你是海盗语翻译官");
+        // 用户消息包装保持内置：模式文案 + 目标语言 + 原文
+        assert!(chat.user_prompt.contains("英语"));
+        assert!(chat.user_prompt.contains("你好"));
+    }
+
+    #[test]
+    fn blank_custom_falls_back_to_builtin() {
+        for custom in [None, Some(""), Some("   ")] {
+            let chat = build_chat_request(&request(custom), &config()).unwrap();
+            assert!(chat.system_prompt.contains("翻译"));
+            assert!(chat.system_prompt.contains("自然商务"));
+            assert!(chat.system_prompt.contains("额外要求：老客户"));
+        }
+    }
 }

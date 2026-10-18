@@ -8,6 +8,8 @@ export interface TranslateRequest {
   targetLang: string;
   tone?: TonePreset;
   customNote?: string;
+  /** 非空时完全替换内置系统提示词（用户消息包装仍由模式决定） */
+  customSystemPrompt?: string;
   text: string;
 }
 

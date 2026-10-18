@@ -139,6 +139,7 @@ mod tests {
             target_lang: "en".into(),
             tone: None,
             custom_note: None,
+            custom_system_prompt: None,
             text: "你好".into(),
         };
         let p = build_user_prompt(&req);

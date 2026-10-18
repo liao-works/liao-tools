@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { History, Languages, Settings2 } from 'lucide-react';
+import { History, Languages, Settings2, SquarePen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
 import { translateApi } from '@/lib/api/translate';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +17,8 @@ export function TranslatePage() {
   const [mode, setMode] = useState<TranslateMode>('translate');
   const [tone, setTone] = useState<TonePreset>('natural');
   const [customNote, setCustomNote] = useState('');
+  const [customPromptOn, setCustomPromptOn] = useState(false);
+  const [customSystemPrompt, setCustomSystemPrompt] = useState('');
   const [sourceLang, setSourceLang] = useState('auto');
   const [targetLang, setTargetLang] = useState('en');
   const [input, setInput] = useState('');
@@ -62,6 +65,7 @@ export function TranslatePage() {
         targetLang: mode === 'explain' ? 'zh' : target,
         tone: mode === 'explain' ? undefined : tone,
         customNote: mode === 'explain' ? undefined : (customNote.trim() || undefined),
+        customSystemPrompt: customPromptOn && customSystemPrompt.trim() ? customSystemPrompt.trim() : undefined,
         text: input,
       }, handleEvent);
     } catch (e) {
@@ -70,7 +74,7 @@ export function TranslatePage() {
       setError(message);
       toast({ title: '翻译失败', description: message, variant: 'destructive' });
     }
-  }, [input, running, sourceLang, targetLang, mode, tone, customNote, handleEvent, toast]);
+  }, [input, running, sourceLang, targetLang, mode, tone, customNote, customPromptOn, customSystemPrompt, handleEvent, toast]);
 
   const stop = useCallback(() => {
     void translateApi.abort();
@@ -123,9 +127,21 @@ export function TranslatePage() {
             onTargetChange={setTargetLang}
           />
         )}
-        {mode !== 'explain' && (
+        {mode !== 'explain' && !customPromptOn && (
           <ToneSelector tone={tone} customNote={customNote} onToneChange={setTone} onCustomNoteChange={setCustomNote} />
         )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={[
+            'h-7 text-xs',
+            customPromptOn ? 'bg-primary/10 text-primary' : 'text-muted-foreground',
+          ].join(' ')}
+          onClick={() => setCustomPromptOn((v) => !v)}
+        >
+          <SquarePen size={14} /> 自定义提示词
+        </Button>
         <div className="ml-auto flex items-center gap-1">
           <Button type="button" variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => setHistoryOpen(true)}>
             <History size={14} /> 历史
@@ -135,6 +151,14 @@ export function TranslatePage() {
           </Button>
         </div>
       </div>
+      {customPromptOn && (
+        <Textarea
+          value={customSystemPrompt}
+          onChange={(e) => setCustomSystemPrompt(e.target.value)}
+          placeholder="输入完整的系统提示词，将完全替换内置提示词（角色、语气、输出规则全部由你定义）。留空则仍使用内置提示词。"
+          className="h-24 text-xs"
+        />
+      )}
       <Workbench
         mode={mode}
         input={input}

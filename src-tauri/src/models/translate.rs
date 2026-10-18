@@ -48,6 +48,9 @@ pub struct TranslateRequest {
     pub tone: Option<TonePreset>,
     #[serde(default)]
     pub custom_note: Option<String>,
+    /// 非空（trim 后）时完全替换内置系统提示词；用户消息包装仍由模式决定
+    #[serde(default)]
+    pub custom_system_prompt: Option<String>,
     pub text: String,
 }
 
