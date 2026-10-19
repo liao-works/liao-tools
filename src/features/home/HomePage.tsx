@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { taxApi } from '@/lib/api/tax';
 import { altaApi } from '@/lib/api/alta';
+import { HomeTodoCalendar } from '@/features/todo/components/HomeTodoCalendar';
 
 const tools = [
   { name: '关税查询', text: '查询 GB / NI 税率与来源状态', to: '/tax', icon: Search, accent: 'orange' },
@@ -38,7 +39,8 @@ export function HomePage() {
     return () => { alive = false; };
   }, []);
 
-  return <div className="lt-home lt-home--polished">
+  return <div className="lt-home lt-home--polished lt-home--with-rail">
+    <div className="lt-home-main">
     <section className="lt-hero lt-hero--editorial" aria-labelledby="welcome-title">
       <div className="lt-hero-copy">
         <span className="lt-kicker">WELCOME TO LIAO TOOLS</span>
@@ -105,5 +107,9 @@ export function HomePage() {
         </div>
       </section>
     </div>
+    </div>
+    <aside className="lt-home-rail">
+      <HomeTodoCalendar />
+    </aside>
   </div>;
 }

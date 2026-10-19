@@ -92,6 +92,14 @@
 .lt-tool-info small {font-size:11px;line-height:1.5;display:block;color:var(--muted-foreground)}
 .lt-tool-arrow {color:var(--muted-foreground);flex:0 0 auto}
 .lt-home-bottom {display:grid;grid-template-columns:1fr 1fr;gap:16px}
+/* 首页右栏（待办日历）：宽屏双栏，窄屏落到主列下方 */
+.lt-home-main {display:flex;flex-direction:column;gap:16px;min-width:0}
+.lt-home-rail {align-self:start;min-width:0}
+@media (min-width: 1280px) {
+  .lt-home--with-rail {grid-template-columns:minmax(0,1fr) 372px}
+  .lt-home--with-rail .lt-tools-grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+  .lt-home-rail {position:sticky;top:12px;max-height:calc(100vh - 60px);overflow-y:auto}
+}
 .lt-panel-heading {align-items:center;margin-bottom:12px}
 .lt-panel-heading > div {display:flex;align-items:center;gap:9px}
 .lt-panel-heading svg {color:var(--primary-fg)}
