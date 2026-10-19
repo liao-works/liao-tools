@@ -38,7 +38,7 @@ export function RecentTranslations() {
           还没有翻译记录——写好的邮件拿去译一段，这里就会显示
         </p>
       ) : (
-        <div className="space-y-1">
+        <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
           {entries.map((entry) => (
             <Link
               key={entry.id}

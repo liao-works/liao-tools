@@ -103,7 +103,7 @@ export function HomeTodoCalendar() {
           <span className="font-medium">{format(selectedDay, 'M月d日 EEEE', { locale: zhCN })}</span>
           <span className="text-muted-foreground">{selectedTasks.length} 条</span>
         </div>
-        <div className="space-y-0.5">
+        <div className="max-h-52 space-y-0.5 overflow-y-auto pr-1">
           {selectedTasks.length === 0 && (
             <p className="py-1.5 text-xs text-muted-foreground/70">这一天还没有安排</p>
           )}
