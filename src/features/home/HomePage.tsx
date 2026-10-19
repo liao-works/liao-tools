@@ -1,20 +1,21 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import {
-  ArrowRight, Search, ShieldCheck, Boxes, FileSpreadsheet, Package,
-  Wrench, CheckCheck, Database, Clock3, ArrowUpRight, BookOpen, Info,
+  ArrowRight, Search, ShieldCheck, Boxes, FileSpreadsheet,
+  Wrench, CheckCheck, Languages, Database, Clock3, ArrowUpRight, BookOpen, Info,
 } from 'lucide-react';
 import { taxApi } from '@/lib/api/tax';
 import { altaApi } from '@/lib/api/alta';
+import { HomeTodoCalendar } from '@/features/todo/components/HomeTodoCalendar';
 
 const tools = [
   { name: '关税查询', text: '查询 GB / NI 税率与来源状态', to: '/tax', icon: Search, accent: 'orange' },
   { name: 'Alta 禁运查询', text: '查看限制条目及适用例外', to: '/alta', icon: ShieldCheck, accent: 'blue' },
   { name: 'Amazon 商品查询', text: '商品价格、尺寸与重量信息', to: '/revcal', icon: Boxes, accent: 'blue' },
   { name: 'Excel 数据拆分', text: '海铁、空运表格处理', to: '/excel', icon: FileSpreadsheet, accent: 'green' },
-  { name: 'UPS / DPD', text: '物流数据与模板填充', to: '/ups-dpd', icon: Package, accent: 'amber' },
   { name: '系统工具', text: '快速启动常用应用', to: '/system-tools', icon: Wrench, accent: 'green' },
   { name: 'Todo 清单', text: '记录与整理待办任务', to: '/todo', icon: CheckCheck, accent: 'amber' },
+  { name: '翻译', text: '邮件翻译、润色与语气解读', to: '/translate', icon: Languages, accent: 'blue' },
 ];
 
 type Snapshot = { kind: 'loading' | 'ready' | 'unavailable'; label: string };
@@ -38,7 +39,8 @@ export function HomePage() {
     return () => { alive = false; };
   }, []);
 
-  return <div className="lt-home lt-home--polished">
+  return <div className="lt-home lt-home--polished lt-home--with-rail">
+    <div className="lt-home-main">
     <section className="lt-hero lt-hero--editorial" aria-labelledby="welcome-title">
       <div className="lt-hero-copy">
         <span className="lt-kicker">WELCOME TO LIAO TOOLS</span>
@@ -77,11 +79,6 @@ export function HomePage() {
             <span><strong>批量税率查询</strong><small>导入 Excel，生成包含状态的查询结果</small></span>
             <ArrowUpRight size={16}/>
           </Link>
-          <Link to="/ups-dpd" className="lt-workflow-item">
-            <span className="lt-workflow-glyph"><Package size={18}/></span>
-            <span><strong>处理物流总结单</strong><small>选择 UPS / DPD 模板及源文件</small></span>
-            <ArrowUpRight size={16}/>
-          </Link>
           <Link to="/alta?tab=batch" className="lt-workflow-item">
             <span className="lt-workflow-glyph"><ShieldCheck size={18}/></span>
             <span><strong>批量禁运筛查</strong><small>检查编码命中及限制条目</small></span>
@@ -110,5 +107,9 @@ export function HomePage() {
         </div>
       </section>
     </div>
+    </div>
+    <aside className="lt-home-rail">
+      <HomeTodoCalendar />
+    </aside>
   </div>;
 }

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
+  Calendar,
+  CalendarClock,
   CheckCircle2,
   Circle,
   ExternalLink,
@@ -11,8 +13,10 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { format, startOfDay } from 'date-fns';
 import { useTodoStore } from './store/todoStore';
 import { SettingsModal } from './components/SettingsModal';
+import { DueDatePopover } from './components/DueDatePopover';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { TodoPriority } from './types';
@@ -39,6 +43,9 @@ export function TodoPage() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [addingTask, setAddingTask] = useState(false);
   const [newTaskPriority, setNewTaskPriority] = useState<TodoPriority>('medium');
+  const [newTaskDueDate, setNewTaskDueDate] = useState<number | undefined>(
+    () => startOfDay(new Date()).getTime(),
+  );
   const [showSettings, setShowSettings] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -76,9 +83,10 @@ export function TodoPage() {
     if (!newTaskTitle.trim() || isLoading || addingTask) return;
     setAddingTask(true);
     try {
-      await addTask(newTaskTitle.trim(), newTaskPriority);
+      await addTask(newTaskTitle.trim(), newTaskPriority, newTaskDueDate);
       setNewTaskTitle('');
       setNewTaskPriority('medium');
+      setNewTaskDueDate(startOfDay(new Date()).getTime());
     } catch {
       // The store exposes the real save error. Keep the typed title for retry.
     } finally {
@@ -243,6 +251,22 @@ export function TodoPage() {
             <option value="medium">中</option>
             <option value="high">高</option>
           </select>
+          <DueDatePopover value={newTaskDueDate} onChange={setNewTaskDueDate}>
+            <Button
+              type="button"
+              variant="outline"
+              className={
+                'gap-1.5 px-3 text-muted-foreground' +
+                (newTaskDueDate !== undefined ? ' border-primary/60 text-primary' : '')
+              }
+              title="设置到期日（可选）"
+            >
+              <Calendar className="h-4 w-4" />
+              {newTaskDueDate !== undefined && (
+                <span className="text-xs">{format(newTaskDueDate, 'M/d')}</span>
+              )}
+            </Button>
+          </DueDatePopover>
           <Button onClick={() => void handleAddTask()} disabled={!newTaskTitle.trim() || isLoading || addingTask} aria-label="添加任务">
             <Plus className="h-4 w-4" />
           </Button>
@@ -357,6 +381,7 @@ interface TaskItemProps {
     status: 'pending' | 'completed';
     priority: TodoPriority;
     createdAt: number;
+    dueDate?: number;
   };
   isActive: boolean;
   setTaskRef: (element: HTMLDivElement | null) => void;
@@ -369,6 +394,10 @@ function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
   const [editTitle, setEditTitle] = useState(task.title);
   const editInputRef = useRef<HTMLInputElement | null>(null);
   const skipBlurSaveRef = useRef(false);
+  const overdue =
+    task.status === 'pending' &&
+    task.dueDate !== undefined &&
+    task.dueDate < startOfDay(new Date()).getTime();
 
   useEffect(() => {
     if (!isEditing) return;
@@ -495,11 +524,34 @@ function TaskItem({ task, isActive, setTaskRef, onActivate }: TaskItemProps) {
           >
             {PRIORITY_LABELS[task.priority]}
           </span>
+          {task.dueDate !== undefined && (
+            <span
+              className={`rounded px-1.5 py-0.5 text-xs ${
+                overdue ? 'bg-destructive/15 text-destructive' : 'bg-primary/10 text-primary'
+              }`}
+            >
+              {format(task.dueDate, 'M/d')}{overdue ? ' 已过期' : ' 到期'}
+            </span>
+          )}
         </div>
       </div>
 
       {!isEditing && (
         <>
+          <DueDatePopover
+            value={task.dueDate}
+            onChange={(value) => void updateTask(task.id, { dueDate: value }).catch(() => undefined)}
+            align="end"
+          >
+            <button
+              className={`rounded p-1 transition-all hover:bg-muted hover:text-foreground md:opacity-40 md:group-hover:opacity-100 md:focus-visible:opacity-100 ${
+                task.dueDate !== undefined ? 'text-primary' : 'text-muted-foreground'
+              }`}
+              title="设置到期日"
+            >
+              <CalendarClock className="h-4 w-4" />
+            </button>
+          </DueDatePopover>
           <button
             onClick={startEditing}
             className="rounded p-1 text-muted-foreground opacity-100 transition-all hover:bg-muted hover:text-foreground md:opacity-40 md:group-hover:opacity-100 md:focus-visible:opacity-100"

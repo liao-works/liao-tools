@@ -1,3 +1,5 @@
+pub mod calc;
+pub mod calc_excel;
 pub mod commands;
 pub mod database;
 pub mod downloader;

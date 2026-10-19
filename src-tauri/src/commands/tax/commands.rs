@@ -2,6 +2,8 @@ use crate::commands::tax::database::TaxDatabase;
 use crate::commands::tax::downloader::TaxDataDownloader;
 use crate::commands::tax::stats::{self, TaxDataStats};
 use crate::commands::tax::update_log::{self, UpdateEventKind};
+use crate::commands::tax::calc::{self, CalcBatchParams, CalcRequest};
+use crate::commands::tax::calc_excel::CalcExcelProcessor;
 use crate::commands::tax::excel::TaxExcelProcessor;
 use crate::commands::tax::query::TaxQuery;
 use crate::commands::tax::scraper::TaxScraper;
@@ -13,6 +15,70 @@ use tauri::Emitter;
 use tauri_plugin_opener::OpenerExt;
 use log::{info, warn};
 use chrono;
+
+/// 单码关税成本试算（本地离线数据，仅估算，非申报依据）
+#[tauri::command]
+pub async fn tax_calc_estimate(
+    request: CalcRequest,
+    app_handle: tauri::AppHandle,
+) -> Result<calc::CalcResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let db = TaxDatabase::new(&app_handle).map_err(|e| e.to_string())?;
+        db.ensure_has_data().map_err(|e| e.to_string())?;
+        calc::estimate(&db, &request)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// 下载批量试算 Excel 模板
+#[tauri::command]
+pub async fn tax_calc_template(output_path: String) -> Result<(), String> {
+    CalcExcelProcessor::generate_template(&output_path).map_err(|e| e.to_string())
+}
+
+/// 批量关税成本试算（Excel 文件）
+#[tauri::command]
+pub async fn tax_calc_batch(
+    input_path: String,
+    params: CalcBatchParams,
+    app_handle: tauri::AppHandle,
+    window: tauri::Window,
+) -> Result<calc::CalcBatchResult, String> {
+    let db = TaxDatabase::new(&app_handle).map_err(|e| e.to_string())?;
+    db.ensure_has_data().map_err(|e| e.to_string())?;
+
+    let input_path_obj = std::path::Path::new(&input_path);
+    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M").to_string();
+    let output_filename = format!(
+        "{}_试算结果_{}.xlsx",
+        input_path_obj
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("tax_calc"),
+        timestamp
+    );
+    let output_path = input_path_obj
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .join(&output_filename);
+    let output_path_str = output_path.to_string_lossy().to_string();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        CalcExcelProcessor::process_batch(&db, &input_path, &output_path_str, &params, |current, total| {
+            let _ = window.emit(
+                "calc-batch-progress",
+                serde_json::json!({
+                    "current": current,
+                    "total": total
+                }),
+            );
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
+}
 
 /// 精确查询税率
 #[tauri::command]

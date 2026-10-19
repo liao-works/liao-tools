@@ -77,6 +77,8 @@ export const USAGE_TOOL_LABELS: Record<string, string> = {
   revcal: 'Amazon 商品查询',
   excel: 'Excel 数据拆分',
   upsdpd: 'UPS / DPD',
+  cbm: '体积 / 计费重计算',
+  translate: '翻译',
 };
 
 export function formatDuration(ms: number): string {

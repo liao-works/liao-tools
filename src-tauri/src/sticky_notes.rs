@@ -46,6 +46,9 @@ pub struct TodoTask {
     pub priority: TodoPriority,
     pub created_at: u64,
     pub completed_at: Option<u64>,
+    /// 到期日：当日本地零点的毫秒时间戳；None = 未排期（不上日历）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1205,5 +1208,29 @@ mod todo_store_integrity_tests {
         assert_eq!(next_todo_revision(4, 4).unwrap(), 5);
         assert!(next_todo_revision(4, 5).unwrap_err().contains("其他窗口"));
         assert!(next_todo_revision(u64::MAX, u64::MAX).is_err());
+    }
+
+    #[test]
+    fn legacy_task_without_due_date_deserializes_and_roundtrips() {
+        // 旧数据：无 due_date 字段 → 反序列化为 None，不报错
+        let legacy = serde_json::json!({
+            "id": "t1", "title": "旧任务", "status": "pending",
+            "priority": "medium", "createdAt": 1700000000000u64,
+        });
+        let task: TodoTask = serde_json::from_value(legacy).unwrap();
+        assert_eq!(task.due_date, None);
+
+        // 新数据：带 due_date → roundtrip 保留；None 时序列化不产出该字段
+        let scheduled: TodoTask = serde_json::from_value(serde_json::json!({
+            "id": "t2", "title": "排期任务", "status": "pending",
+            "priority": "high", "createdAt": 1700000000000u64,
+            "dueDate": 1767200400000u64,
+        })).unwrap();
+        assert_eq!(scheduled.due_date, Some(1767200400000));
+        let roundtrip: TodoTask = serde_json::from_value(serde_json::to_value(&scheduled).unwrap()).unwrap();
+        assert_eq!(roundtrip.due_date, Some(1767200400000));
+
+        let unscheduled = serde_json::to_value(&task).unwrap();
+        assert!(unscheduled.get("dueDate").is_none());
     }
 }

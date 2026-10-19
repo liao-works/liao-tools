@@ -110,9 +110,9 @@ mod tests {
         // 完全相同
         assert!((TaxQuery::calculate_similarity("0101210000", "0101210000") - 1.0).abs() < 0.01);
         
-        // 相同前缀
+        // 相同前缀：5 位公共前缀 + 1 处编辑距离，理论值 0.5×0.7 + 0.9×0.3 = 0.62
         let sim = TaxQuery::calculate_similarity("0101210000", "0101220000");
-        assert!(sim > 0.8); // 前8个字符相同
+        assert!((sim - 0.62).abs() < 0.01);
         
         // 完全不同
         let sim = TaxQuery::calculate_similarity("0000000000", "9999999999");

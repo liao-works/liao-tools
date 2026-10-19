@@ -1,4 +1,5 @@
 pub mod alta;
+pub mod cbm;
 pub mod error;
 pub mod excel;
 pub mod icon_extractor;
@@ -13,3 +14,4 @@ pub mod system_tools;
 pub mod usage_stats;
 pub mod user_tools;
 pub mod revcal;
+pub mod translate;
