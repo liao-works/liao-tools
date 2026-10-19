@@ -32,11 +32,15 @@ pub fn save_provider_config(app_handle: &tauri::AppHandle, config: &ProviderConf
 }
 
 /// 指定路径版本（测试与工具直接复用核心逻辑）
+/// 先写临时文件再原子替换，避免写入中途崩溃留下半截配置。
 pub fn save_provider_config_at(path: &std::path::Path, config: &ProviderConfig) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).context("创建配置目录失败")?;
     }
-    std::fs::write(path, serde_json::to_string_pretty(config)?).context("写入配置文件失败")?;
+    let payload = serde_json::to_string_pretty(config)?;
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, payload).with_context(|| format!("写入临时配置失败: {}", tmp.display()))?;
+    std::fs::rename(&tmp, path).with_context(|| format!("替换配置失败: {}", path.display()))?;
     Ok(())
 }
 
