@@ -94,7 +94,7 @@
 .lt-home-bottom {display:grid;grid-template-columns:1fr 1fr;gap:16px}
 /* 首页右栏（待办日历）：宽屏双栏，窄屏落到主列下方 */
 .lt-home-main {display:flex;flex-direction:column;gap:16px;min-width:0}
-.lt-home-rail {align-self:start;min-width:0}
+.lt-home-rail {display:grid;gap:16px;align-self:start;min-width:0}
 @media (min-width: 1280px) {
   .lt-home--with-rail {grid-template-columns:minmax(0,1fr) 372px}
   /* 主列收窄后统一 3 列，避免第 4 个起的小卡（跨 3 列）窄到文字竖排 */

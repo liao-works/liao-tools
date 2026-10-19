@@ -7,6 +7,7 @@ import {
 import { taxApi } from '@/lib/api/tax';
 import { altaApi } from '@/lib/api/alta';
 import { HomeTodoCalendar } from '@/features/todo/components/HomeTodoCalendar';
+import { RecentTranslations } from '@/features/translate/components/RecentTranslations';
 
 const tools = [
   { name: '关税查询', text: '查询 GB / NI 税率与来源状态', to: '/tax', icon: Search, accent: 'orange' },
@@ -110,6 +111,8 @@ export function HomePage() {
     </div>
     <aside className="lt-home-rail">
       <HomeTodoCalendar />
+      <RecentTranslations />
     </aside>
   </div>;
 }
+// MARKER-1792378305
