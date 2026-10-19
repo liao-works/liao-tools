@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { History, Languages, Settings2, SquarePen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,7 +11,7 @@ import { ToneSelector } from './components/ToneSelector';
 import { Workbench } from './components/Workbench';
 import { ProviderDialog } from './components/ProviderDialog';
 import { HistoryDrawer } from './components/HistoryDrawer';
-import type { ProviderStatus, TonePreset, TranslateEvent, TranslateMode } from '@/types/translate';
+import type { HistoryEntry, ProviderStatus, TonePreset, TranslateEvent, TranslateMode } from '@/types/translate';
 
 export function TranslatePage() {
   const { toast } = useToast();
@@ -42,6 +43,20 @@ export function TranslatePage() {
       .catch(() => { if (alive) setStatus(null); })
       .finally(() => { if (alive) setStatusLoaded(true); });
     return () => { alive = false; };
+  }, []);
+
+  // 首页「最近翻译」点击回填：带原文译文与模式进入本页
+  const location = useLocation();
+  useEffect(() => {
+    const restore = (location.state as { restore?: HistoryEntry } | null)?.restore;
+    if (!restore) return;
+    setInput(restore.sourceText);
+    setOutput(restore.resultText);
+    setMode(restore.mode);
+    if (restore.targetLang && restore.targetLang !== 'auto') setTargetLang(restore.targetLang);
+    if (restore.tone) setTone(restore.tone);
+    window.history.replaceState({}, ''); // 清掉路由状态，避免之后进出页面反复回填
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const providerReady = !!status && !!status[status.activeProvider]?.configured;
