@@ -35,6 +35,9 @@ export default defineConfig(async () => ({
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
+      // 4. Windows 下默认文件监听偶发失效（改动后 HMR/转换缓存不更新），改用轮询
+      usePolling: true,
+      interval: 300,
     },
   },
 }));
