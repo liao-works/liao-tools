@@ -92,15 +92,20 @@
 .lt-tool-info small {font-size:11px;line-height:1.5;display:block;color:var(--muted-foreground)}
 .lt-tool-arrow {color:var(--muted-foreground);flex:0 0 auto}
 .lt-home-bottom {display:grid;grid-template-columns:1fr 1fr;gap:16px}
-/* 首页右栏（待办日历）：宽屏双栏，窄屏落到主列下方 */
-.lt-home-main {display:flex;flex-direction:column;gap:16px;min-width:0}
+/* 首页右栏（待办日历）：宽屏时日历贴 hero 右侧并跨「快速开始」两行，
+   快速开始保留全宽的原始错位网格；窄屏所有模块单列顺排 */
 .lt-home-rail {display:grid;gap:16px;align-self:start;min-width:0}
 @media (min-width: 1280px) {
   .lt-home--with-rail {grid-template-columns:minmax(0,1fr) 372px}
-  /* 主列收窄后统一 3 列，避免第 4 个起的小卡（跨 3 列）窄到文字竖排 */
-  .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile,
-  .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) {grid-column:span 4}
-  .lt-home-rail {position:sticky;top:0;max-height:calc(100vh - 48px);overflow-y:auto}
+  .lt-home--with-rail .lt-home-rail {grid-column:2;grid-row:1/span 2;position:sticky;top:0;max-height:calc(100vh - 48px);overflow-y:auto}
+  .lt-home--with-rail .lt-home-bottom {grid-column:1/-1}
+  /* 主列收窄后保留错位节奏：第 4 个起的小卡用紧凑变体（小图标、隐藏描述与箭头）保证 182px 下可读 */
+  .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) {min-height:70px;padding:10px 12px;gap:9px}
+  .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-icon {width:28px;height:28px;border-radius:8px}
+  .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-icon svg {width:15px;height:15px}
+  .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-info strong {font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-info small {display:none}
+  .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-arrow {display:none}
 }
 .lt-panel-heading {align-items:center;margin-bottom:12px}
 .lt-panel-heading > div {display:flex;align-items:center;gap:9px}

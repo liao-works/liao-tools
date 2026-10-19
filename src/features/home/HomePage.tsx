@@ -41,7 +41,6 @@ export function HomePage() {
   }, []);
 
   return <div className="lt-home lt-home--polished lt-home--with-rail">
-    <div className="lt-home-main">
     <section className="lt-hero lt-hero--editorial" aria-labelledby="welcome-title">
       <div className="lt-hero-copy">
         <span className="lt-kicker">WELCOME TO LIAO TOOLS</span>
@@ -55,6 +54,11 @@ export function HomePage() {
       <img className="lt-hero-art" src="/illustrations/trade-hero.svg"
         alt="集装箱、海关单据和关税检索放大镜的原创插画"/>
     </section>
+
+    <aside className="lt-home-rail">
+      <HomeTodoCalendar />
+      <RecentTranslations />
+    </aside>
 
     <section className="lt-home-section" aria-labelledby="tools-title">
       <div className="lt-section-heading">
@@ -108,11 +112,5 @@ export function HomePage() {
         </div>
       </section>
     </div>
-    </div>
-    <aside className="lt-home-rail">
-      <HomeTodoCalendar />
-      <RecentTranslations />
-    </aside>
   </div>;
 }
-// MARKER-1792378305
