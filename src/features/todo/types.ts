@@ -9,6 +9,8 @@ export interface TodoTask {
   priority: TodoPriority;
   createdAt: number;
   completedAt?: number;
+  /** 到期日：当日本地零点的毫秒时间戳；缺省 = 未排期（不上日历） */
+  dueDate?: number;
 }
 
 export interface WidgetPosition {

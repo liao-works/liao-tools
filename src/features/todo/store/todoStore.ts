@@ -34,7 +34,7 @@ interface TodoState {
   loadTasks: () => Promise<void>;
   reloadTasks: () => Promise<void>;
   saveTasks: () => Promise<void>;
-  addTask: (title: string, priority?: TodoPriority) => Promise<TodoTask>;
+  addTask: (title: string, priority?: TodoPriority, dueDate?: number) => Promise<TodoTask>;
   updateTask: (id: string, updates: Partial<TodoTask>) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   toggleTask: (id: string) => Promise<void>;
@@ -164,7 +164,7 @@ export const useTodoStore = create<TodoState>((set, get) => {
     await commit((current) => ({ tasks: current.tasks, config: current.config }));
   },
 
-  addTask: async (title, priority = 'medium') => {
+  addTask: async (title, priority = 'medium', dueDate?: number) => {
     const now = Date.now();
     const newTask: TodoTask = {
       id: `task-${now}-${Math.random().toString(36).slice(2, 11)}`,
@@ -172,6 +172,7 @@ export const useTodoStore = create<TodoState>((set, get) => {
       status: 'pending',
       priority,
       createdAt: now,
+      dueDate,
     };
     await commit((current) => ({
       tasks: [newTask, ...current.tasks],
