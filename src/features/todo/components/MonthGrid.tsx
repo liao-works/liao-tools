@@ -55,7 +55,21 @@ export function MonthGrid({ month, selected, markers, onMonthChange, onSelect, r
         >
           <ChevronLeft size={15} />
         </Button>
-        <span className="text-sm font-medium">{format(month, 'yyyy年M月')}</span>
+        <div className="flex items-center gap-0.5">
+          <span className="text-sm font-medium">{format(month, 'yyyy年M月')}</span>
+          <Button
+            type="button" variant="ghost" size="sm"
+            className="h-6 px-1.5 text-xs text-muted-foreground"
+            title="回到今天"
+            onClick={() => {
+              const now = new Date();
+              onMonthChange(now);
+              onSelect?.(now);
+            }}
+          >
+            今天
+          </Button>
+        </div>
         <Button
           type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label="下一月"
           onClick={() => onMonthChange(addMonths(month, 1))}

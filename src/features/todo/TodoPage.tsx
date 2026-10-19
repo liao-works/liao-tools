@@ -43,7 +43,9 @@ export function TodoPage() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [addingTask, setAddingTask] = useState(false);
   const [newTaskPriority, setNewTaskPriority] = useState<TodoPriority>('medium');
-  const [newTaskDueDate, setNewTaskDueDate] = useState<number | undefined>(undefined);
+  const [newTaskDueDate, setNewTaskDueDate] = useState<number | undefined>(
+    () => startOfDay(new Date()).getTime(),
+  );
   const [showSettings, setShowSettings] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -84,7 +86,7 @@ export function TodoPage() {
       await addTask(newTaskTitle.trim(), newTaskPriority, newTaskDueDate);
       setNewTaskTitle('');
       setNewTaskPriority('medium');
-      setNewTaskDueDate(undefined);
+      setNewTaskDueDate(startOfDay(new Date()).getTime());
     } catch {
       // The store exposes the real save error. Keep the typed title for retry.
     } finally {
