@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { History, Languages, Settings2, SquarePen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -26,38 +26,56 @@ export function TranslatePage() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<ProviderStatus | null>(null);
+  const [statusLoaded, setStatusLoaded] = useState(false);
   const [providerOpen, setProviderOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0); // done 后让抽屉刷新
+  // 运行中的镜像与代次：runningRef 供事件回调判断「停止后迟到的错误」；
+  // runIdRef 丢弃被新请求顶替的旧流事件
+  const runningRef = useRef(false);
+  const runIdRef = useRef(0);
 
   useEffect(() => {
-    translateApi.getStatus().then(setStatus).catch(() => setStatus(null));
+    let alive = true;
+    translateApi.getStatus()
+      .then((s) => { if (alive) setStatus(s); })
+      .catch(() => { if (alive) setStatus(null); })
+      .finally(() => { if (alive) setStatusLoaded(true); });
+    return () => { alive = false; };
   }, []);
 
-  const handleEvent = useCallback((event: TranslateEvent) => {
-    if (event.type === 'delta') {
-      setOutput((prev) => prev + event.text);
-    } else if (event.type === 'done') {
-      setRunning(false);
-      setHistoryVersion((v) => v + 1);
-    } else {
-      setRunning(false);
-      setError(event.message);
-      toast({ title: '翻译失败', description: event.message, variant: 'destructive' });
-    }
-  }, [toast]);
+  const providerReady = !!status && !!status[status.activeProvider]?.configured;
 
   const run = useCallback(async () => {
-    if (!input.trim() || running) return;
+    if (!input.trim() || runningRef.current || !providerReady) return;
     // 方向自动检测：source=auto 且为翻译模式时按输入推断
     const detected = detectSourceLang(input);
     const source = sourceLang === 'auto' ? detected : sourceLang;
     const target = mode === 'translate'
       ? (targetLang !== 'auto' ? targetLang : (source === 'zh' ? 'en' : 'zh'))
       : source;
+    const runId = ++runIdRef.current;
+    const onEvent = (event: TranslateEvent) => {
+      if (runIdRef.current !== runId) return; // 已被新请求顶替，丢弃过期事件
+      if (event.type === 'delta') {
+        setOutput((prev) => prev + event.text);
+      } else if (event.type === 'done') {
+        runningRef.current = false;
+        setRunning(false);
+        setHistoryVersion((v) => v + 1);
+      } else {
+        const wasRunning = runningRef.current;
+        runningRef.current = false;
+        setRunning(false);
+        setError(event.message);
+        // 手动停止后迟到的错误不再打扰
+        if (wasRunning) toast({ title: '翻译失败', description: event.message, variant: 'destructive' });
+      }
+    };
     setOutput('');
     setError(null);
     setRunning(true);
+    runningRef.current = true;
     try {
       await translateApi.run({
         mode,
@@ -67,32 +85,38 @@ export function TranslatePage() {
         customNote: mode === 'explain' ? undefined : (customNote.trim() || undefined),
         customSystemPrompt: customPromptOn && customSystemPrompt.trim() ? customSystemPrompt.trim() : undefined,
         text: input,
-      }, handleEvent);
+      }, onEvent);
     } catch (e) {
+      runningRef.current = false;
       setRunning(false);
       const message = typeof e === 'string' ? e : '发起请求失败';
       setError(message);
       toast({ title: '翻译失败', description: message, variant: 'destructive' });
     }
-  }, [input, running, sourceLang, targetLang, mode, tone, customNote, customPromptOn, customSystemPrompt, handleEvent, toast]);
+  }, [input, sourceLang, targetLang, mode, tone, customNote, customPromptOn, customSystemPrompt, providerReady, toast]);
 
   const stop = useCallback(() => {
     void translateApi.abort();
+    runningRef.current = false;
     setRunning(false);
   }, []);
 
-  // Esc 中止
+  // Esc 中止（弹窗打开时交给弹窗自己处理）
   useEffect(() => {
+    if (!running || providerOpen || historyOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && running) stop();
+      if (e.key === 'Escape') stop();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [running, stop]);
+  }, [running, providerOpen, historyOpen, stop]);
 
-  const activeConfigured = status
-    ? status[status.activeProvider]?.configured
-    : false;
+  const switchMode = (value: TranslateMode) => {
+    if (runningRef.current) stop(); // 不让旧流串进新模式
+    setMode(value);
+    setOutput('');
+    setError(null);
+  };
 
   return (
     <div className="lt-feature flex h-full min-h-0 flex-col gap-3">
@@ -103,46 +127,50 @@ export function TranslatePage() {
         icon={<Languages size={32} />}
       />
       <div className="flex flex-wrap items-center gap-2">
-        {/* 模式三选一 */}
-        <div className="flex items-center rounded-md border border-border bg-background p-0.5">
-          {([['translate', '翻译'], ['polish', '润色'], ['explain', '解释']] as const).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => { setMode(value); setOutput(''); setError(null); }}
-              className={[
-                'px-3 py-1 text-xs rounded-sm transition-colors',
-                mode === value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
-              ].join(' ')}
-            >
-              {label}
-            </button>
-          ))}
+        {/* 左组：模式 + 随模式变化的上下文控件 */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center rounded-md border border-border bg-background p-0.5">
+            {([['translate', '翻译'], ['polish', '润色'], ['explain', '解释']] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => switchMode(value)}
+                className={[
+                  'px-3 py-1 text-xs rounded-sm transition-colors',
+                  mode === value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+                ].join(' ')}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {mode === 'translate' && (
+            <LanguageSelect
+              sourceLang={sourceLang}
+              targetLang={targetLang}
+              onSourceChange={setSourceLang}
+              onTargetChange={setTargetLang}
+            />
+          )}
+          {mode !== 'explain' && !customPromptOn && (
+            <ToneSelector tone={tone} customNote={customNote} onToneChange={setTone} onCustomNoteChange={setCustomNote} />
+          )}
         </div>
-        {mode === 'translate' && (
-          <LanguageSelect
-            sourceLang={sourceLang}
-            targetLang={targetLang}
-            onSourceChange={setSourceLang}
-            onTargetChange={setTargetLang}
-          />
-        )}
-        {mode !== 'explain' && !customPromptOn && (
-          <ToneSelector tone={tone} customNote={customNote} onToneChange={setTone} onCustomNoteChange={setCustomNote} />
-        )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className={[
-            'h-7 text-xs',
-            customPromptOn ? 'bg-primary/10 text-primary' : 'text-muted-foreground',
-          ].join(' ')}
-          onClick={() => setCustomPromptOn((v) => !v)}
-        >
-          <SquarePen size={14} /> 自定义提示词
-        </Button>
+        {/* 右组：高级开关与工具 */}
         <div className="ml-auto flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={[
+              'h-7 text-xs',
+              customPromptOn ? 'bg-primary/10 text-primary' : 'text-muted-foreground',
+            ].join(' ')}
+            onClick={() => setCustomPromptOn((v) => !v)}
+          >
+            <SquarePen size={14} /> 自定义提示词
+          </Button>
+          <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
           <Button type="button" variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => setHistoryOpen(true)}>
             <History size={14} /> 历史
           </Button>
@@ -165,9 +193,11 @@ export function TranslatePage() {
         output={output}
         running={running}
         error={error}
+        providerState={statusLoaded ? (providerReady ? 'ready' : 'unconfigured') : 'loading'}
         onInputChange={setInput}
         onRun={run}
         onStop={stop}
+        onOpenProvider={() => setProviderOpen(true)}
       />
       <ProviderDialog
         open={providerOpen}
@@ -182,23 +212,10 @@ export function TranslatePage() {
         onRestore={(entry) => {
           setInput(entry.sourceText);
           setOutput(entry.resultText);
-          setMode(entry.mode);
+          switchMode(entry.mode);
           setHistoryOpen(false);
         }}
       />
-      {/* 未配置引导：未配置供应商时在底部显示提示条，点击「去配置」打开配置弹窗 */}
-      {status && !activeConfigured && !providerOpen && (
-        <UnconfiguredHint onOpen={() => setProviderOpen(true)} />
-      )}
-    </div>
-  );
-}
-
-function UnconfiguredHint({ onOpen }: { onOpen: () => void }) {
-  return (
-    <div className="flex items-center justify-between rounded-md border border-dashed border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-      <span>还没有配置模型供应商——先花一分钟填入 API Key，翻译即可使用。</span>
-      <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={onOpen}>去配置</Button>
     </div>
   );
 }
