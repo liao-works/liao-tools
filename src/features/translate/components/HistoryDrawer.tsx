@@ -31,14 +31,22 @@ export function HistoryDrawer({ open, onOpenChange, version, onRestore }: Histor
   }, [open, version, reload]);
 
   const remove = async (id: number) => {
-    await translateApi.deleteHistory(id);
-    setEntries((prev) => prev.filter((e) => e.id !== id));
+    try {
+      await translateApi.deleteHistory(id);
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+    } catch {
+      toast({ title: '删除失败', description: '这条历史暂时删不掉，请稍后再试', variant: 'destructive' });
+    }
   };
 
   const clearAll = async () => {
-    const n = await translateApi.clearHistory();
-    setEntries([]);
-    toast({ title: '历史已清空', description: `共删除 ${n} 条` });
+    try {
+      const n = await translateApi.clearHistory();
+      setEntries([]);
+      toast({ title: '历史已清空', description: `共删除 ${n} 条` });
+    } catch {
+      toast({ title: '清空失败', description: '请稍后再试', variant: 'destructive' });
+    }
   };
 
   return (

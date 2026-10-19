@@ -40,6 +40,7 @@ export function ProviderDialog({ open, onOpenChange, status, onSaved }: Provider
   const [provider, setProvider] = useState<ProviderKind>('deepseek');
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
+  const [customModelMode, setCustomModelMode] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +51,7 @@ export function ProviderDialog({ open, onOpenChange, status, onSaved }: Provider
     setProvider(status.activeProvider);
     const entry = entryOf(status, status.activeProvider);
     setModel(entry?.model ?? '');
+    setCustomModelMode(false);
     setBaseUrl(entry?.baseUrl ?? '');
     setApiKey(''); // Key 永远不回填明文
     setError(null);
@@ -58,6 +60,7 @@ export function ProviderDialog({ open, onOpenChange, status, onSaved }: Provider
   const switchProvider = (kind: ProviderKind) => {
     setProvider(kind);
     setModel(entryOf(status, kind)?.model ?? '');
+    setCustomModelMode(false);
     setApiKey('');
     setError(null);
   };
@@ -157,15 +160,25 @@ export function ProviderDialog({ open, onOpenChange, status, onSaved }: Provider
             <Label className="text-xs">模型</Label>
             {models.length > 0 ? (
               <div className="flex gap-2">
-                <Select value={knownModel ? model : '__custom'} onValueChange={(v) => v !== '__custom' && setModel(v)}>
+                <Select
+                  value={knownModel && !customModelMode ? model : '__custom'}
+                  onValueChange={(v) => {
+                    if (v === '__custom') {
+                      setCustomModelMode(true);
+                    } else {
+                      setCustomModelMode(false);
+                      setModel(v);
+                    }
+                  }}
+                >
                   <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {models.map((m) => <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>)}
                     <SelectItem value="__custom" className="text-xs">自定义…</SelectItem>
                   </SelectContent>
                 </Select>
-                {!knownModel && (
-                  <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="模型名" className="h-8 flex-1 text-xs" />
+                {(customModelMode || !knownModel) && (
+                  <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="模型名" className="h-8 flex-1 text-xs" autoFocus />
                 )}
               </div>
             ) : (
