@@ -6,6 +6,7 @@ mod sticky_notes;
 use commands::alta::*;
 use commands::alta::database::DatabaseManager;
 use commands::cbm::commands::*;
+use commands::tracking::commands::*;
 use commands::alta::matcher::HSCodeMatcher;
 use commands::excel::*;
 use commands::file_utils::open_file_with_default_app;
@@ -145,8 +146,12 @@ pub fn run() {
             tax_update_single_row,
             // CBM commands
             cbm_calculate,
+            cbm_loading_estimate,
             cbm_batch,
             cbm_template,
+            // Tracking commands
+            tracking_batch_query,
+            tracking_export_results,
             // Update history commands
             get_update_sessions,
             get_update_details,
