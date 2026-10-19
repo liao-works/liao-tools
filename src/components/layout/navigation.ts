@@ -11,6 +11,7 @@ import {
   Percent,
   Search,
   Settings,
+  Ship,
   ShoppingBag,
   Wrench,
   type LucideIcon,
@@ -44,6 +45,7 @@ export const navGroups: ToolNavigationGroup[] = [
       { title: 'Amazon 商品', href: '/revcal', icon: ShoppingBag, description: 'ASIN / UPC / EAN 信息查询', keywords: ['amazon', 'asin', 'upc', 'ean', '价格', '尺寸', '商品'] },
       { title: '体积 / 计费重', href: '/cbm', icon: Boxes, description: 'CBM、体积重与计费重试算', keywords: ['cbm', '体积', '体积重', '计费重', '装柜', '柜型', '空运', '海运', '快递'] },
       { title: '运单轨迹', href: '/tracking', icon: PackageSearch, description: '批量查询运单轨迹与预计送达', keywords: ['轨迹', 'tracking', '运单', '单号', '17track', '物流', '签收', '承运商'] },
+      { title: '船司查询', href: '/shipping', icon: Ship, description: '船司官网与货物跟踪入口', keywords: ['船司', '船公司', '船东', 'shipping', '官网', '货物追踪', '集装箱', '提单'] },
     ],
   },
   {
