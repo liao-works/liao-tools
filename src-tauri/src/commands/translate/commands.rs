@@ -141,8 +141,10 @@ pub async fn translate_list_history(
     app_handle: AppHandle,
 ) -> Result<Vec<HistoryEntry>, String> {
     let db = TranslateHistory::new(&app_handle).map_err(|e| e.to_string())?;
-    db.list(limit.unwrap_or(100).min(500), offset.unwrap_or(0))
-        .map_err(|e| e.to_string())
+    // 钳制分页参数：SQLite 里负数 LIMIT 等于不限制，会把整表捞出来
+    let limit = limit.unwrap_or(100).clamp(0, 500);
+    let offset = offset.unwrap_or(0).max(0);
+    db.list(limit, offset).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

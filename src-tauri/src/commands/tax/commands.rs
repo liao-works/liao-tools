@@ -106,7 +106,7 @@ pub async fn tax_fuzzy_search(
     // 检查数据库是否有数据
     db.ensure_has_data().map_err(|e| e.to_string())?;
     
-    let limit = limit.unwrap_or(10);
+    let limit = limit.unwrap_or(10).min(100);
     TaxQuery::fuzzy_search(&db, &query, limit).map_err(|e| e.to_string())
 }
 
@@ -323,7 +323,7 @@ pub async fn tax_get_update_events(
     limit: Option<usize>,
     app_handle: tauri::AppHandle,
 ) -> Result<Vec<update_log::UpdateEvent>, String> {
-    update_log::read_events(&app_handle, limit.unwrap_or(50)).map_err(|e| e.to_string())
+    update_log::read_events(&app_handle, limit.unwrap_or(50).min(500)).map_err(|e| e.to_string())
 }
 
 /// 清空数据更新事件日志
