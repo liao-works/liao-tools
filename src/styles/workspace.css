@@ -106,7 +106,7 @@
   .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-icon {width:28px;height:28px;border-radius:8px}
   .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-icon svg {width:15px;height:15px}
   .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-info strong {font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-info small {display:none}
+  .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-info small {display:block;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-arrow {display:none}
 }
 .lt-home .lt-section-heading p {white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
