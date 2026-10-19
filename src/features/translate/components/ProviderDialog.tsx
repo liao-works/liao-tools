@@ -1,5 +1,5 @@
 // Task 8 实现：供应商配置弹窗（DeepSeek / Gemini / 自定义）与 Key 申请引导
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { Button } from '@/components/ui/button';
 import {
@@ -45,9 +45,16 @@ export function ProviderDialog({ open, onOpenChange, status, onSaved }: Provider
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 打开时把当前激活供应商的配置回填表单
+  // 打开时把当前激活供应商的配置回填表单；同一次打开期间 status 刷新不再回填，
+  // 否则父组件刷新会清空正在编辑的 Key / 模型 / 地址
+  const seededRef = useRef(false);
   useEffect(() => {
-    if (!open || !status) return;
+    if (!open) {
+      seededRef.current = false;
+      return;
+    }
+    if (seededRef.current || !status) return;
+    seededRef.current = true;
     setProvider(status.activeProvider);
     const entry = entryOf(status, status.activeProvider);
     setModel(entry?.model ?? '');
