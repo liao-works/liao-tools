@@ -100,7 +100,7 @@
   /* 主列收窄后统一 3 列，避免第 4 个起的小卡（跨 3 列）窄到文字竖排 */
   .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile,
   .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) {grid-column:span 4}
-  .lt-home-rail {position:sticky;top:12px;max-height:calc(100vh - 60px);overflow-y:auto}
+  .lt-home-rail {position:sticky;top:0;max-height:calc(100vh - 48px);overflow-y:auto}
 }
 .lt-panel-heading {align-items:center;margin-bottom:12px}
 .lt-panel-heading > div {display:flex;align-items:center;gap:9px}
