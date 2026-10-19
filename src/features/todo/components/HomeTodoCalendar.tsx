@@ -5,6 +5,7 @@ import { zhCN } from 'date-fns/locale';
 import { ArrowRight, CalendarClock, CalendarPlus, Check, ChevronDown, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { getChinaHoliday } from '@/lib/china-holidays';
 import { MonthGrid, dayKey, type MonthMarker } from './MonthGrid';
 import { useTodoStore } from '../store/todoStore';
 import { PRIORITY_COLORS, type TodoTask } from '../types';
@@ -41,6 +42,7 @@ export function HomeTodoCalendar() {
   }, [dated]);
 
   const selectedDay = startOfDay(selected);
+  const selectedHoliday = getChinaHoliday(dayKey(selectedDay));
   const selectedTasks = useMemo(
     () => dated.filter((t) => isSameDay(new Date(t.dueDate!), selectedDay)),
     [dated, selectedDay],
@@ -100,7 +102,14 @@ export function HomeTodoCalendar() {
       {/* 选中日的待办列表（可操作） */}
       <div className="mt-3 border-t border-border pt-3">
         <div className="mb-2 flex items-center justify-between text-xs">
-          <span className="font-medium">{format(selectedDay, 'M月d日 EEEE', { locale: zhCN })}</span>
+          <span className="font-medium">
+            {format(selectedDay, 'M月d日 EEEE', { locale: zhCN })}
+            {selectedHoliday && (
+              <span className={cn('ml-1.5 font-normal', selectedHoliday.isOffDay ? 'text-destructive' : 'text-muted-foreground')}>
+                · {selectedHoliday.name}{selectedHoliday.isOffDay ? '' : '（补班）'}
+              </span>
+            )}
+          </span>
           <span className="text-muted-foreground">{selectedTasks.length} 条</span>
         </div>
         <div className="max-h-52 space-y-0.5 overflow-y-auto pr-1">
