@@ -12,6 +12,7 @@ import {
 } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getChinaHoliday } from '@/lib/china-holidays';
 import { cn } from '@/lib/utils';
 
 export interface MonthMarker {
@@ -84,6 +85,7 @@ export function MonthGrid({ month, selected, markers, onMonthChange, onSelect, r
         {days.map((day, index) => {
           const key = dayKey(day);
           const marker = markers?.[key];
+          const holiday = getChinaHoliday(key);
           const inMonth = isSameMonth(day, month);
           const isSelected = selected ? isSameDay(day, selected) : false;
           const isToday = isSameDay(day, today);
@@ -98,8 +100,12 @@ export function MonthGrid({ month, selected, markers, onMonthChange, onSelect, r
                 onMouseLeave={() => setHovered(null)}
                 className={cn(
                   'flex h-11 w-full flex-col items-center justify-center gap-0.5 rounded-md text-xs transition-colors',
-                  inMonth ? 'text-foreground' : 'text-muted-foreground/50',
-                  isSelected ? 'bg-primary font-medium text-primary-foreground' : 'hover:bg-muted',
+                  inMonth
+                    ? holiday?.isOffDay
+                      ? 'text-destructive'
+                      : 'text-foreground'
+                    : 'text-muted-foreground/50',
+                  isSelected && 'bg-primary font-medium text-primary-foreground',
                   isToday && !isSelected && 'ring-1 ring-primary/60',
                 )}
               >
@@ -116,6 +122,15 @@ export function MonthGrid({ month, selected, markers, onMonthChange, onSelect, r
                       ))}
                     </span>
                     <span className="text-[10px] opacity-80">{marker.count}</span>
+                  </span>
+                ) : holiday ? (
+                  <span
+                    className={cn(
+                      'rounded-sm px-0.5 text-[9px] font-medium leading-[1.2]',
+                      holiday.isOffDay ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary',
+                    )}
+                  >
+                    {holiday.isOffDay ? '休' : '班'}
                   </span>
                 ) : (
                   <span className="h-2.5" />
