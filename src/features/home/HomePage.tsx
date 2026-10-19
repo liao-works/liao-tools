@@ -55,11 +55,6 @@ export function HomePage() {
         alt="集装箱、海关单据和关税检索放大镜的原创插画"/>
     </section>
 
-    <aside className="lt-home-rail">
-      <HomeTodoCalendar />
-      <RecentTranslations />
-    </aside>
-
     <section className="lt-home-section" aria-labelledby="tools-title">
       <div className="lt-section-heading">
         <div><h2 id="tools-title">快速开始 · 常用工具</h2><p>选择一个工具，直接进入工作流程</p></div>
@@ -74,6 +69,11 @@ export function HomePage() {
           </Link>)}
       </div>
     </section>
+
+    <aside className="lt-home-rail">
+      <HomeTodoCalendar />
+      <RecentTranslations />
+    </aside>
 
     <div className="lt-home-bottom">
       <section className="lt-home-panel">

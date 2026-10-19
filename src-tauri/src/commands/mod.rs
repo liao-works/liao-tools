@@ -5,6 +5,7 @@ pub mod excel;
 pub mod icon_extractor;
 pub mod installed_apps;
 pub mod tax;
+pub mod tracking;
 pub mod ups_dpd;
 pub mod update_history;
 pub mod updater;

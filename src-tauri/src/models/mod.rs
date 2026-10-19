@@ -2,6 +2,7 @@ pub mod alta;
 pub mod cbm;
 pub mod excel;
 pub mod tax;
+pub mod tracking;
 pub mod ups_dpd;
 pub mod system_tools;
 pub mod update_history;

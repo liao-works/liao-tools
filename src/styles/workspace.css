@@ -92,13 +92,15 @@
 .lt-tool-info small {font-size:11px;line-height:1.5;display:block;color:var(--muted-foreground)}
 .lt-tool-arrow {color:var(--muted-foreground);flex:0 0 auto}
 .lt-home-bottom {display:grid;grid-template-columns:1fr 1fr;gap:16px}
-/* 首页右栏（待办日历）：宽屏时日历贴 hero 右侧并跨「快速开始」两行，
-   快速开始保留全宽的原始错位网格；窄屏所有模块单列顺排 */
+/* 首页右栏：hero 独占一行全宽；日历与「快速开始」同行贴右侧并跨到面板行，
+   左列（快速开始/常用操作/本地数据）等宽；列表内部滚动封顶，右栏高度不随 todo 无限增长 */
 .lt-home-rail {display:grid;gap:16px;align-self:start;min-width:0}
 @media (min-width: 1280px) {
   .lt-home--with-rail {grid-template-columns:minmax(0,1fr) 372px}
-  .lt-home--with-rail .lt-home-rail {grid-column:2;grid-row:1/span 2;position:sticky;top:0;max-height:calc(100vh - 48px);overflow-y:auto}
-  .lt-home--with-rail .lt-home-bottom {grid-column:1/-1}
+  .lt-home--with-rail .lt-hero {grid-column:1/-1}
+  .lt-home--with-rail .lt-home-section {grid-column:1}
+  .lt-home--with-rail .lt-home-bottom {grid-column:1}
+  .lt-home--with-rail .lt-home-rail {grid-column:2;grid-row:2/span 2;position:sticky;top:0;max-height:calc(100vh - 48px);overflow-y:auto}
   /* 主列收窄后保留错位节奏：第 4 个起的小卡用紧凑变体（小图标、隐藏描述与箭头）保证 182px 下可读 */
   .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) {min-height:70px;padding:10px 12px;gap:9px}
   .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-icon {width:28px;height:28px;border-radius:8px}
@@ -107,6 +109,7 @@
   .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-info small {display:none}
   .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-arrow {display:none}
 }
+.lt-home .lt-section-heading p {white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lt-panel-heading {align-items:center;margin-bottom:12px}
 .lt-panel-heading > div {display:flex;align-items:center;gap:9px}
 .lt-panel-heading svg {color:var(--primary-fg)}

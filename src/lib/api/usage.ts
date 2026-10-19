@@ -79,6 +79,7 @@ export const USAGE_TOOL_LABELS: Record<string, string> = {
   upsdpd: 'UPS / DPD',
   cbm: '体积 / 计费重计算',
   translate: '翻译',
+  tracking: '轨迹查询',
 };
 
 export function formatDuration(ms: number): string {

@@ -12,6 +12,7 @@ import {
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
@@ -24,6 +25,7 @@ import {
   CBM_PRESETS,
   cbmApi,
   type CbmBatchResult,
+  type CbmLoadingResult,
   type CbmResult,
 } from '@/lib/api/cbm';
 import { getFileName } from '@/lib/file-opener';
@@ -71,6 +73,15 @@ export function CbmPage() {
   const [showTemplateFileDialog, setShowTemplateFileDialog] = useState(false);
   const [templateFilePath, setTemplateFilePath] = useState<string>('');
 
+  const [loadLength, setLoadLength] = useState('');
+  const [loadWidth, setLoadWidth] = useState('');
+  const [loadHeight, setLoadHeight] = useState('');
+  const [loadQty, setLoadQty] = useState('');
+  const [loadWeight, setLoadWeight] = useState('');
+  const [loadStackable, setLoadStackable] = useState(true);
+  const [loadLoading, setLoadLoading] = useState(false);
+  const [loadResult, setLoadResult] = useState<CbmLoadingResult | null>(null);
+
   const { toast } = useToast();
 
   const divisor = preset === 'custom'
@@ -116,6 +127,36 @@ export function CbmPage() {
       toast({ title: '试算失败', description: queryErrorMessage(error), variant: 'destructive' });
     } finally {
       setCalcLoading(false);
+    }
+  };
+
+  const handleLoadingEstimate = async () => {
+    if (!(Number(loadLength) > 0) || !(Number(loadWidth) > 0) || !(Number(loadHeight) > 0)) {
+      toast({ title: '请填写大于 0 的长宽高', variant: 'destructive' });
+      return;
+    }
+    if (!(Number(loadQty) > 0)) {
+      toast({ title: '请填写大于 0 的件数', variant: 'destructive' });
+      return;
+    }
+    setLoadLoading(true);
+    setLoadResult(null);
+    try {
+      const data = await cbmApi.estimateLoading({
+        length: Number(loadLength),
+        width: Number(loadWidth),
+        height: Number(loadHeight),
+        lengthUnit,
+        weight: loadWeight.trim() === '' ? 0 : Number(loadWeight) || 0,
+        weightUnit,
+        quantity: Number(loadQty) || 0,
+        stackable: loadStackable,
+      });
+      setLoadResult(data);
+    } catch (error) {
+      toast({ title: '装柜试算失败', description: queryErrorMessage(error), variant: 'destructive' });
+    } finally {
+      setLoadLoading(false);
     }
   };
 
@@ -385,6 +426,102 @@ export function CbmPage() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>装柜试算（单规格）</CardTitle>
+          <CardDescription>
+            同一商品整柜装载的简化估算：地面摆放 × 堆叠层数、载重封顶；不含混装与复杂 3D 排柜
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="lt-load-l">长（{lengthUnit}）</Label>
+              <Input id="lt-load-l" className="w-24" inputMode="decimal" value={loadLength}
+                onChange={e => { setLoadLength(e.target.value); setLoadResult(null); }}/>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="lt-load-w">宽（{lengthUnit}）</Label>
+              <Input id="lt-load-w" className="w-24" inputMode="decimal" value={loadWidth}
+                onChange={e => { setLoadWidth(e.target.value); setLoadResult(null); }}/>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="lt-load-h">高（{lengthUnit}）</Label>
+              <Input id="lt-load-h" className="w-24" inputMode="decimal" value={loadHeight}
+                onChange={e => { setLoadHeight(e.target.value); setLoadResult(null); }}/>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="lt-load-qty">总件数</Label>
+              <Input id="lt-load-qty" className="w-24" inputMode="decimal" value={loadQty}
+                onChange={e => { setLoadQty(e.target.value); setLoadResult(null); }}/>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="lt-load-weight">单件实重（{weightUnit}）</Label>
+              <Input id="lt-load-weight" className="w-28" inputMode="decimal" value={loadWeight} placeholder="可留空"
+                onChange={e => { setLoadWeight(e.target.value); setLoadResult(null); }}/>
+            </div>
+            <div className="flex items-center gap-2 pb-1.5">
+              <Checkbox id="lt-load-stackable" checked={loadStackable}
+                onCheckedChange={checked => { setLoadStackable(checked === true); setLoadResult(null); }}/>
+              <Label htmlFor="lt-load-stackable" className="text-sm font-normal cursor-pointer">可堆叠</Label>
+            </div>
+            <Button onClick={handleLoadingEstimate} disabled={loadLoading}>
+              {loadLoading
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>试算中…</>
+                : <><Boxes className="mr-2 h-4 w-4"/>装柜试算</>}
+            </Button>
+          </div>
+          {loadResult && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                单件 {fmt(loadResult.itemVolumeCbm, 3)} m³
+                {loadResult.itemWeightKg != null && <> · {fmt(loadResult.itemWeightKg)} kg</>}
+                {' · '}合计 {fmt(loadResult.totalVolumeCbm, 3)} m³
+              </p>
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>柜型</TableHead>
+                      <TableHead className="text-right">每柜可装</TableHead>
+                      <TableHead className="text-right">需柜数</TableHead>
+                      <TableHead className="text-right">体积利用率</TableHead>
+                      <TableHead className="text-right">重量利用率</TableHead>
+                      <TableHead>限制因素</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loadResult.containers.map(container => (
+                      <TableRow key={container.name}>
+                        <TableCell className="font-medium">{container.name}</TableCell>
+                        <TableCell className="text-right">
+                          {container.piecesPerContainer > 0 ? container.piecesPerContainer : <span className="text-warning-fg">超出柜型</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {container.containersNeeded > 0 ? container.containersNeeded : '—'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {container.containersNeeded > 0 ? (container.volumeUtilization * 100).toFixed(1) + '%' : '—'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {container.weightUtilization != null && container.containersNeeded > 0
+                            ? (container.weightUtilization * 100).toFixed(1) + '%'
+                            : '—'}
+                        </TableCell>
+                        <TableCell>{container.limitingFactor}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                简化估算未考虑装箱排版间隙、门框限制与混装；利用率为理论上限的近似，实际装载请以排柜方案为准。
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

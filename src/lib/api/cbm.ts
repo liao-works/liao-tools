@@ -74,6 +74,39 @@ export interface CbmBatchResult {
   outputPath: string;
 }
 
+/** 单规格装柜试算请求 */
+export interface CbmLoadingRequest {
+  length: number;
+  width: number;
+  height: number;
+  lengthUnit: string;
+  /** 单件实重，0 表示未提供（只按体积估算） */
+  weight: number;
+  weightUnit: string;
+  quantity: number;
+  /** 是否可堆叠（不可堆叠时只装一层） */
+  stackable: boolean;
+}
+
+export interface CbmLoadingContainer {
+  name: string;
+  /** 每柜可装件数；0 表示单件超出该柜型 */
+  piecesPerContainer: number;
+  containersNeeded: number;
+  /** 体积 / 重量利用率（0-1） */
+  volumeUtilization: number;
+  weightUtilization: number | null;
+  /** "体积" 或 "重量" */
+  limitingFactor: string;
+}
+
+export interface CbmLoadingResult {
+  itemVolumeCbm: number;
+  itemWeightKg: number | null;
+  totalVolumeCbm: number;
+  containers: CbmLoadingContainer[];
+}
+
 export const CBM_PRESETS = [
   { value: 'air', label: '空运（1:6000）', divisor: 6000 },
   { value: 'express', label: '国际快递（1:5000）', divisor: 5000 },
@@ -91,6 +124,19 @@ export const cbmApi = {
       );
     } catch (error) {
       console.error('体积试算失败:', error);
+      throw error;
+    }
+  },
+
+  /** 单规格装柜试算（纯本地简化估算：地面摆放 × 堆叠层数，载重封顶） */
+  async estimateLoading(request: CbmLoadingRequest): Promise<CbmLoadingResult> {
+    try {
+      return await withUsage(
+        { tool: 'cbm', action: 'process', items: 1 },
+        () => invoke<CbmLoadingResult>('cbm_loading_estimate', { request }),
+      );
+    } catch (error) {
+      console.error('装柜试算失败:', error);
       throw error;
     }
   },

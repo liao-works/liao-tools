@@ -1,11 +1,21 @@
 use crate::commands::cbm::{self, excel::CbmExcelProcessor};
-use crate::models::cbm::{CbmBatchParams, CbmBatchResult, CbmRequest, CbmResult};
+use crate::models::cbm::{
+    CbmBatchParams, CbmBatchResult, CbmLoadingRequest, CbmLoadingResult, CbmRequest, CbmResult,
+};
 use tauri::Emitter;
 
 /// 体积 / 计费重试算（纯本地计算）
 #[tauri::command]
 pub async fn cbm_calculate(request: CbmRequest) -> Result<CbmResult, String> {
     tauri::async_runtime::spawn_blocking(move || cbm::calculate(&request))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// 单规格装柜试算（纯本地简化估算）
+#[tauri::command]
+pub async fn cbm_loading_estimate(request: CbmLoadingRequest) -> Result<CbmLoadingResult, String> {
+    tauri::async_runtime::spawn_blocking(move || cbm::calc_loading(&request))
         .await
         .map_err(|e| e.to_string())?
 }
