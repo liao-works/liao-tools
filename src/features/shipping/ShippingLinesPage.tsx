@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Globe, PackageSearch, Search, Ship, X } from 'lucide-react';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { recordUsage } from '@/lib/api/usage';
 import { openUrlPath } from '@/lib/file-opener';
 import {
@@ -12,16 +14,13 @@ import {
   SHIPPING_LINES_CAPTURED_AT,
   SHIPPING_LINES_SOURCE_URL,
   filterShippingLines,
+  identifyTrackingNumber,
   shippingLineLetters,
+  wubaliuTrackUrl,
   type ShippingLine,
 } from './data';
 
-function OpenLinkButton({
-  line,
-  field,
-  label,
-  icon: Icon,
-}: {
+function OpenLineButton({ line, field, label, icon: Icon }: {
   line: ShippingLine;
   field: 'official' | 'tracking';
   label: string;
@@ -46,7 +45,7 @@ function OpenLinkButton({
   );
 }
 
-export function ShippingLinesPage() {
+function LinesDirectory() {
   const [query, setQuery] = useState('');
   const [letter, setLetter] = useState<string | null>(null);
 
@@ -54,14 +53,7 @@ export function ShippingLinesPage() {
   const results = useMemo(() => filterShippingLines(query, letter), [query, letter]);
 
   return (
-    <div className="lt-feature space-y-6">
-      <FeatureHeader
-        eyebrow="业务查询"
-        title="船司查询"
-        description={`收录 ${SHIPPING_LINES.length} 家船司的官网与货物跟踪入口，支持按代码、中英文名搜索`}
-        icon={<Ship size={26} strokeWidth={1.8} />}
-      />
-
+    <div className="space-y-4">
       <Card>
         <CardContent className="pt-6 space-y-4">
           <div className="relative">
@@ -136,14 +128,154 @@ export function ShippingLinesPage() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <OpenLinkButton line={line} field="official" label="官网" icon={Globe} />
-                  <OpenLinkButton line={line} field="tracking" label="货物追踪" icon={PackageSearch} />
+                  <OpenLineButton line={line} field="official" label="官网" icon={Globe} />
+                  <OpenLineButton line={line} field="tracking" label="货物追踪" icon={PackageSearch} />
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function CargoTracking() {
+  const navigate = useNavigate();
+  const [number, setNumber] = useState('');
+
+  const match = useMemo(() => identifyTrackingNumber(number), [number]);
+  const hasInput = match.normalized.length > 0;
+
+  const openWuba = () => {
+    recordUsage({ tool: 'shipping', action: 'query', items: 1 });
+    void openUrlPath(wubaliuTrackUrl(match.normalized, match.kind)).catch(() => undefined);
+  };
+  const openTrackingTool = () => {
+    recordUsage({ tool: 'shipping', action: 'query', items: 1 });
+    navigate(`/tracking?numbers=${encodeURIComponent(match.normalized)}`);
+  };
+  const openOfficial = () => {
+    if (!match.line?.tracking) return;
+    recordUsage({ tool: 'shipping', action: 'query', items: 1 });
+    void openUrlPath(match.line.tracking).catch(() => undefined);
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={number}
+              onChange={(e) => setNumber(e.target.value)}
+              placeholder="输入提单号 / 集装箱号 / 快递单号，如 COSU1234567890"
+              className="pl-9 pr-9"
+            />
+            {number && (
+              <button
+                type="button"
+                aria-label="清空单号"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-accent"
+                onClick={() => setNumber('')}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            海运单号本地识别承运商后直达官方查询页；快递单号交由运单轨迹（17TRACK）查询；
+            空运主单可交由 5688 识别 300+ 航司。识别完全在本机完成。
+          </p>
+        </CardContent>
+      </Card>
+
+      {hasInput && (
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">{match.kindLabel}</Badge>
+              <span className="font-mono text-sm text-muted-foreground">{match.normalized}</span>
+            </div>
+
+            {match.line && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">识别承运商：</span>
+                <span className="font-medium">{match.line.cn || match.line.en}</span>
+                <Badge variant="secondary" className="font-mono text-xs">{match.line.code}</Badge>
+              </div>
+            )}
+
+            {match.kind === 'sea-container' && !match.line && (
+              <p className="text-sm text-muted-foreground">
+                箱主代码 {match.normalized.slice(0, 4)} 未命中内置船司前缀，可用 5688 识别，或在下方名录中手动查找。
+              </p>
+            )}
+            {match.kind === 'sea-bl' && !match.line && (
+              <p className="text-sm text-muted-foreground">
+                提单前缀 {match.normalized.slice(0, 4)} 未命中内置船司前缀，可用 5688 识别，或在下方名录中手动查找。
+              </p>
+            )}
+            {match.kind === 'unknown' && (
+              <p className="text-sm text-muted-foreground">
+                未识别出单号类型，可交给 5688 尝试识别，或在运单轨迹工具中批量查询。
+              </p>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              {match.kind === 'express' && (
+                <Button size="sm" className="h-8" onClick={openTrackingTool}>
+                  <PackageSearch size={14} className="mr-1" />
+                  去运单轨迹查询{match.carrierLabel ? `（${match.carrierLabel}）` : ''}
+                </Button>
+              )}
+              {match.line?.tracking && (
+                <Button size="sm" className="h-8" onClick={openOfficial}>
+                  <Globe size={14} className="mr-1" />
+                  打开{match.line.cn || match.line.en}官方跟踪页
+                </Button>
+              )}
+              <Button size="sm" variant={match.line?.tracking ? 'outline' : 'default'} className="h-8" onClick={openWuba}>
+                <Globe size={14} className="mr-1" />
+                5688 识别并查询
+              </Button>
+              {match.kind !== 'express' && (
+                <Button size="sm" variant="outline" className="h-8" onClick={openTrackingTool}>
+                  <PackageSearch size={14} className="mr-1" />
+                  在运单轨迹中查询
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+export function ShippingLinesPage() {
+  return (
+    <div className="lt-feature space-y-6">
+      <FeatureHeader
+        eyebrow="业务查询"
+        title="船司查询"
+        description={`收录 ${SHIPPING_LINES.length} 家船司的官网与货物跟踪入口，支持单号识别直达官方查询页`}
+        icon={<Ship size={26} strokeWidth={1.8} />}
+      />
+
+      <Tabs defaultValue="lines" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="lines">船司名录</TabsTrigger>
+          <TabsTrigger value="track">货物追踪</TabsTrigger>
+        </TabsList>
+        <TabsContent value="lines">
+          <LinesDirectory />
+        </TabsContent>
+        <TabsContent value="track">
+          <CargoTracking />
+        </TabsContent>
+      </Tabs>
 
       <p className="text-xs text-muted-foreground">
         数据来源：
@@ -154,7 +286,7 @@ export function ShippingLinesPage() {
         >
           物流巴巴 · 船公司大全
         </button>
-        （{SHIPPING_LINES_CAPTURED_AT} 收录）。货物追踪会打开各船司官网，在对应页面输入提单号或集装箱号查询。
+        （{SHIPPING_LINES_CAPTURED_AT} 收录）。货物追踪与 5688 的逻辑一致：识别单号后跳转承运商官方查询页。
       </p>
     </div>
   );

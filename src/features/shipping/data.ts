@@ -185,3 +185,122 @@ export function filterShippingLines(query: string, letter: string | null): Shipp
       || line.en.toLocaleLowerCase().includes(q);
   });
 }
+
+/**
+ * 单号识别。与目标站点（5688.cn/track）同一产品逻辑：识别单号类型与承运商后
+ * 跳转官方查询页（快递转 17TRACK）。识别全部在本地完成，不依赖外部接口。
+ *
+ * 前缀映射只收录业界通行的主流船司代码，未命中不代表不支持——
+ * 界面会引导用户改用 5688 识别或手动选择船司。
+ */
+export type TrackingNumberKind = 'sea-container' | 'sea-bl' | 'express' | 'air-mawb' | 'unknown';
+
+export interface IdentifyResult {
+  kind: TrackingNumberKind;
+  /** 规范化后的单号（去空格连字符、转大写） */
+  normalized: string;
+  /** 识别到的船司（仅海运且前缀命中时） */
+  line: ShippingLine | null;
+  /** 快递商名（仅快递单号） */
+  carrierLabel: string | null;
+  /** 展示用类型名 */
+  kindLabel: string;
+}
+
+/** 集装箱箱主代码（ISO 6346）→ 船司代码 */
+const CONTAINER_PREFIX_TO_CODE: Record<string, string> = {
+  MAEU: 'MSK', MRKU: 'MSK', MSKU: 'MSK',
+  MSCU: 'MSC',
+  CMAU: 'CMA',
+  COSU: 'COSCO', CBHU: 'COSCO', CCLU: 'COSCO', CSNU: 'COSCO',
+  EGHU: 'EMC', EGSU: 'EMC',
+  ONEU: 'ONE', NYKU: 'ONE', MOLU: 'ONE',
+  OOLU: 'OOCL', GLDU: 'OOCL',
+  HLCU: 'HPL', HXLU: 'HPL',
+  HDMU: 'HMM',
+  YMLU: 'YML',
+  ZIMU: 'ZIM',
+  WHLU: 'WHL',
+  PILU: 'PIL',
+  SITU: 'SITC',
+  KMTU: 'KMTC',
+  TRLU: 'TSL',
+  RCLU: 'RCL',
+  APLU: 'APL',
+};
+
+/** 海运提单号前缀（SCAC 惯例）→ 船司代码 */
+const BL_PREFIX_TO_CODE: Record<string, string> = {
+  MAEU: 'MSK',
+  MSCU: 'MSC',
+  CMDU: 'CMA',
+  COSU: 'COSCO',
+  EGHU: 'EMC', EGLV: 'EMC',
+  ONEY: 'ONE',
+  OOLU: 'OOCL',
+  HLCU: 'HPL',
+  HDMU: 'HMM',
+  YMLU: 'YML',
+  ZIMU: 'ZIM',
+  WHLU: 'WHL',
+  SITU: 'SITC',
+  APLU: 'APL',
+  KMTU: 'KMTC',
+  TRLU: 'TSL',
+};
+
+function lineByCode(code: string): ShippingLine | null {
+  return SHIPPING_LINES.find((line) => line.code === code) ?? null;
+}
+
+function identifyNormalized(value: string): IdentifyResult {
+  const normalized = value.trim().replace(/[\s-]/g, '').toUpperCase();
+  if (!normalized) {
+    return { kind: 'unknown', normalized, line: null, carrierLabel: null, kindLabel: '未识别' };
+  }
+  // 快递：UPS 起头 1Z、EMS 的 E+字母+9位+CN
+  if (/^1Z[0-9A-Z]{10,16}$/.test(normalized)) {
+    return { kind: 'express', normalized, line: null, carrierLabel: 'UPS', kindLabel: '快递单号（UPS）' };
+  }
+  if (/^E[A-Z]\d{9}CN$/.test(normalized)) {
+    return { kind: 'express', normalized, line: null, carrierLabel: 'EMS', kindLabel: '快递单号（EMS）' };
+  }
+  // 海运集装箱：4 字母箱主代码 + 7 位数字（含校验位）
+  if (/^[A-Z]{4}\d{7}$/.test(normalized)) {
+    const line = lineByCode(CONTAINER_PREFIX_TO_CODE[normalized.slice(0, 4)] ?? '');
+    return {
+      kind: 'sea-container',
+      normalized,
+      line,
+      carrierLabel: null,
+      kindLabel: line ? `海运集装箱（${line.cn || line.en}）` : '海运集装箱',
+    };
+  }
+  // 海运提单：字母前缀 + 6~12 位数字
+  if (/^[A-Z]{4}\d{6,12}$/.test(normalized)) {
+    const line = lineByCode(BL_PREFIX_TO_CODE[normalized.slice(0, 4)] ?? '');
+    return {
+      kind: 'sea-bl',
+      normalized,
+      line,
+      carrierLabel: null,
+      kindLabel: line ? `海运提单（${line.cn || line.en}）` : '海运提单',
+    };
+  }
+  // 空运主单 MAWB：3 位航司代码 + 8 位数字，共 11 位
+  if (/^\d{11}$/.test(normalized)) {
+    return { kind: 'air-mawb', normalized, line: null, carrierLabel: null, kindLabel: '空运主运单（MAWB）' };
+  }
+  return { kind: 'unknown', normalized, line: null, carrierLabel: null, kindLabel: '未识别' };
+}
+
+/** 识别运单号 / 提单号 / 柜号；识别不出时仍可交给 5688 或 17TRACK 尝试。 */
+export function identifyTrackingNumber(raw: string): IdentifyResult {
+  return identifyNormalized(raw);
+}
+
+/** 5688 货物追踪结果页地址（由其站内完成识别并跳转官方查询页）。 */
+export function wubaliuTrackUrl(normalized: string, kind: TrackingNumberKind): string {
+  const category = kind === 'air-mawb' ? 'air' : kind === 'express' ? 'express' : 'sea';
+  return `https://www.5688.cn/track?no=${encodeURIComponent(normalized)}&category=${category}`;
+}
