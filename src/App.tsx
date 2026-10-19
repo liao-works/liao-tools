@@ -15,6 +15,7 @@ import { DataMaintenancePage } from './features/data-maintenance/DataMaintenance
 import { UsageStatsPage } from './features/usage/UsageStatsPage';
 import { TodoPage } from './features/todo/TodoPage';
 import { TodoWidget } from './features/todo/TodoWidget';
+import { TrackingPage } from './features/tracking/TrackingPage';
 import { TranslatePage } from './features/translate/TranslatePage';
 import { Toaster } from './components/ui/toaster';
 import { UpdateHistoryHost } from './components/update-history/UpdateHistoryHost';
@@ -69,6 +70,7 @@ function App() {
           <Route path="alta" element={<AltaPage />} />
           <Route path="tax" element={<TaxPage />} />
           <Route path="cbm" element={<CbmPage />} />
+          <Route path="tracking" element={<TrackingPage />} />
           <Route path="excel" element={<ExcelPage />} />
           <Route path="revcal" element={<RevCalPage />} />
           <Route path="translate" element={<TranslatePage />} />
