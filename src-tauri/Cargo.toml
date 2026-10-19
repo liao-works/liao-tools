@@ -1,6 +1,6 @@
 [package]
 name = "liao-tools"
-version = "0.0.24"
+version = "0.0.25"
 description = "Liao Tools"
 authors = ["cavin"]
 edition = "2021"
