@@ -60,7 +60,7 @@ export function HomePage() {
     <section className="lt-home-section" aria-labelledby="tools-title">
       <div className="lt-section-heading">
         <div><h2 id="tools-title">快速开始 · 常用工具</h2><p>选择一个工具，直接进入工作流程</p></div>
-        <span className="lt-section-count">7 个核心工具</span>
+        <span className="lt-section-count">{tools.length} 个核心工具</span>
       </div>
       <div className="lt-tools-grid lt-tools-grid--balanced">
         {tools.map(({ name, text, to, icon: Icon, accent }) =>
