@@ -110,6 +110,9 @@
   .lt-home--with-rail .lt-tools-grid--balanced .lt-tool-tile:nth-child(n+4) .lt-tool-arrow {display:none}
 }
 .lt-home .lt-section-heading p {white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 首页工具卡标题与描述均单行显示，宽度不足时省略 */
+.lt-home .lt-tools-grid--balanced .lt-tool-info strong,
+.lt-home .lt-tools-grid--balanced .lt-tool-info small {white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lt-panel-heading {align-items:center;margin-bottom:12px}
 .lt-panel-heading > div {display:flex;align-items:center;gap:9px}
 .lt-panel-heading svg {color:var(--primary-fg)}
