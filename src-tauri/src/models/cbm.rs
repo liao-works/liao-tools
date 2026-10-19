@@ -4,6 +4,10 @@ fn default_length_unit() -> String {
     "cm".to_string()
 }
 
+fn default_true() -> bool {
+    true
+}
+
 fn default_weight_unit() -> String {
     "kg".to_string()
 }
@@ -117,4 +121,49 @@ pub struct CbmBatchResult {
     pub failed: usize,
     pub errors: Vec<String>,
     pub output_path: String,
+}
+
+/// 单规格装柜试算请求：同一商品装满柜的简化估算
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CbmLoadingRequest {
+    pub length: f64,
+    pub width: f64,
+    pub height: f64,
+    #[serde(default = "default_length_unit")]
+    pub length_unit: String,
+    /// 单件实重，0 表示未提供（只按体积估算）
+    #[serde(default)]
+    pub weight: f64,
+    #[serde(default = "default_weight_unit")]
+    pub weight_unit: String,
+    pub quantity: f64,
+    /// 是否可堆叠（不可堆叠时只装一层）
+    #[serde(default = "default_true")]
+    pub stackable: bool,
+}
+
+/// 单柜型装柜试算结果
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CbmLoadingContainer {
+    pub name: String,
+    /// 每柜可装件数；0 表示单件超出该柜型
+    pub pieces_per_container: u32,
+    pub containers_needed: u32,
+    /// 体积 / 重量利用率（0-1）
+    pub volume_utilization: f64,
+    pub weight_utilization: Option<f64>,
+    /// 限制装载数的因素："体积" 或 "重量"
+    pub limiting_factor: String,
+}
+
+/// 装柜试算结果
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CbmLoadingResult {
+    pub item_volume_cbm: f64,
+    pub item_weight_kg: Option<f64>,
+    pub total_volume_cbm: f64,
+    pub containers: Vec<CbmLoadingContainer>,
 }

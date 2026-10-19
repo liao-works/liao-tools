@@ -7,7 +7,8 @@ pub mod commands;
 pub mod excel;
 
 use crate::models::cbm::{
-    CbmContainerEstimate, CbmPackage, CbmPackageResult, CbmRequest, CbmResult,
+    CbmContainerEstimate, CbmLoadingContainer, CbmLoadingRequest, CbmLoadingResult, CbmPackage,
+    CbmPackageResult, CbmRequest, CbmResult,
 };
 
 /// 常用柜型参考（内尺寸 m、容积 m³、参考载重 kg）——行业常见约数
@@ -117,6 +118,89 @@ pub fn estimate_containers(total_volume_cbm: f64, total_actual_weight_kg: f64) -
             }
         })
         .collect()
+}
+
+/// 矩形地面摆放数：floor(柜长/a) × floor(柜宽/b)，两边取最大
+fn floor_fit(container_l: f64, container_w: f64, item_l: f64, item_w: f64) -> u32 {
+    let fit = |a: f64, b: f64| -> u32 {
+        (container_l / a).floor() as u32 * (container_w / b).floor() as u32
+    };
+    fit(item_l, item_w).max(fit(item_w, item_l))
+}
+
+/// 单规格装柜试算：地面摆放 × 堆叠层数，再按载重封顶。
+/// 简化估算——不含复杂 3D 排柜与混装，结果为理论上限的保守近似。
+pub fn calc_loading(request: &CbmLoadingRequest) -> Result<CbmLoadingResult, String> {
+    let lf = length_factor(&request.length_unit)
+        .ok_or_else(|| format!("不支持的尺寸单位“{}”", request.length_unit))?;
+    let wf = weight_factor(&request.weight_unit)
+        .ok_or_else(|| format!("不支持的重量单位“{}”", request.weight_unit))?;
+    if !request.length.is_finite() || !request.width.is_finite() || !request.height.is_finite()
+        || request.length <= 0.0 || request.width <= 0.0 || request.height <= 0.0
+    {
+        return Err("长、宽、高必须大于 0".to_string());
+    }
+    if !request.quantity.is_finite() || request.quantity <= 0.0 {
+        return Err("件数必须大于 0".to_string());
+    }
+    if !request.weight.is_finite() || request.weight < 0.0 {
+        return Err("单件实重不能为负数".to_string());
+    }
+    let item_weight_kg = (request.weight > 0.0).then(|| request.weight * wf);
+
+    let item_l = request.length * lf;
+    let item_w = request.width * lf;
+    let item_h = request.height * lf;
+    let item_volume_cm3 = item_l * item_w * item_h;
+    let quantity = request.quantity;
+
+    let containers = CONTAINER_TYPES
+        .iter()
+        .map(|(name, cl, cw, ch, capacity, payload)| {
+            // 柜型内尺寸由 m 转 cm
+            let (cl, cw, ch) = (cl * 100.0, cw * 100.0, ch * 100.0);
+            let fit = floor_fit(cl, cw, item_l, item_w);
+            let layers = if request.stackable {
+                (ch / item_h).floor().max(1.0) as u32
+            } else {
+                1
+            };
+            let by_volume = fit.saturating_mul(layers);
+            let by_weight = item_weight_kg
+                .map(|kg| ((*payload / kg).floor() as u32))
+                .unwrap_or(u32::MAX);
+            let pieces_per_container = by_volume.min(by_weight);
+            let limiting_factor = if by_weight <= by_volume { "重量" } else { "体积" };
+            let (containers_needed, volume_util, weight_util) = if pieces_per_container == 0 {
+                (0, 0.0, None)
+            } else {
+                let needed = ceil_div(quantity as f64, pieces_per_container as f64);
+                let total_item_volume_cm3 = item_volume_cm3 * quantity;
+                let container_volume_cm3 = cl * cw * ch;
+                let volume_utilization = total_item_volume_cm3
+                    / (needed as f64 * container_volume_cm3);
+                let weight_utilization = item_weight_kg.map(|kg| {
+                    kg * quantity / (needed as f64 * *payload)
+                });
+                (needed, volume_utilization, weight_utilization)
+            };
+            CbmLoadingContainer {
+                name: name.to_string(),
+                pieces_per_container,
+                containers_needed,
+                volume_utilization: volume_util.clamp(0.0, 1.0),
+                weight_utilization: weight_util.map(|u| u.clamp(0.0, 1.0)),
+                limiting_factor: limiting_factor.to_string(),
+            }
+        })
+        .collect();
+
+    Ok(CbmLoadingResult {
+        item_volume_cbm: item_volume_cm3 / 1_000_000.0,
+        item_weight_kg,
+        total_volume_cbm: item_volume_cm3 * quantity / 1_000_000.0,
+        containers,
+    })
 }
 
 /// 试算主入口：逐行计算 + 合计 + 柜型估算
@@ -277,5 +361,73 @@ mod tests {
         };
         assert!(calculate(&request).is_err());
         assert!(calculate(&CbmRequest { packages: vec![], divisor: 6000.0 }).is_err());
+    }
+
+    fn loading_req(length: f64, width: f64, height: f64, weight: f64, quantity: f64, stackable: bool) -> CbmLoadingRequest {
+        CbmLoadingRequest {
+            length,
+            width,
+            height,
+            length_unit: "cm".to_string(),
+            weight,
+            weight_unit: "kg".to_string(),
+            quantity,
+            stackable,
+        }
+    }
+
+    #[test]
+    fn loading_counts_floor_fit_times_layers() {
+        // 60×40×40 cm 纸箱装入 20GP（589.8×235.2×238.5 cm）：
+        // 地面 9×5=45 或 5×9=45（两种朝向一致），层高 5 层 → 每柜 225
+        let result = calc_loading(&loading_req(60.0, 40.0, 40.0, 10.0, 1000.0, true)).unwrap();
+        let gp20 = result.containers.iter().find(|c| c.name == "20GP").unwrap();
+        assert_eq!(gp20.pieces_per_container, 225);
+        assert_eq!(gp20.containers_needed, 5);
+        assert_eq!(gp20.limiting_factor, "体积");
+        // 载重 21700/10=2170 件 > 225，重量利用率低于体积利用率
+        assert!(gp20.weight_utilization.unwrap() < gp20.volume_utilization);
+    }
+
+    #[test]
+    fn loading_no_stack_single_layer() {
+        let stacked = calc_loading(&loading_req(60.0, 40.0, 40.0, 0.0, 225.0, true)).unwrap();
+        let not_stacked = calc_loading(&loading_req(60.0, 40.0, 40.0, 0.0, 225.0, false)).unwrap();
+        let stacked20 = stacked.containers.iter().find(|c| c.name == "20GP").unwrap();
+        let flat20 = not_stacked.containers.iter().find(|c| c.name == "20GP").unwrap();
+        assert_eq!(stacked20.pieces_per_container, 225);
+        assert_eq!(flat20.pieces_per_container, 45);
+        assert_eq!(flat20.containers_needed, 5);
+    }
+
+    #[test]
+    fn loading_weight_limits_pieces() {
+        // 单件 500 kg：20GP 载重 21700 → 每柜最多 43 件（体积可装远多于此）
+        let result = calc_loading(&loading_req(60.0, 40.0, 40.0, 500.0, 100.0, true)).unwrap();
+        let gp20 = result.containers.iter().find(|c| c.name == "20GP").unwrap();
+        assert_eq!(gp20.pieces_per_container, 43);
+        assert_eq!(gp20.limiting_factor, "重量");
+    }
+
+    #[test]
+    fn loading_oversized_item_reports_zero() {
+        // 7 m 单件超出 20GP 内长 5.898 m
+        let result = calc_loading(&loading_req(700.0, 100.0, 100.0, 100.0, 1.0, true)).unwrap();
+        let gp20 = result.containers.iter().find(|c| c.name == "20GP").unwrap();
+        assert_eq!(gp20.pieces_per_container, 0);
+        assert_eq!(gp20.containers_needed, 0);
+        // 能进 40GP：横放 1×2 摆放 × 2 层 = 4 件
+        let gp40 = result.containers.iter().find(|c| c.name == "40GP").unwrap();
+        assert_eq!(gp40.pieces_per_container, 4);
+    }
+
+    #[test]
+    fn loading_rejects_invalid_input() {
+        assert!(calc_loading(&loading_req(0.0, 10.0, 10.0, 1.0, 1.0, true)).is_err());
+        assert!(calc_loading(&loading_req(10.0, 10.0, 10.0, -1.0, 1.0, true)).is_err());
+        assert!(calc_loading(&loading_req(10.0, 10.0, 10.0, 1.0, 0.0, true)).is_err());
+        let mut bad = loading_req(10.0, 10.0, 10.0, 1.0, 1.0, true);
+        bad.length_unit = "光年".to_string();
+        assert!(calc_loading(&bad).is_err());
     }
 }
