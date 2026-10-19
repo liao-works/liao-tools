@@ -20,6 +20,7 @@ import { save } from '@tauri-apps/plugin-dialog';
 import {
   MAX_BATCH_SIZE,
   TRACKING_APPLY_URL,
+  TRACKING_DOCS_URL,
   TRACKING_TOKEN_STORAGE_KEY,
   trackingApi,
   trackingStatusLabel,
@@ -126,21 +127,38 @@ export function TrackingPage() {
         <CardHeader>
           <CardTitle>接口设置</CardTitle>
           <CardDescription>
-            在 <button type="button" className="lt-tax-source-link" onClick={() => { void openUrlPath(TRACKING_APPLY_URL); }}>
-              17TRACK 开放平台 <ExternalLink size={13}/>
-            </button> 免费申请 API Key；额度按注册单号计费，以官方计费规则为准
+            查询能力来自 17TRACK 开放接口（覆盖 3500+ 承运商）；需要自备 API Key，新注册账号有 100 单免费测试额度
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1.5 flex-1 min-w-64">
-            <Label htmlFor="lt-tracking-token">API Key（17token）</Label>
-            <Input id="lt-tracking-token" type="password" value={apiKey}
-              placeholder="仅保存在本机，不会上传到其他服务器"
-              onChange={e => setApiKey(e.target.value)}/>
+        <CardContent className="space-y-4">
+          <ol className="list-decimal pl-5 space-y-1.5 text-sm text-muted-foreground">
+            <li>
+              前往 <button type="button" className="lt-tax-source-link" onClick={() => { void openUrlPath(TRACKING_APPLY_URL); }}>
+                17TRACK 开放平台 <ExternalLink size={13}/>
+              </button>，注册账号并开通 API 服务（免费）
+            </li>
+            <li>
+              登录 API 控制台，在「设置 → 访问密钥」页复制密钥（即 17token）；用法详见
+              <button type="button" className="lt-tax-source-link ml-1" onClick={() => { void openUrlPath(TRACKING_DOCS_URL); }}>
+                接口开发文档 <ExternalLink size={13}/>
+              </button>
+            </li>
+            <li>把密钥粘贴到下方输入框并保存，即可开始批量查询</li>
+          </ol>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5 flex-1 min-w-64">
+              <Label htmlFor="lt-tracking-token">API Key（17token）</Label>
+              <Input id="lt-tracking-token" type="password" value={apiKey}
+                placeholder="仅保存在本机，不会上传到其他服务器"
+                onChange={e => setApiKey(e.target.value)}/>
+            </div>
+            <Button variant="outline" onClick={handleSaveToken} disabled={!apiKey.trim()}>
+              <Save className="mr-2 h-4 w-4"/>保存
+            </Button>
           </div>
-          <Button variant="outline" onClick={handleSaveToken} disabled={!apiKey.trim()}>
-            <Save className="mr-2 h-4 w-4"/>保存
-          </Button>
+          <p className="text-xs text-muted-foreground">
+            额度按注册单号计费（已注册过的单号重复查询不重复计费，以官方计费规则为准）；在控制台更换密钥后，新密钥最长 5 分钟生效、旧密钥立即失效。
+          </p>
         </CardContent>
       </Card>
 

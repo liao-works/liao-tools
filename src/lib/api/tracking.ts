@@ -47,8 +47,11 @@ export function trackingStatusLabel(status: string): string {
 /** API Key 的本地存储键；仅保存在本机 localStorage */
 export const TRACKING_TOKEN_STORAGE_KEY = 'tracking-17api-token';
 
-/** 17TRACK API 申请入口 */
+/** 17TRACK API 申请入口（注册并开通 API 服务） */
 export const TRACKING_APPLY_URL = 'https://www.17track.net/zh-cn/api';
+
+/** 17TRACK 接口开发文档（中文） */
+export const TRACKING_DOCS_URL = 'https://asset.17track.net/api/document/v2.4_zh/index.html';
 
 /** 单次接口上限（与 Rust 端 MAX_BATCH 一致），用于前端提示分批规模 */
 export const MAX_BATCH_SIZE = 40;
