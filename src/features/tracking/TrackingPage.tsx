@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   Download,
@@ -47,8 +48,10 @@ function loadStoredToken(): string {
 }
 
 export function TrackingPage() {
+  const [params] = useSearchParams();
   const [apiKey, setApiKey] = useState(loadStoredToken);
-  const [numbersText, setNumbersText] = useState('');
+  // 支持从其他工具（如船司查询）携带 ?numbers= 预填单号
+  const [numbersText, setNumbersText] = useState(() => params.get('numbers') || '');
   const [querying, setQuerying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [rows, setRows] = useState<TrackingRow[] | null>(null);
