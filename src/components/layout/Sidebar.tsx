@@ -2,7 +2,8 @@ import { NavLink } from 'react-router-dom';
 import {
   BarChart3,
   Home, Search, ShieldCheck, FileSpreadsheet, Wrench,
-  CheckCheck, Languages, Settings, Database, Calculator, PanelLeftClose, PanelLeftOpen, RefreshCw
+  CheckCheck, Languages, Settings, Database, Calculator, PanelLeftClose, PanelLeftOpen, RefreshCw,
+  Boxes, PackageSearch
 } from 'lucide-react';
 
 interface SidebarProps { collapsed: boolean; onToggle: () => void; onNavigate?: () => void }
@@ -13,6 +14,8 @@ const groups = [
     { label: '关税查询', href: '/tax', icon: Search },
     { label: 'Alta 禁运查询', href: '/alta', icon: ShieldCheck },
     { label: 'Amazon 商品查询', href: '/revcal', icon: Calculator },
+    { label: '体积 / 计费重', href: '/cbm', icon: Boxes },
+    { label: '运单轨迹', href: '/tracking', icon: PackageSearch },
   ] },
   { label: '文件处理', items: [
     { label: 'Excel 数据拆分', href: '/excel', icon: FileSpreadsheet },

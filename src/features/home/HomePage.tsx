@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import {
   ArrowRight, Search, ShieldCheck, Boxes, FileSpreadsheet,
-  Wrench, CheckCheck, Languages, Database, Clock3, ArrowUpRight, BookOpen, Info,
+  Wrench, CheckCheck, Languages, Database, Clock3, ArrowUpRight, BookOpen, Info, PackageSearch,
 } from 'lucide-react';
 import { taxApi } from '@/lib/api/tax';
 import { altaApi } from '@/lib/api/alta';
@@ -17,6 +17,8 @@ const tools = [
   { name: '系统工具', text: '快速启动常用应用', to: '/system-tools', icon: Wrench, accent: 'green' },
   { name: 'Todo 清单', text: '记录与整理待办任务', to: '/todo', icon: CheckCheck, accent: 'amber' },
   { name: '翻译', text: '邮件翻译、润色与语气解读', to: '/translate', icon: Languages, accent: 'blue' },
+  { name: '体积 / 计费重', text: 'CBM、体积重与装柜试算', to: '/cbm', icon: Boxes, accent: 'green' },
+  { name: '运单轨迹', text: '批量轨迹查询与预计送达', to: '/tracking', icon: PackageSearch, accent: 'orange' },
 ];
 
 type Snapshot = { kind: 'loading' | 'ready' | 'unavailable'; label: string };
