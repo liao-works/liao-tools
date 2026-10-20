@@ -161,6 +161,9 @@ export function ProviderDialog({ open, onOpenChange, status, onSaved }: Provider
               className="h-8 text-xs"
               autoComplete="off"
             />
+            {entry?.configured && (
+              <p className="text-xs text-muted-foreground">Key 已持久化到本机，界面不回显明文；留空保存即保持不变，无需重新填写。</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
