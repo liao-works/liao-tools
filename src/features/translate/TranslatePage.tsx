@@ -21,7 +21,7 @@ export function TranslatePage() {
   const [customPromptOn, setCustomPromptOn] = useState(false);
   const [customSystemPrompt, setCustomSystemPrompt] = useState('');
   const [sourceLang, setSourceLang] = useState('auto');
-  const [targetLang, setTargetLang] = useState('en');
+  const [targetLang, setTargetLang] = useState('auto'); // 目标默认「自动」：按源语言互译
   const [input, setInput] = useState('');
   const [output, setOutput] = useState('');
   const [running, setRunning] = useState(false);
@@ -67,6 +67,13 @@ export function TranslatePage() {
     : null;
   // 识别结果与目标语言相同（如英→英）时，翻译是原样返回的无效操作，提示一键换向
   const sameLang = detectedLang !== null && detectedLang === targetLang;
+  // 目标「自动」时的实际方向：与源互译，规则与 run() 的解析保持一致，仅用于回显
+  const resolvedSource = mode === 'translate'
+    ? (sourceLang === 'auto' ? detectedLang : sourceLang)
+    : null;
+  const autoTarget = mode === 'translate' && targetLang === 'auto' && resolvedSource
+    ? (resolvedSource === 'zh' ? 'en' : 'zh')
+    : null;
 
   const run = useCallback(async () => {
     if (!input.trim() || runningRef.current || !providerReady) return;
@@ -171,6 +178,7 @@ export function TranslatePage() {
               sourceLang={sourceLang}
               targetLang={targetLang}
               detected={detectedLang}
+              autoTarget={autoTarget}
               onSourceChange={setSourceLang}
               onTargetChange={setTargetLang}
             />

@@ -19,13 +19,14 @@ interface LanguageSelectProps {
   targetLang: string;
   /** sourceLang 为 auto 时对当前输入的识别结果，回显在下拉框里 */
   detected?: 'zh' | 'en' | null;
+  /** targetLang 为 auto 时按源互译的实际方向，回显在下拉框里 */
+  autoTarget?: string | null;
   onSourceChange: (code: string) => void;
   onTargetChange: (code: string) => void;
 }
 
-/** 方向选择：源（默认自动检测）+ 目标 */
-export function LanguageSelect({ sourceLang, targetLang, detected, onSourceChange, onTargetChange }: LanguageSelectProps) {
-  const targetOptions = LANGUAGES.filter((l) => l.code !== 'auto');
+/** 方向选择：源（默认自动检测）+ 目标（默认自动互译） */
+export function LanguageSelect({ sourceLang, targetLang, detected, autoTarget, onSourceChange, onTargetChange }: LanguageSelectProps) {
   return (
     <div className="flex items-center gap-1.5 text-xs">
       <Select value={sourceLang} onValueChange={onSourceChange}>
@@ -40,9 +41,13 @@ export function LanguageSelect({ sourceLang, targetLang, detected, onSourceChang
       </Select>
       <span className="text-muted-foreground">→</span>
       <Select value={targetLang} onValueChange={onTargetChange}>
-        <SelectTrigger className="h-7 w-[110px] text-xs"><SelectValue /></SelectTrigger>
-        <SelectContent>{targetOptions.map((l) => (
-          <SelectItem key={l.code} value={l.code} className="text-xs">{l.label}</SelectItem>
+        <SelectTrigger className="h-7 w-[132px] text-xs">
+          <SelectValue>
+            {targetLang === 'auto' && autoTarget ? `自动（→${langLabel(autoTarget)}）` : undefined}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>{LANGUAGES.map((l) => (
+          <SelectItem key={l.code} value={l.code} className="text-xs">{l.code === 'auto' ? '自动（互译）' : l.label}</SelectItem>
         ))}</SelectContent>
       </Select>
     </div>
