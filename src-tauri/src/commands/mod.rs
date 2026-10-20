@@ -4,6 +4,7 @@ pub mod error;
 pub mod excel;
 pub mod icon_extractor;
 pub mod installed_apps;
+pub mod shipping;
 pub mod tax;
 pub mod tracking;
 pub mod ups_dpd;
