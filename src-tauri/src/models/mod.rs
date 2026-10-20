@@ -1,6 +1,7 @@
 pub mod alta;
 pub mod cbm;
 pub mod excel;
+pub mod shipping;
 pub mod tax;
 pub mod tracking;
 pub mod ups_dpd;

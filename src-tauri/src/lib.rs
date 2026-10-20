@@ -13,6 +13,7 @@ use commands::file_utils::open_file_with_default_app;
 use commands::icon_extractor::extract_icon;
 use commands::installed_apps::get_installed_apps;
 use commands::revcal::commands::*;
+use commands::shipping::shipping_track_lookup;
 use commands::system_tools::*;
 use commands::tax::*;
 use commands::translate::commands::{
@@ -152,6 +153,8 @@ pub fn run() {
             // Tracking commands
             tracking_batch_query,
             tracking_export_results,
+            // Shipping commands
+            shipping_track_lookup,
             // Update history commands
             get_update_sessions,
             get_update_details,
