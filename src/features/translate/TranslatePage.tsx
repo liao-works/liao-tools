@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
 import { translateApi } from '@/lib/api/translate';
 import { useToast } from '@/hooks/use-toast';
-import { detectSourceLang, LanguageSelect } from './components/LanguageSelect';
+import { detectSourceLang, LanguageSelect, langLabel } from './components/LanguageSelect';
 import { ToneSelector } from './components/ToneSelector';
 import { Workbench } from './components/Workbench';
 import { ProviderDialog } from './components/ProviderDialog';
@@ -60,6 +60,13 @@ export function TranslatePage() {
   }, []);
 
   const providerReady = !!status && !!status[status.activeProvider]?.configured;
+
+  // 源语言自动识别：仅翻译模式 + 自动检测时对当前输入实时回显
+  const detectedLang = mode === 'translate' && sourceLang === 'auto' && input.trim()
+    ? detectSourceLang(input)
+    : null;
+  // 识别结果与目标语言相同（如英→英）时，翻译是原样返回的无效操作，提示一键换向
+  const sameLang = detectedLang !== null && detectedLang === targetLang;
 
   const run = useCallback(async () => {
     if (!input.trim() || runningRef.current || !providerReady) return;
@@ -163,6 +170,7 @@ export function TranslatePage() {
             <LanguageSelect
               sourceLang={sourceLang}
               targetLang={targetLang}
+              detected={detectedLang}
               onSourceChange={setSourceLang}
               onTargetChange={setTargetLang}
             />
@@ -194,6 +202,19 @@ export function TranslatePage() {
           </Button>
         </div>
       </div>
+      {sameLang && (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <span>识别到原文已是{langLabel(targetLang)}，继续运行会原样返回</span>
+          <Button
+            type="button"
+            variant="link"
+            className="h-4 p-0 text-xs"
+            onClick={() => setTargetLang(detectedLang === 'zh' ? 'en' : 'zh')}
+          >
+            改为{langLabel(detectedLang === 'zh' ? 'en' : 'zh')}
+          </Button>
+        </div>
+      )}
       {customPromptOn && (
         <Textarea
           value={customSystemPrompt}
