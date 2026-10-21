@@ -57,9 +57,11 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
         ))}
         <div className="lt-nav-group lt-nav-group--bottom">
           {!collapsed && <div className="lt-nav-label">管理</div>}
-          <NavLink to="/data-maintenance" onClick={onNavigate} className="lt-nav-item"
+          <NavLink to="/data-maintenance" onClick={onNavigate}
+            className={({ isActive }) => ['lt-nav-item', isActive ? 'is-active' : ''].join(' ')}
             title={collapsed ? '数据维护' : undefined}><Database size={18}/>{!collapsed && '数据维护'}</NavLink>
-          <NavLink to="/usage" onClick={onNavigate} className="lt-nav-item"
+          <NavLink to="/usage" onClick={onNavigate}
+            className={({ isActive }) => ['lt-nav-item', isActive ? 'is-active' : ''].join(' ')}
             title={collapsed ? '使用统计' : undefined}><BarChart3 size={18}/>{!collapsed && '使用统计'}</NavLink>
           <NavLink to="/updates" onClick={onNavigate}
             className={({ isActive }) => ['lt-nav-item', isActive ? 'is-active' : ''].join(' ')}
