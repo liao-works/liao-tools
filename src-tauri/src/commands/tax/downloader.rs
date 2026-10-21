@@ -8,6 +8,7 @@ use md5::Md5;
 use sha2::{Digest, Sha256};
 use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tauri::Manager;
 
 /// 同时计算 SHA-256 与 MD5 的 Write 适配器：一遍 IO 完成双哈希校验。
@@ -46,6 +47,12 @@ const MAX_DOWNLOAD_ATTEMPTS: u32 = 5;
 const CHUNK_STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(150);
 /// 计为「实质推进」的最小新增字节数；防止慢性涓流让重试无限循环。
 const PROGRESS_RESET_MIN_BYTES: u64 = 1024 * 1024;
+/// 分段并行下载的连接数；弱网单连接吞吐受限，多连接可成倍提速。
+const PARALLEL_CONNECTIONS: u64 = 6;
+/// 快照不小于该值才启用分段（小文件单连接即可，省去分段管理开销）。
+const MIN_SEGMENTED_SIZE: u64 = 16 * 1024 * 1024;
+/// 单段最小字节数；决定中等大小文件的分段数。
+const MIN_SEGMENT_SIZE: u64 = 4 * 1024 * 1024;
 
 /// 一次下载要取的资产：清单里的 zstd 压缩包，或（旧清单语义下的）原始快照本体。
 struct AssetPlan {
@@ -67,10 +74,12 @@ enum AssetOutcome {
     Failed(anyhow::Error),
 }
 
-/// 单次请求失败的分类：HTTP 状态异常说明资产本身拿不到（续传无意义），
+/// 单次请求失败的分类：HTTP 404/410 说明资产本身拿不到（续传无意义），
+/// RangeIgnored 说明服务器不支持分段请求（仅分段路径使用，需回退单连接），
 /// 其余按可续传处理。
 enum AttemptFailure {
     Unavailable(anyhow::Error),
+    RangeIgnored(anyhow::Error),
     Retryable(anyhow::Error),
 }
 
@@ -228,13 +237,13 @@ impl TaxDataDownloader {
         }
 
         log::info!("Tariff data safely installed: {}", metadata.version);
-        // 清理遗留的 staging 与旧版临时下载文件（当前 staging 已被晋升走）
+        // 清理遗留的 staging（含分段下载的 .part 分片）与旧版临时下载文件
         if let Ok(entries) = std::fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 let name = entry.file_name();
                 let name = name.to_string_lossy();
-                if (name.starts_with("tariffs.staging-")
-                        && (name.ends_with(".db") || name.ends_with(".db.zst")))
+                if name.starts_with("tariffs.staging-")
+                    && (name.ends_with(".db") || name.ends_with(".db.zst") || name.contains(".part"))
                     || name.starts_with("tariffs-download-")
                 {
                     let _ = std::fs::remove_file(entry.path());
@@ -375,8 +384,9 @@ impl TaxDataDownloader {
         }
     }
 
-    /// 带重试预算的单资产下载：流中断/停滞自动退避续传，重试预算只对
-    /// 「无进展的连续失败」计费；HTTP 状态异常立即按资产不可用返回。
+    /// 带重试预算的单资产下载：大文件用多连接分段并行（每段独立断点），
+    /// 小文件或服务器不支持 Range 时退回单连接顺序下载；流中断/停滞自动
+    /// 退避续传，重试预算只对「无进展的连续失败」计费。
     async fn download_plan<F>(
         client: &reqwest::Client,
         plan: &AssetPlan,
@@ -390,9 +400,10 @@ impl TaxDataDownloader {
         F: FnMut(u64, u64),
     {
         let mut failures_without_progress: u32 = 0;
-        let mut prev_len: u64 = std::fs::metadata(&plan.staging).map(|meta| meta.len()).unwrap_or(0);
+        let mut prev_len: u64 = Self::downloaded_len(plan);
         let mut attempts: u32 = 0;
         let mut last_error: Option<anyhow::Error> = None;
+        let mut segmented = Self::should_segment(plan.expected_size);
         loop {
             if failures_without_progress >= MAX_DOWNLOAD_ATTEMPTS {
                 break;
@@ -408,7 +419,12 @@ impl TaxDataDownloader {
                 tokio::time::sleep(delay).await;
             }
             attempts += 1;
-            match Self::download_asset(client, &plan.url, &plan.staging, plan.expected_size, progress).await {
+            let attempt = if segmented {
+                Self::download_segmented(client, plan, progress).await
+            } else {
+                Self::download_asset(client, &plan.url, &plan.staging, plan.expected_size, progress).await
+            };
+            match attempt {
                 Ok(received) if received == plan.expected_size => {
                     // 资产字节完整后的校验/解压属于内容完整性问题，与链路抖动
                     // 无关；压缩路径的资产损坏可降级，原始路径只能报错。
@@ -425,12 +441,19 @@ impl TaxDataDownloader {
                         received, plan.expected_size
                     ));
                 }
+                Err(AttemptFailure::RangeIgnored(error)) => {
+                    // 服务器忽略 Range 返回 200，分段不可行：清理分片，改走单连接
+                    log::warn!("服务器不支持分段请求，回退单连接顺序下载: {error:#}");
+                    Self::remove_parts(plan);
+                    segmented = false;
+                    last_error = Some(error);
+                }
                 Err(AttemptFailure::Unavailable(error)) => {
                     return AssetOutcome::AssetUnavailable(error);
                 }
                 Err(AttemptFailure::Retryable(error)) => last_error = Some(error),
             }
-            let now_len = std::fs::metadata(&plan.staging).map(|meta| meta.len()).unwrap_or(0);
+            let now_len = Self::downloaded_len(plan);
             if now_len >= prev_len.saturating_add(PROGRESS_RESET_MIN_BYTES) {
                 log::info!("本次尝试推进了 {} 字节，重置续传重试预算", now_len - prev_len);
                 failures_without_progress = 0;
@@ -444,6 +467,237 @@ impl TaxDataDownloader {
             "下载中断，连续 {} 次续传无进展；断点已保留，再次下载将从断点继续: {:#}",
             failures_without_progress, error
         ))
+    }
+
+    /// 是否启用分段并行下载。
+    fn should_segment(expected_size: u64) -> bool {
+        expected_size >= MIN_SEGMENTED_SIZE
+    }
+
+    /// 把 [0, total) 切成尽量均匀、首段可多 1 字节的分段（闭区间约定见
+    /// 返回值）；段数由 MIN_SEGMENT_SIZE 与 PARALLEL_CONNECTIONS 共同决定。
+    fn segment_bounds(total: u64) -> Vec<(u64, u64)> {
+        if total == 0 {
+            return Vec::new();
+        }
+        let count = (((total + MIN_SEGMENT_SIZE - 1) / MIN_SEGMENT_SIZE) as usize)
+            .min(PARALLEL_CONNECTIONS as usize)
+            .min(total as usize);
+        let base = total / count as u64;
+        let remainder = total % count as u64;
+        let mut bounds = Vec::with_capacity(count);
+        let mut start = 0u64;
+        for index in 0..count {
+            let length = base + if (index as u64) < remainder { 1 } else { 0 };
+            bounds.push((start, start + length));
+            start += length;
+        }
+        bounds
+    }
+
+    /// 第 index 段的分片暂存文件。
+    fn part_path(plan: &AssetPlan, index: usize) -> PathBuf {
+        let file_name = plan.staging
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_else(|| "part".to_string());
+        plan.staging.with_file_name(format!("{file_name}.part{index}"))
+    }
+
+    /// 清理全部分片文件（best-effort）。
+    fn remove_parts(plan: &AssetPlan) {
+        for index in 0..Self::segment_bounds(plan.expected_size).len() {
+            let _ = std::fs::remove_file(Self::part_path(plan, index));
+        }
+    }
+
+    /// 当前已下载字节数：分段模式为各分片长度之和，单连接模式为 staging 长度。
+    fn downloaded_len(plan: &AssetPlan) -> u64 {
+        if Self::should_segment(plan.expected_size) {
+            Self::segment_bounds(plan.expected_size)
+                .iter()
+                .enumerate()
+                .map(|(index, _)| {
+                    std::fs::metadata(Self::part_path(plan, index))
+                        .map(|meta| meta.len())
+                        .unwrap_or(0)
+                })
+                .sum()
+        } else {
+            std::fs::metadata(&plan.staging).map(|meta| meta.len()).unwrap_or(0)
+        }
+    }
+
+    /// 全部段完成后按序拼接分片为最终 staging，并清理分片。
+    /// 任一分片缺失/短缺都报可续传错误，保留现场供重试。
+    fn assemble_parts(plan: &AssetPlan) -> Result<()> {
+        let mut output = std::fs::OpenOptions::new()
+            .write(true).create(true).truncate(true)
+            .open(&plan.staging)?;
+        for (index, (start, end)) in Self::segment_bounds(plan.expected_size).iter().enumerate() {
+            let part = Self::part_path(plan, index);
+            let expected = end - start;
+            let actual = std::fs::metadata(&part).map(|meta| meta.len()).unwrap_or(0);
+            if actual != expected {
+                ensure!(actual == 0,
+                    "分片 {index} 尺寸异常: {} / {expected}", actual);
+                continue; // 空分片（如全新分段）直接跳过
+            }
+            let mut input = std::fs::File::open(&part)?;
+            std::io::copy(&mut input, &mut output)?;
+        }
+        output.sync_all()?;
+        drop(output);
+        let assembled = std::fs::metadata(&plan.staging)?.len();
+        ensure!(assembled == plan.expected_size,
+            "拼接后尺寸异常: {} / {}", assembled, plan.expected_size);
+        Self::remove_parts(plan);
+        Ok(())
+    }
+
+    /// 分段并行下载：每段独立连接 + 独立分片文件（可独立续传），全部段
+    /// 完成后拼接。任一段返回致命分类（资产缺失/Range 被忽略）时中止其余
+    /// 段；普通失败由调用方的重试预算接管——已完成的段下次零成本跳过。
+    async fn download_segmented<F>(
+        client: &reqwest::Client,
+        plan: &AssetPlan,
+        progress: &mut F,
+    ) -> Result<u64, AttemptFailure>
+    where
+        F: FnMut(u64, u64),
+    {
+        let bounds = Self::segment_bounds(plan.expected_size);
+        let total = plan.expected_size;
+        let received = Arc::new(std::sync::atomic::AtomicU64::new(Self::downloaded_len(plan)));
+        let mut tasks = tokio::task::JoinSet::new();
+        for (index, &(start, end)) in bounds.iter().enumerate() {
+            let client = client.clone();
+            let url = plan.url.clone();
+            let part = Self::part_path(plan, index);
+            let counter = received.clone();
+            tasks.spawn(async move {
+                Self::download_segment(&client, &url, &part, start, end, counter).await
+            });
+        }
+
+        let mut mode_failure: Option<AttemptFailure> = None;
+        let mut retryable_error: Option<anyhow::Error> = None;
+        let mut pump = tokio::time::interval(std::time::Duration::from_millis(200));
+        pump.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        while !tasks.is_empty() {
+            tokio::select! {
+                _ = pump.tick() => {
+                    progress(received.load(std::sync::atomic::Ordering::Relaxed), total);
+                }
+                joined = tasks.join_next() => {
+                    // 循环顶部已保证非空，join_next 不会返回 None
+                    let joined = joined.context("分片任务意外缺失")?;
+                    let outcome = match joined {
+                        Ok(outcome) => outcome,
+                        Err(join_error) if join_error.is_cancelled() => {
+                            continue; // 模式级失败后主动中止的其余段
+                        }
+                        Err(join_error) => {
+                            Err(AttemptFailure::Retryable(anyhow!("分片任务异常退出: {join_error}")))
+                        }
+                    };
+                    match outcome {
+                        Ok(()) => {}
+                        Err(AttemptFailure::Retryable(error)) => {
+                            retryable_error.get_or_insert(error);
+                        }
+                        Err(failure @ (AttemptFailure::Unavailable(_)
+                            | AttemptFailure::RangeIgnored(_))) => {
+                            // 模式级失败：其余段的连接已无意义，立即中止
+                            mode_failure.get_or_insert(failure);
+                            tasks.abort_all();
+                        }
+                    }
+                }
+            }
+        }
+        progress(received.load(std::sync::atomic::Ordering::Relaxed), total);
+        if let Some(failure) = mode_failure {
+            return Err(failure);
+        }
+        match retryable_error {
+            Some(error) => Err(AttemptFailure::Retryable(error)),
+            None => {
+                Self::assemble_parts(plan).map_err(AttemptFailure::from)?;
+                Ok(total)
+            }
+        }
+    }
+
+    /// 下载单个分段到其分片文件：从分片现有长度续传，显式带上段末界，
+    /// 服务器必须返回 206；写满段长即完成。
+    async fn download_segment(
+        client: &reqwest::Client,
+        url: &str,
+        part: &Path,
+        start: u64,
+        end: u64,
+        received: Arc<std::sync::atomic::AtomicU64>,
+    ) -> Result<(), AttemptFailure> {
+        let segment_size = end - start;
+        let resume_from: u64 = std::fs::metadata(part)
+            .map(|meta| meta.len())
+            .unwrap_or(0);
+        if resume_from >= segment_size {
+            return Ok(()); // 之前尝试已完成
+        }
+        // 注意：续传起点已计入 download_segmented 的初始计数器，这里不再累加
+        let mut request = client.get(url);
+        request = request.header(reqwest::header::RANGE,
+            format!("bytes={}-{}", start + resume_from, end - 1));
+        let response = request.send().await.map_err(AttemptFailure::retryable)?;
+        let status = response.status();
+        if status == reqwest::StatusCode::NOT_FOUND || status == reqwest::StatusCode::GONE {
+            return Err(AttemptFailure::Unavailable(anyhow!(
+                "资产不存在: HTTP {status}"
+            )));
+        }
+        if status != reqwest::StatusCode::PARTIAL_CONTENT {
+            // 典型情形：服务器忽略 Range 返回 200，内容起点与本段不符
+            return Err(AttemptFailure::RangeIgnored(anyhow!(
+                "分段请求未返回 206: HTTP {status}"
+            )));
+        }
+        let mut file = std::fs::OpenOptions::new()
+            .write(true).create(true)
+            .truncate(resume_from == 0)
+            .open(part).map_err(AttemptFailure::retryable)?;
+        file.seek(SeekFrom::Start(resume_from)).map_err(AttemptFailure::retryable)?;
+        let mut stream = response.bytes_stream();
+        let mut written = resume_from;
+        loop {
+            let chunk = match tokio::time::timeout(CHUNK_STALL_TIMEOUT, stream.next()).await {
+                Ok(Some(chunk)) => chunk
+                    .map_err(|error| AttemptFailure::Retryable(
+                        anyhow::Error::new(error).context("Download stream failed")
+                    ))?,
+                Ok(None) => break,
+                Err(_elapsed) => return Err(AttemptFailure::Retryable(anyhow!(
+                    "分片下载停滞超过 150 秒"
+                ))),
+            };
+            if written + chunk.len() as u64 > segment_size {
+                return Err(AttemptFailure::Retryable(anyhow!(
+                    "分片内容超出段长（Range 未按请求截取）"
+                )));
+            }
+            file.write_all(&chunk).map_err(AttemptFailure::retryable)?;
+            written += chunk.len() as u64;
+            received.fetch_add(chunk.len() as u64, std::sync::atomic::Ordering::Relaxed);
+        }
+        file.sync_all().map_err(AttemptFailure::retryable)?;
+        drop(file);
+        if written != segment_size {
+            return Err(AttemptFailure::Retryable(anyhow!(
+                "分片不完整: {written} / {segment_size}"
+            )));
+        }
+        Ok(())
     }
 
     /// "sha256:<64 位 hex>" → 归一化小写 hex；顺带完成格式校验。
@@ -754,6 +1008,102 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let plan = TaxDataDownloader::resolve_asset_plan(&metadata, dir.path(), FIXTURE_RAW_HASH).unwrap();
         assert_eq!(plan.expected_md5.as_deref(), Some(FIXTURE_RAW_MD5));
+    }
+
+    #[test]
+    fn should_segment_gates_small_files() {
+        assert!(!TaxDataDownloader::should_segment(MIN_SEGMENTED_SIZE - 1));
+        assert!(TaxDataDownloader::should_segment(MIN_SEGMENTED_SIZE));
+        assert!(TaxDataDownloader::should_segment(400 * 1024 * 1024));
+    }
+
+    #[test]
+    fn segment_bounds_partition_exactly() {
+        // 精确整除、有余数、不足一段、刚好一整段等多种形态
+        for total in [1u64, 4 * 1024 * 1024, 17 * 1024 * 1024 + 7,
+            100 * 1024 * 1024, 400 * 1024 * 1024 + 123, MIN_SEGMENTED_SIZE] {
+            let bounds = TaxDataDownloader::segment_bounds(total);
+            assert!(!bounds.is_empty());
+            // 无缝衔接且覆盖 [0, total)
+            assert_eq!(bounds.first().unwrap().0, 0);
+            assert_eq!(bounds.last().unwrap().1, total);
+            for pair in bounds.windows(2) {
+                assert_eq!(pair[0].1, pair[1].0, "total={total}");
+            }
+            let covered: u64 = bounds.iter().map(|(start, end)| end - start).sum();
+            assert_eq!(covered, total, "total={total}");
+            // 段数上限与最小段长约束
+            assert!(bounds.len() <= PARALLEL_CONNECTIONS as usize, "total={total}");
+        }
+        assert!(TaxDataDownloader::segment_bounds(0).is_empty());
+        // 大文件应正好用满连接数
+        assert_eq!(TaxDataDownloader::segment_bounds(400 * 1024 * 1024).len(),
+            PARALLEL_CONNECTIONS as usize);
+    }
+
+    fn segmented_test_plan(dir: &tempfile::TempDir, size: u64) -> AssetPlan {
+        AssetPlan {
+            url: "https://example.invalid/tariffs.db.zst".into(),
+            expected_size: size,
+            expected_hex: FIXTURE_ZST_HASH.into(),
+            expected_md5: None,
+            staging: dir.path().join("tariffs.staging-test.db.zst"),
+            compressed: true,
+        }
+    }
+
+    #[test]
+    fn assemble_parts_joins_segments_and_cleans_up() {
+        let dir = tempfile::tempdir().unwrap();
+        let total = 10 * 1024 * 1024; // 10MB → 3 段（4/4/2）
+        let plan = segmented_test_plan(&dir, total);
+        let bounds = TaxDataDownloader::segment_bounds(total);
+        // 各分片写入确定性内容：第 i 段全部填 i 对应的字节
+        let mut expected = Vec::with_capacity(total as usize);
+        for (index, (start, end)) in bounds.iter().enumerate() {
+            let part = TaxDataDownloader::part_path(&plan, index);
+            let body = vec![index as u8 + 1; (end - start) as usize];
+            std::fs::write(&part, &body).unwrap();
+            expected.extend_from_slice(&body);
+        }
+        TaxDataDownloader::assemble_parts(&plan).unwrap();
+        assert_eq!(std::fs::read(&plan.staging).unwrap(), expected);
+        for index in 0..bounds.len() {
+            assert!(!TaxDataDownloader::part_path(&plan, index).exists());
+        }
+    }
+
+    #[test]
+    fn assemble_parts_rejects_short_segment_without_consuming_parts() {
+        let dir = tempfile::tempdir().unwrap();
+        let total = 10 * 1024 * 1024;
+        let plan = segmented_test_plan(&dir, total);
+        let bounds = TaxDataDownloader::segment_bounds(total);
+        for (index, (start, end)) in bounds.iter().enumerate() {
+            let body = vec![index as u8 + 1; (end - start) as usize];
+            std::fs::write(TaxDataDownloader::part_path(&plan, index), &body).unwrap();
+        }
+        // 截短第 2 段 → 拼接必须失败且分片保留（供下次续传）
+        std::fs::write(TaxDataDownloader::part_path(&plan, 1), b"short").unwrap();
+        assert!(TaxDataDownloader::assemble_parts(&plan).is_err());
+        assert!(TaxDataDownloader::part_path(&plan, 0).exists());
+        assert!(TaxDataDownloader::part_path(&plan, 1).exists());
+    }
+
+    #[test]
+    fn downloaded_len_counts_parts_then_staging() {
+        let dir = tempfile::tempdir().unwrap();
+        let total = MIN_SEGMENTED_SIZE; // 16MB（门槛上）→ 4 段分段模式
+        let plan = segmented_test_plan(&dir, total);
+        assert_eq!(TaxDataDownloader::downloaded_len(&plan), 0);
+        std::fs::write(TaxDataDownloader::part_path(&plan, 0), vec![0u8; 1024]).unwrap();
+        std::fs::write(TaxDataDownloader::part_path(&plan, 2), vec![0u8; 512]).unwrap();
+        assert_eq!(TaxDataDownloader::downloaded_len(&plan), 1024 + 512);
+        // 小文件走单连接口径：看 staging 长度
+        let small = segmented_test_plan(&dir, 1024);
+        assert_eq!(TaxDataDownloader::downloaded_len(&small), 0);
+        std::fs::write(&small.staging, vec![0u8; 256]).unwrap();
+        assert_eq!(TaxDataDownloader::downloaded_len(&small), 256);
     }
 
     #[test]
