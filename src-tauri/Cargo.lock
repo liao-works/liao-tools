@@ -2959,6 +2959,7 @@ dependencies = [
  "wreq",
  "wreq-util",
  "zip 0.6.6",
+ "zstd",
 ]
 
 [[package]]

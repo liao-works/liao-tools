@@ -109,6 +109,22 @@ pub struct BatchResult {
     pub output_path: String,
 }
 
+/// 清单里可选的压缩快照资产；缺失时客户端按原始快照下载（向后兼容旧清单）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompressedAsset {
+    /// 压缩格式，目前仅支持 "zstd"，其他值客户端拒绝下载
+    pub format: String,
+    /// Release 内的资产文件名
+    #[serde(default = "default_compressed_asset")]
+    pub asset: String,
+    pub file_size: u64,
+    pub file_hash: String,
+}
+
+fn default_compressed_asset() -> String {
+    "tariffs.db.zst".to_string()
+}
+
 /// 远程元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoteMetadata {
@@ -120,6 +136,8 @@ pub struct RemoteMetadata {
     pub file_hash: Option<String>,
     pub record_count: i64,
     pub download_urls: DownloadUrls,
+    #[serde(default)]
+    pub compressed: Option<CompressedAsset>,
     #[serde(default)]
     pub changelog: Option<Vec<ChangelogItem>>,
     #[serde(default)]

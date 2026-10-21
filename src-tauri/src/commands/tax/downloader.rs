@@ -22,6 +22,15 @@ const CHUNK_STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(
 /// 计为「实质推进」的最小新增字节数；防止慢性涓流让重试无限循环。
 const PROGRESS_RESET_MIN_BYTES: u64 = 1024 * 1024;
 
+/// 一次下载要取的资产：清单里的 zstd 压缩包，或（旧清单语义下的）原始快照本体。
+struct AssetPlan {
+    url: String,
+    expected_size: u64,
+    expected_hex: String,
+    staging: PathBuf,
+    compressed: bool,
+}
+
 /// Install *immutable* release assets. The current public channel stays on latest-data.
 /// Future shadow or V2 data MUST NOT use this production installer until promoted.
 pub struct TaxDataDownloader;
@@ -247,24 +256,21 @@ impl TaxDataDownloader {
     }
 
     /// 下载快照到与目标版本绑定的 staging 文件；同名 staging 已存在时发起
-    /// Range 续传（服务器不支持分段则整体重下）。流中断/停滞时自动退避续传
-    /// 重试，重试耗尽仍保留 staging 供手动续传。最终以清单大小 + 完整文件
-    /// SHA-256 全量校验为准，校验通过前绝不进入安装。
+    /// Range 续传（服务器不支持分段则整体重下）。清单提供 zstd 压缩资产时
+    /// 下载压缩包、校验通过后本地解压（旧清单无 compressed 字段则按原始
+    /// 快照下载）。流中断/停滞自动退避续传，且重试预算只对「无进展的连续
+    /// 失败」计费。最终以清单的（解压后）大小 + 完整文件 SHA-256 全量校验
+    /// 为准，校验通过前绝不进入安装。
     async fn download_database<F>(
         directory: &Path, metadata: &RemoteMetadata, progress: &mut F
     ) -> Result<PathBuf>
     where
         F: FnMut(u64, u64),
     {
-        let expected_hash = metadata.file_hash.as_ref()
-            .context("Missing file_hash: refusing unauthenticated snapshot")?;
-        let expected_hex = expected_hash.strip_prefix("sha256:")
-            .context("Unsupported checksum algorithm")?;
-        ensure!(expected_hex.len() == 64 &&
-            expected_hex.bytes().all(|byte| byte.is_ascii_hexdigit()),
-            "Invalid snapshot SHA-256 value");
+        let expected_hex = Self::parse_sha256(metadata.file_hash.as_ref()
+            .context("Missing file_hash: refusing unauthenticated snapshot")?)?;
         ensure!(metadata.file_size > 0, "Metadata file_size must be positive");
-        let url = Self::release_url(&metadata.version)?;
+        let plan = Self::resolve_asset_plan(metadata, directory, &expected_hex)?;
         let staging = directory.join(format!("tariffs.staging-{}.db", metadata.version));
 
         // A complete tariff snapshot can exceed 400 MB. A five-minute *total*
@@ -281,7 +287,7 @@ impl TaxDataDownloader {
         // 重试预算只对「无进展的连续失败」计费：慢链路下每次都有推进
         // 就一直续传，只有反复原地失败才耗尽预算报错。
         let mut failures_without_progress: u32 = 0;
-        let mut prev_len: u64 = std::fs::metadata(&staging).map(|meta| meta.len()).unwrap_or(0);
+        let mut prev_len: u64 = std::fs::metadata(&plan.staging).map(|meta| meta.len()).unwrap_or(0);
         let mut attempts: u32 = 0;
         let mut last_error: Option<anyhow::Error> = None;
         loop {
@@ -299,27 +305,23 @@ impl TaxDataDownloader {
                 tokio::time::sleep(delay).await;
             }
             attempts += 1;
-            match Self::download_attempt(&client, &url, &staging, metadata, progress).await {
-                Ok(received) if received == metadata.file_size => {
-                    // 终验以磁盘上的完整文件为准，续传/重试路径无需维护增量哈希。
-                    let mut staged = std::fs::File::open(&staging)?;
-                    let mut hash = Sha256::new();
-                    std::io::copy(&mut staged, &mut hash)?;
-                    let digest = format!("{:x}", hash.finalize());
-                    ensure!(digest.eq_ignore_ascii_case(expected_hex),
-                        "Snapshot SHA-256 mismatch: refusing installation");
-                    return Ok(staging);
+            match Self::download_asset(&client, &plan.url, &plan.staging, plan.expected_size, progress).await {
+                Ok(received) if received == plan.expected_size => {
+                    // 资产字节完整后的校验/解压属于内容完整性问题，与链路抖动
+                    // 无关，重试同样内容没有意义，失败直接返回（staging 保留）。
+                    Self::finalize_snapshot(&plan, &staging, metadata.file_size, &expected_hex)?;
+                    return Ok(staging); // 晋升成功后由调用方清理；失败时保留以支持再次续传
                 }
                 Ok(received) => {
                     // 服务器提前正常关流（截断）：按可续传失败处理。
                     last_error = Some(anyhow!(
                         "连接在下载完成前关闭: received {} expected {}",
-                        received, metadata.file_size
+                        received, plan.expected_size
                     ));
                 }
                 Err(error) => last_error = Some(error),
             }
-            let now_len = std::fs::metadata(&staging).map(|meta| meta.len()).unwrap_or(0);
+            let now_len = std::fs::metadata(&plan.staging).map(|meta| meta.len()).unwrap_or(0);
             if now_len >= prev_len.saturating_add(PROGRESS_RESET_MIN_BYTES) {
                 log::info!("本次尝试推进了 {} 字节，重置续传重试预算", now_len - prev_len);
                 failures_without_progress = 0;
@@ -336,19 +338,106 @@ impl TaxDataDownloader {
         ))
     }
 
+    /// "sha256:<64 位 hex>" → 归一化小写 hex；顺带完成格式校验。
+    fn parse_sha256(value: &str) -> Result<String> {
+        let hex = value.strip_prefix("sha256:").context("Unsupported checksum algorithm")?;
+        ensure!(hex.len() == 64 &&
+            hex.bytes().all(|byte| byte.is_ascii_hexdigit()),
+            "Invalid snapshot SHA-256 value");
+        Ok(hex.to_ascii_lowercase())
+    }
+
+    /// 决定本次要下载的资产：清单带 zstd 压缩块则取压缩包（弱网下传输量
+    /// 只有原始快照的零头），否则按旧清单语义取原始快照本体。
+    fn resolve_asset_plan(
+        metadata: &RemoteMetadata, directory: &Path, raw_hex: &str,
+    ) -> Result<AssetPlan> {
+        let version = &metadata.version;
+        match metadata.compressed.as_ref() {
+            Some(compressed) if compressed.format == "zstd" => {
+                let expected_hex = Self::parse_sha256(&compressed.file_hash)
+                    .context("Invalid compressed asset hash")?;
+                ensure!(compressed.file_size > 0, "Compressed asset file_size must be positive");
+                let asset = compressed.asset.as_str();
+                // 资产名拼进下载 URL，校验字符集防止路径穿越（与 release_url 同级防线）
+                ensure!(!asset.is_empty() && asset.len() <= 110 &&
+                    asset.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_')),
+                    "Unexpected compressed asset name");
+                Ok(AssetPlan {
+                    url: format!("{}/{}/{}", RELEASE_BASE, version, asset),
+                    expected_size: compressed.file_size,
+                    expected_hex,
+                    staging: directory.join(format!("tariffs.staging-{}.db.zst", version)),
+                    compressed: true,
+                })
+            }
+            Some(other) => Err(anyhow!(
+                "Unsupported compressed snapshot format: {}", other.format
+            )),
+            None => Ok(AssetPlan {
+                url: Self::release_url(version)?,
+                expected_size: metadata.file_size,
+                expected_hex: raw_hex.to_string(),
+                staging: directory.join(format!("tariffs.staging-{}.db", version)),
+                compressed: false,
+            }),
+        }
+    }
+
+    /// 资产字节完整后的本地收尾：压缩资产先验自身哈希（尽早暴露传输损坏），
+    /// 流式解压到最终 staging，再对（解压后的）快照做尺寸 + SHA-256 终验。
+    /// 任一校验失败都会清掉 staging 内容——绝不让坏数据以「尺寸完整」的
+    /// 假象留存。只涉及本地 IO，可单元测试。
+    fn finalize_snapshot(
+        plan: &AssetPlan, staging: &Path, raw_size: u64, raw_hex: &str,
+    ) -> Result<()> {
+        if plan.compressed {
+            Self::verify_file(&plan.staging, plan.expected_size, &plan.expected_hex)
+                .context("Compressed asset verification failed")?;
+            {
+                let input = std::io::BufReader::new(std::fs::File::open(&plan.staging)?);
+                let mut output = std::io::BufWriter::new(std::fs::OpenOptions::new()
+                    .write(true).create(true).truncate(true).open(staging)?);
+                zstd::stream::copy_decode(input, &mut output)
+                    .context("Zstd decompression failed")?;
+                output.flush()?;
+            }
+            let _ = std::fs::remove_file(&plan.staging);
+        }
+        let verified = Self::verify_file(staging, raw_size, raw_hex);
+        if verified.is_err() {
+            let _ = std::fs::remove_file(staging);
+        }
+        verified
+    }
+
+    /// 单文件的尺寸 + SHA-256 校验。
+    fn verify_file(path: &Path, expected_size: u64, expected_hex: &str) -> Result<()> {
+        let actual_size = std::fs::metadata(path)?.len();
+        ensure!(actual_size == expected_size,
+            "Snapshot size mismatch: received {} expected {}", actual_size, expected_size);
+        let mut file = std::fs::File::open(path)?;
+        let mut hash = Sha256::new();
+        std::io::copy(&mut file, &mut hash)?;
+        let digest = format!("{:x}", hash.finalize());
+        ensure!(digest.eq_ignore_ascii_case(expected_hex),
+            "Snapshot SHA-256 mismatch: refusing installation");
+        Ok(())
+    }
+
     /// 第 next_attempt（2 起）次尝试前的退避间隔：3s、6s、12s、24s。
     fn retry_delay(next_attempt: u32) -> std::time::Duration {
         std::time::Duration::from_secs(3 * (1u64 << (next_attempt - 2).min(4)))
     }
 
-    /// 单次下载尝试：按 staging 现状发起请求（有半成品就带 Range 续传），
+    /// 单次资产下载尝试：按 staging 现状发起请求（有半成品就带 Range 续传），
     /// 流式写入直到服务器正常关流，返回累计偏移。网络中断/停滞以 Err 返回，
     /// 由调用方决定重试；staging 内容在异常退出时仍然有效（追加写入）。
-    async fn download_attempt<F>(
+    async fn download_asset<F>(
         client: &reqwest::Client,
         url: &str,
         staging: &Path,
-        metadata: &RemoteMetadata,
+        expected_size: u64,
         progress: &mut F,
     ) -> Result<u64>
     where
@@ -358,7 +447,7 @@ impl TaxDataDownloader {
         // 也覆盖本次的重试（包括上一块只写了一部分的情况）。
         let mut resume_from: u64 = 0;
         match std::fs::metadata(staging) {
-            Ok(existing) if existing.len() < metadata.file_size => resume_from = existing.len(),
+            Ok(existing) if existing.len() < expected_size => resume_from = existing.len(),
             _ => { let _ = std::fs::remove_file(staging); }
         }
 
@@ -376,7 +465,7 @@ impl TaxDataDownloader {
 
         let total = response.content_length()
             .map(|len| len + resume_from)
-            .unwrap_or(metadata.file_size);
+            .unwrap_or(expected_size);
         let mut received: u64 = resume_from;
         let mut file = std::fs::OpenOptions::new()
             .write(true).create(true).truncate(false)
@@ -395,7 +484,7 @@ impl TaxDataDownloader {
                 )),
             };
             received += chunk.len() as u64;
-            ensure!(received <= metadata.file_size, "Snapshot larger than manifest");
+            ensure!(received <= expected_size, "Snapshot larger than manifest");
             file.write_all(&chunk)?;
             progress(received, total);
         }
@@ -425,6 +514,156 @@ impl TaxDataDownloader {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 与 testdata/snapshot-fixture.db.zst 一一对应的校验值；
+    /// 由 testdata/make_fixture.py 生成（zstd level 15）。
+    const FIXTURE_RAW_SIZE: u64 = 344553;
+    const FIXTURE_RAW_HASH: &str = "0b7f1ef8e191433499521dc1d64540f7338360a6b924492e1cedc15910c02c8d";
+    const FIXTURE_ZST_SIZE: u64 = 24911;
+    const FIXTURE_ZST_HASH: &str = "d8628d4944837bc4c76e28c1ff98725827ae67bb0e57b507b55f02baa558b493";
+
+    fn test_metadata(file_hash: &str, compressed: Option<crate::models::tax::CompressedAsset>) -> RemoteMetadata {
+        RemoteMetadata {
+            version: "data-36851279616".into(),
+            timestamp: "2026-10-21T00:00:00Z".into(),
+            last_modified: "2026-10-21T00:00:00Z".into(),
+            file_size: FIXTURE_RAW_SIZE,
+            file_hash: Some(file_hash.into()),
+            record_count: 1,
+            download_urls: crate::models::tax::DownloadUrls {
+                primary: String::new(),
+                metadata: String::new(),
+                mirror: Vec::new(),
+            },
+            compressed,
+            changelog: None,
+            data_changes: None,
+        }
+    }
+
+    #[test]
+    fn resolve_plan_prefers_compressed_asset() {
+        let metadata = test_metadata(
+            &format!("sha256:{FIXTURE_RAW_HASH}"),
+            Some(crate::models::tax::CompressedAsset {
+                format: "zstd".into(),
+                asset: "tariffs.db.zst".into(),
+                file_size: FIXTURE_ZST_SIZE,
+                file_hash: format!("sha256:{FIXTURE_ZST_HASH}"),
+            }),
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let plan = TaxDataDownloader::resolve_asset_plan(&metadata, dir.path(), FIXTURE_RAW_HASH).unwrap();
+        assert!(plan.compressed);
+        assert_eq!(plan.expected_size, FIXTURE_ZST_SIZE);
+        assert_eq!(plan.expected_hex, FIXTURE_ZST_HASH);
+        assert!(plan.url.ends_with("/data-36851279616/tariffs.db.zst"));
+        assert!(plan.staging.to_string_lossy().ends_with(".db.zst"));
+    }
+
+    #[test]
+    fn resolve_plan_rejects_unknown_compression() {
+        let metadata = test_metadata(
+            &format!("sha256:{FIXTURE_RAW_HASH}"),
+            Some(crate::models::tax::CompressedAsset {
+                format: "rar".into(),
+                asset: "tariffs.db.rar".into(),
+                file_size: 1,
+                file_hash: format!("sha256:{FIXTURE_ZST_HASH}"),
+            }),
+        );
+        let dir = tempfile::tempdir().unwrap();
+        assert!(TaxDataDownloader::resolve_asset_plan(&metadata, dir.path(), FIXTURE_RAW_HASH).is_err());
+    }
+
+    #[test]
+    fn resolve_plan_rejects_asset_name_traversal() {
+        let metadata = test_metadata(
+            &format!("sha256:{FIXTURE_RAW_HASH}"),
+            Some(crate::models::tax::CompressedAsset {
+                format: "zstd".into(),
+                asset: "../latest-data/tariffs.db.zst".into(),
+                file_size: FIXTURE_ZST_SIZE,
+                file_hash: format!("sha256:{FIXTURE_ZST_HASH}"),
+            }),
+        );
+        let dir = tempfile::tempdir().unwrap();
+        assert!(TaxDataDownloader::resolve_asset_plan(&metadata, dir.path(), FIXTURE_RAW_HASH).is_err());
+    }
+
+    #[test]
+    fn resolve_plan_falls_back_to_raw_snapshot() {
+        let metadata = test_metadata(&format!("sha256:{FIXTURE_RAW_HASH}"), None);
+        let dir = tempfile::tempdir().unwrap();
+        let plan = TaxDataDownloader::resolve_asset_plan(&metadata, dir.path(), FIXTURE_RAW_HASH).unwrap();
+        assert!(!plan.compressed);
+        assert_eq!(plan.expected_size, FIXTURE_RAW_SIZE);
+        assert_eq!(plan.expected_hex, FIXTURE_RAW_HASH);
+        assert!(plan.url.ends_with("/tariffs.db"));
+        assert!(plan.staging.to_string_lossy().ends_with(".db"));
+    }
+
+    #[test]
+    fn finalize_installs_decompressed_snapshot() {
+        let dir = tempfile::tempdir().unwrap();
+        let zst_path = dir.path().join("snapshot.db.zst");
+        let staging = dir.path().join("snapshot.db");
+        std::fs::write(&zst_path, include_bytes!("testdata/snapshot-fixture.db.zst")).unwrap();
+        let plan = AssetPlan {
+            url: String::new(),
+            expected_size: FIXTURE_ZST_SIZE,
+            expected_hex: FIXTURE_ZST_HASH.into(),
+            staging: zst_path,
+            compressed: true,
+        };
+        TaxDataDownloader::finalize_snapshot(&plan, &staging, FIXTURE_RAW_SIZE, FIXTURE_RAW_HASH).unwrap();
+        assert_eq!(std::fs::metadata(&staging).unwrap().len(), FIXTURE_RAW_SIZE);
+        // 解压完成的压缩包随即清理
+        assert!(!plan.staging.exists());
+    }
+
+    #[test]
+    fn finalize_rejects_corrupt_compressed_asset() {
+        let dir = tempfile::tempdir().unwrap();
+        let zst_path = dir.path().join("snapshot.db.zst");
+        let staging = dir.path().join("snapshot.db");
+        // 篡改一个字节：资产哈希虽不在此校验，坏帧会在解压或终验处暴露
+        let mut blob = include_bytes!("testdata/snapshot-fixture.db.zst").to_vec();
+        blob[100] ^= 0xff;
+        std::fs::write(&zst_path, &blob).unwrap();
+        let plan = AssetPlan {
+            url: String::new(),
+            expected_size: FIXTURE_ZST_SIZE,
+            expected_hex: FIXTURE_ZST_HASH.into(),
+            staging: zst_path,
+            compressed: true,
+        };
+        assert!(TaxDataDownloader::finalize_snapshot(&plan, &staging, FIXTURE_RAW_SIZE, FIXTURE_RAW_HASH).is_err());
+        // 绝不让未通过校验的内容以正确尺寸假象留下
+        assert!(!staging.exists() || std::fs::metadata(&staging).unwrap().len() != FIXTURE_RAW_SIZE);
+    }
+
+    #[test]
+    fn finalize_verifies_uncompressed_snapshot_in_place() {
+        let dir = tempfile::tempdir().unwrap();
+        let staging = dir.path().join("snapshot.db");
+        let raw = zstd::stream::decode_all(include_bytes!("testdata/snapshot-fixture.db.zst").as_slice()).unwrap();
+        std::fs::write(&staging, &raw).unwrap();
+        let plan = AssetPlan {
+            url: String::new(),
+            expected_size: raw.len() as u64,
+            expected_hex: FIXTURE_RAW_HASH.into(),
+            staging: staging.clone(),
+            compressed: false,
+        };
+        TaxDataDownloader::finalize_snapshot(&plan, &staging, raw.len() as u64, FIXTURE_RAW_HASH).unwrap();
+
+        // 尺寸不符必须拒绝
+        assert!(TaxDataDownloader::finalize_snapshot(&plan, &staging, raw.len() as u64 + 1, FIXTURE_RAW_HASH).is_err());
+        // 哈希不符必须拒绝
+        let wrong = "0".repeat(64);
+        assert!(TaxDataDownloader::finalize_snapshot(&plan, &staging, raw.len() as u64, &wrong).is_err());
+    }
 
     #[test]
     fn retry_delay_grows_to_capped_backoff() {
