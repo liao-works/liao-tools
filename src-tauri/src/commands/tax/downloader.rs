@@ -31,6 +31,35 @@ struct AssetPlan {
     compressed: bool,
 }
 
+/// 单个资产的下载结论：Installed = staging 已就位并通过终验；
+/// AssetUnavailable = 资产本身缺失/损坏（压缩路径可降级原始快照）；
+/// Failed = 链路类失败耗尽重试预算（换更大的原始文件重试没有意义）。
+enum AssetOutcome {
+    Installed,
+    AssetUnavailable(anyhow::Error),
+    Failed(anyhow::Error),
+}
+
+/// 单次请求失败的分类：HTTP 状态异常说明资产本身拿不到（续传无意义），
+/// 其余按可续传处理。
+enum AttemptFailure {
+    Unavailable(anyhow::Error),
+    Retryable(anyhow::Error),
+}
+
+impl From<anyhow::Error> for AttemptFailure {
+    fn from(error: anyhow::Error) -> Self {
+        AttemptFailure::Retryable(error)
+    }
+}
+
+impl AttemptFailure {
+    /// std 错误类型（reqwest::Error / std::io::Error 等）一律按可续传处理。
+    fn retryable<E: std::error::Error + Send + Sync + 'static>(error: E) -> Self {
+        AttemptFailure::Retryable(anyhow::Error::new(error))
+    }
+}
+
 /// Install *immutable* release assets. The current public channel stays on latest-data.
 /// Future shadow or V2 data MUST NOT use this production installer until promoted.
 pub struct TaxDataDownloader;
@@ -177,7 +206,8 @@ impl TaxDataDownloader {
             for entry in entries.flatten() {
                 let name = entry.file_name();
                 let name = name.to_string_lossy();
-                if (name.starts_with("tariffs.staging-") && name.ends_with(".db"))
+                if (name.starts_with("tariffs.staging-")
+                        && (name.ends_with(".db") || name.ends_with(".db.zst")))
                     || name.starts_with("tariffs-download-")
                 {
                     let _ = std::fs::remove_file(entry.path());
@@ -257,10 +287,11 @@ impl TaxDataDownloader {
 
     /// 下载快照到与目标版本绑定的 staging 文件；同名 staging 已存在时发起
     /// Range 续传（服务器不支持分段则整体重下）。清单提供 zstd 压缩资产时
-    /// 下载压缩包、校验通过后本地解压（旧清单无 compressed 字段则按原始
-    /// 快照下载）。流中断/停滞自动退避续传，且重试预算只对「无进展的连续
-    /// 失败」计费。最终以清单的（解压后）大小 + 完整文件 SHA-256 全量校验
-    /// 为准，校验通过前绝不进入安装。
+    /// 优先下载压缩包（弱网下传输量只有原始快照的零头）；压缩资产缺失、
+    /// 损坏或格式不被识别时，自动降级为原始 tariffs.db 下载，保持对纯 db
+    /// 发布形态的兼容。流中断/停滞自动退避续传，且重试预算只对「无进展的
+    /// 连续失败」计费。最终以清单的（解压后）大小 + 完整文件 SHA-256 全量
+    /// 校验为准，校验通过前绝不进入安装。
     async fn download_database<F>(
         directory: &Path, metadata: &RemoteMetadata, progress: &mut F
     ) -> Result<PathBuf>
@@ -270,7 +301,7 @@ impl TaxDataDownloader {
         let expected_hex = Self::parse_sha256(metadata.file_hash.as_ref()
             .context("Missing file_hash: refusing unauthenticated snapshot")?)?;
         ensure!(metadata.file_size > 0, "Metadata file_size must be positive");
-        let plan = Self::resolve_asset_plan(metadata, directory, &expected_hex)?;
+        let mut plan = Self::resolve_asset_plan(metadata, directory, &expected_hex)?;
         let staging = directory.join(format!("tariffs.staging-{}.db", metadata.version));
 
         // A complete tariff snapshot can exceed 400 MB. A five-minute *total*
@@ -282,10 +313,47 @@ impl TaxDataDownloader {
         )
         .build()?;
 
-        // 到 GitHub Releases 的长链路上连接被中途重置是常态而非异常：
-        // staging 让每次尝试都能从已下载字节继续，这里自动退避续传。
-        // 重试预算只对「无进展的连续失败」计费：慢链路下每次都有推进
-        // 就一直续传，只有反复原地失败才耗尽预算报错。
+        let outcome = Self::download_plan(
+            &client, &plan, &staging, metadata.file_size, &expected_hex, progress,
+        ).await;
+        let outcome = match outcome {
+            AssetOutcome::Installed | AssetOutcome::Failed(_) => outcome,
+            AssetOutcome::AssetUnavailable(error) if !plan.compressed => {
+                AssetOutcome::Failed(error)
+            }
+            // 压缩资产不可用（缺失/损坏/格式不识别）：降级为原始 db 下载。
+            // 原始快照与压缩资产是独立上传的文件，不受同一份损坏影响。
+            AssetOutcome::AssetUnavailable(error) => {
+                log::warn!("压缩资产不可用，降级为原始快照下载: {error:#}");
+                let _ = std::fs::remove_file(&plan.staging);
+                plan = Self::raw_asset_plan(metadata, directory, &expected_hex)?;
+                Self::download_plan(
+                    &client, &plan, &staging, metadata.file_size, &expected_hex, progress,
+                ).await
+            }
+        };
+        match outcome {
+            AssetOutcome::Installed => Ok(staging),
+            AssetOutcome::Failed(error) | AssetOutcome::AssetUnavailable(error) => {
+                // {:#} 保留原因链，数据更新日志里仍能看到最底层错误（如 stream failed）。
+                Err(anyhow!("{error:#}"))
+            }
+        }
+    }
+
+    /// 带重试预算的单资产下载：流中断/停滞自动退避续传，重试预算只对
+    /// 「无进展的连续失败」计费；HTTP 状态异常立即按资产不可用返回。
+    async fn download_plan<F>(
+        client: &reqwest::Client,
+        plan: &AssetPlan,
+        staging: &Path,
+        raw_size: u64,
+        raw_hex: &str,
+        progress: &mut F,
+    ) -> AssetOutcome
+    where
+        F: FnMut(u64, u64),
+    {
         let mut failures_without_progress: u32 = 0;
         let mut prev_len: u64 = std::fs::metadata(&plan.staging).map(|meta| meta.len()).unwrap_or(0);
         let mut attempts: u32 = 0;
@@ -305,12 +373,15 @@ impl TaxDataDownloader {
                 tokio::time::sleep(delay).await;
             }
             attempts += 1;
-            match Self::download_asset(&client, &plan.url, &plan.staging, plan.expected_size, progress).await {
+            match Self::download_asset(client, &plan.url, &plan.staging, plan.expected_size, progress).await {
                 Ok(received) if received == plan.expected_size => {
                     // 资产字节完整后的校验/解压属于内容完整性问题，与链路抖动
-                    // 无关，重试同样内容没有意义，失败直接返回（staging 保留）。
-                    Self::finalize_snapshot(&plan, &staging, metadata.file_size, &expected_hex)?;
-                    return Ok(staging); // 晋升成功后由调用方清理；失败时保留以支持再次续传
+                    // 无关；压缩路径的资产损坏可降级，原始路径只能报错。
+                    return match Self::finalize_snapshot(plan, staging, raw_size, raw_hex) {
+                        Ok(()) => AssetOutcome::Installed,
+                        Err(error) if plan.compressed => AssetOutcome::AssetUnavailable(error),
+                        Err(error) => AssetOutcome::Failed(error),
+                    };
                 }
                 Ok(received) => {
                     // 服务器提前正常关流（截断）：按可续传失败处理。
@@ -319,7 +390,10 @@ impl TaxDataDownloader {
                         received, plan.expected_size
                     ));
                 }
-                Err(error) => last_error = Some(error),
+                Err(AttemptFailure::Unavailable(error)) => {
+                    return AssetOutcome::AssetUnavailable(error);
+                }
+                Err(AttemptFailure::Retryable(error)) => last_error = Some(error),
             }
             let now_len = std::fs::metadata(&plan.staging).map(|meta| meta.len()).unwrap_or(0);
             if now_len >= prev_len.saturating_add(PROGRESS_RESET_MIN_BYTES) {
@@ -331,8 +405,7 @@ impl TaxDataDownloader {
             prev_len = now_len;
         }
         let error = last_error.expect("download attempts recorded no error");
-        // {:#} 保留原因链，数据更新日志里仍能看到最底层错误（如 stream failed）。
-        Err(anyhow!(
+        AssetOutcome::Failed(anyhow!(
             "下载中断，连续 {} 次续传无进展；断点已保留，再次下载将从断点继续: {:#}",
             failures_without_progress, error
         ))
@@ -347,41 +420,63 @@ impl TaxDataDownloader {
         Ok(hex.to_ascii_lowercase())
     }
 
-    /// 决定本次要下载的资产：清单带 zstd 压缩块则取压缩包（弱网下传输量
-    /// 只有原始快照的零头），否则按旧清单语义取原始快照本体。
+    /// 决定本次要下载的资产：清单带 zstd 压缩块则取压缩包；格式不被识别
+    /// 或压缩块字段异常时**降级原始快照**（保证对纯 db 发布形态的兼容），
+    /// 只有版本号本身非法才报错。
     fn resolve_asset_plan(
         metadata: &RemoteMetadata, directory: &Path, raw_hex: &str,
     ) -> Result<AssetPlan> {
-        let version = &metadata.version;
         match metadata.compressed.as_ref() {
             Some(compressed) if compressed.format == "zstd" => {
-                let expected_hex = Self::parse_sha256(&compressed.file_hash)
-                    .context("Invalid compressed asset hash")?;
-                ensure!(compressed.file_size > 0, "Compressed asset file_size must be positive");
+                let expected_hex = match Self::parse_sha256(&compressed.file_hash) {
+                    Ok(hex) => hex,
+                    Err(error) => {
+                        log::warn!("压缩资产哈希字段异常，回退原始快照下载: {error:#}");
+                        return Self::raw_asset_plan(metadata, directory, raw_hex);
+                    }
+                };
+                if compressed.file_size == 0 {
+                    log::warn!("压缩资产 file_size 为 0，回退原始快照下载");
+                    return Self::raw_asset_plan(metadata, directory, raw_hex);
+                }
                 let asset = compressed.asset.as_str();
                 // 资产名拼进下载 URL，校验字符集防止路径穿越（与 release_url 同级防线）
-                ensure!(!asset.is_empty() && asset.len() <= 110 &&
-                    asset.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_')),
-                    "Unexpected compressed asset name");
+                if asset.is_empty() || asset.len() > 110 ||
+                    !asset.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_'))
+                {
+                    log::warn!("压缩资产名称异常（{asset}），回退原始快照下载");
+                    return Self::raw_asset_plan(metadata, directory, raw_hex);
+                }
                 Ok(AssetPlan {
-                    url: format!("{}/{}/{}", RELEASE_BASE, version, asset),
+                    url: format!("{}/{}/{}", RELEASE_BASE, metadata.version, asset),
                     expected_size: compressed.file_size,
                     expected_hex,
-                    staging: directory.join(format!("tariffs.staging-{}.db.zst", version)),
+                    staging: directory.join(format!("tariffs.staging-{}.db.zst", metadata.version)),
                     compressed: true,
                 })
             }
-            Some(other) => Err(anyhow!(
-                "Unsupported compressed snapshot format: {}", other.format
-            )),
-            None => Ok(AssetPlan {
-                url: Self::release_url(version)?,
-                expected_size: metadata.file_size,
-                expected_hex: raw_hex.to_string(),
-                staging: directory.join(format!("tariffs.staging-{}.db", version)),
-                compressed: false,
-            }),
+            Some(other) => {
+                log::warn!(
+                    "清单使用了不支持的压缩格式（{}），回退原始快照下载",
+                    other.format
+                );
+                Self::raw_asset_plan(metadata, directory, raw_hex)
+            }
+            None => Self::raw_asset_plan(metadata, directory, raw_hex),
         }
+    }
+
+    /// 旧清单语义：直接下载原始 tariffs.db。
+    fn raw_asset_plan(
+        metadata: &RemoteMetadata, directory: &Path, raw_hex: &str,
+    ) -> Result<AssetPlan> {
+        Ok(AssetPlan {
+            url: Self::release_url(&metadata.version)?,
+            expected_size: metadata.file_size,
+            expected_hex: raw_hex.to_string(),
+            staging: directory.join(format!("tariffs.staging-{}.db", metadata.version)),
+            compressed: false,
+        })
     }
 
     /// 资产字节完整后的本地收尾：压缩资产先验自身哈希（尽早暴露传输损坏），
@@ -431,15 +526,16 @@ impl TaxDataDownloader {
     }
 
     /// 单次资产下载尝试：按 staging 现状发起请求（有半成品就带 Range 续传），
-    /// 流式写入直到服务器正常关流，返回累计偏移。网络中断/停滞以 Err 返回，
-    /// 由调用方决定重试；staging 内容在异常退出时仍然有效（追加写入）。
+    /// 流式写入直到服务器正常关流，返回累计偏移。HTTP 状态异常返回
+    /// `Unavailable`（资产本身拿不到，续传没有意义），其余失败按可续传处理；
+    /// staging 内容在异常退出时仍然有效（追加写入）。
     async fn download_asset<F>(
         client: &reqwest::Client,
         url: &str,
         staging: &Path,
         expected_size: u64,
         progress: &mut F,
-    ) -> Result<u64>
+    ) -> Result<u64, AttemptFailure>
     where
         F: FnMut(u64, u64),
     {
@@ -455,9 +551,22 @@ impl TaxDataDownloader {
         if resume_from > 0 {
             request = request.header(reqwest::header::RANGE, format!("bytes={resume_from}-"));
         }
-        let response = request.send().await?.error_for_status()?;
+        let response = request.send().await.map_err(AttemptFailure::retryable)?;
+        let status = response.status();
+        // 只有「资产确实不存在」（404/410，如发布端漏传 .zst）才立即判定
+        // 不可用；5xx/429 等瞬时错误仍走续传重试，避免抖动触发大文件降级
+        if status == reqwest::StatusCode::NOT_FOUND || status == reqwest::StatusCode::GONE {
+            return Err(AttemptFailure::Unavailable(anyhow!(
+                "资产不存在: HTTP {status}"
+            )));
+        }
+        if !(status.is_success() || status == reqwest::StatusCode::PARTIAL_CONTENT) {
+            return Err(AttemptFailure::Retryable(anyhow!(
+                "资产请求被拒绝: HTTP {status}"
+            )));
+        }
         // 服务器忽略 Range 返回 200 时只能整体重下
-        let resuming = resume_from > 0 && response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+        let resuming = resume_from > 0 && status == reqwest::StatusCode::PARTIAL_CONTENT;
         if !resuming {
             resume_from = 0;
             let _ = std::fs::remove_file(staging);
@@ -469,26 +578,33 @@ impl TaxDataDownloader {
         let mut received: u64 = resume_from;
         let mut file = std::fs::OpenOptions::new()
             .write(true).create(true).truncate(false)
-            .open(staging)?;
-        file.seek(SeekFrom::Start(resume_from))?;
+            .open(staging).map_err(AttemptFailure::retryable)?;
+        file.seek(SeekFrom::Start(resume_from)).map_err(AttemptFailure::retryable)?;
         if resuming {
             progress(received, total);
         }
         let mut stream = response.bytes_stream();
         loop {
             let chunk = match tokio::time::timeout(CHUNK_STALL_TIMEOUT, stream.next()).await {
-                Ok(Some(chunk)) => chunk.context("Download stream failed")?,
+                Ok(Some(chunk)) => chunk
+                    .map_err(|error| AttemptFailure::Retryable(
+                        anyhow::Error::new(error).context("Download stream failed")
+                    ))?,
                 Ok(None) => break,
-                Err(_elapsed) => return Err(anyhow!(
+                Err(_elapsed) => return Err(AttemptFailure::Retryable(anyhow!(
                     "Tariff data download stalled for 150 seconds"
-                )),
+                ))),
             };
             received += chunk.len() as u64;
-            ensure!(received <= expected_size, "Snapshot larger than manifest");
-            file.write_all(&chunk)?;
+            if received > expected_size {
+                return Err(AttemptFailure::Retryable(anyhow!(
+                    "Snapshot larger than manifest"
+                )));
+            }
+            file.write_all(&chunk).map_err(AttemptFailure::retryable)?;
             progress(received, total);
         }
-        file.sync_all()?;
+        file.sync_all().map_err(AttemptFailure::retryable)?;
         drop(file);
         Ok(received)
     }
@@ -562,7 +678,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_plan_rejects_unknown_compression() {
+    fn resolve_plan_degrades_unknown_compression_to_raw() {
         let metadata = test_metadata(
             &format!("sha256:{FIXTURE_RAW_HASH}"),
             Some(crate::models::tax::CompressedAsset {
@@ -573,11 +689,15 @@ mod tests {
             }),
         );
         let dir = tempfile::tempdir().unwrap();
-        assert!(TaxDataDownloader::resolve_asset_plan(&metadata, dir.path(), FIXTURE_RAW_HASH).is_err());
+        let plan = TaxDataDownloader::resolve_asset_plan(&metadata, dir.path(), FIXTURE_RAW_HASH).unwrap();
+        // 未来格式 + 旧客户端：必须兼容纯 db 发布形态，回退原始快照
+        assert!(!plan.compressed);
+        assert_eq!(plan.expected_size, FIXTURE_RAW_SIZE);
+        assert!(plan.url.ends_with("/tariffs.db"));
     }
 
     #[test]
-    fn resolve_plan_rejects_asset_name_traversal() {
+    fn resolve_plan_degrades_bad_asset_name_to_raw() {
         let metadata = test_metadata(
             &format!("sha256:{FIXTURE_RAW_HASH}"),
             Some(crate::models::tax::CompressedAsset {
@@ -588,7 +708,27 @@ mod tests {
             }),
         );
         let dir = tempfile::tempdir().unwrap();
-        assert!(TaxDataDownloader::resolve_asset_plan(&metadata, dir.path(), FIXTURE_RAW_HASH).is_err());
+        let plan = TaxDataDownloader::resolve_asset_plan(&metadata, dir.path(), FIXTURE_RAW_HASH).unwrap();
+        // 路径穿越类资产名不可信：降级原始快照而不是拼进 URL
+        assert!(!plan.compressed);
+        assert!(plan.url.ends_with("/tariffs.db"));
+    }
+
+    #[test]
+    fn resolve_plan_degrades_broken_compressed_block_to_raw() {
+        let metadata = test_metadata(
+            &format!("sha256:{FIXTURE_RAW_HASH}"),
+            Some(crate::models::tax::CompressedAsset {
+                format: "zstd".into(),
+                asset: "tariffs.db.zst".into(),
+                file_size: 0,
+                file_hash: "not-a-hash".into(),
+            }),
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let plan = TaxDataDownloader::resolve_asset_plan(&metadata, dir.path(), FIXTURE_RAW_HASH).unwrap();
+        assert!(!plan.compressed);
+        assert_eq!(plan.expected_size, FIXTURE_RAW_SIZE);
     }
 
     #[test]
