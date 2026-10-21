@@ -4,10 +4,35 @@ use crate::commands::update_history::diff::diff_tariffs;
 use crate::models::tax::{RemoteMetadata, TaxVersionInfo, VersionDetail};
 use anyhow::{anyhow, ensure, Context, Result};
 use futures_util::StreamExt;
+use md5::Md5;
 use sha2::{Digest, Sha256};
 use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use tauri::Manager;
+
+/// 同时计算 SHA-256 与 MD5 的 Write 适配器：一遍 IO 完成双哈希校验。
+struct DualHasher {
+    sha256: Sha256,
+    md5: Md5,
+}
+
+impl DualHasher {
+    fn new() -> Self {
+        Self { sha256: Sha256::new(), md5: Md5::new() }
+    }
+}
+
+impl Write for DualHasher {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.sha256.update(buf);
+        self.md5.update(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
 
 const METADATA_URL: &str =
     "https://github.com/liao-works/cursor-tax-tools/releases/download/latest-data/metadata.json";
@@ -27,6 +52,8 @@ struct AssetPlan {
     url: String,
     expected_size: u64,
     expected_hex: String,
+    /// 可选 MD5 第二重校验值（小写 hex）；清单未提供时为 None
+    expected_md5: Option<String>,
     staging: PathBuf,
     compressed: bool,
 }
@@ -301,6 +328,13 @@ impl TaxDataDownloader {
         let expected_hex = Self::parse_sha256(metadata.file_hash.as_ref()
             .context("Missing file_hash: refusing unauthenticated snapshot")?)?;
         ensure!(metadata.file_size > 0, "Metadata file_size must be positive");
+        let raw_md5 = metadata.file_md5.as_deref().and_then(|value| {
+            let parsed = Self::parse_md5(value);
+            if parsed.is_none() {
+                log::warn!("清单 file_md5 字段异常（{value}），跳过 MD5 第二重校验");
+            }
+            parsed
+        });
         let mut plan = Self::resolve_asset_plan(metadata, directory, &expected_hex)?;
         let staging = directory.join(format!("tariffs.staging-{}.db", metadata.version));
 
@@ -314,7 +348,7 @@ impl TaxDataDownloader {
         .build()?;
 
         let outcome = Self::download_plan(
-            &client, &plan, &staging, metadata.file_size, &expected_hex, progress,
+            &client, &plan, &staging, metadata.file_size, &expected_hex, raw_md5.as_deref(), progress,
         ).await;
         let outcome = match outcome {
             AssetOutcome::Installed | AssetOutcome::Failed(_) => outcome,
@@ -328,7 +362,7 @@ impl TaxDataDownloader {
                 let _ = std::fs::remove_file(&plan.staging);
                 plan = Self::raw_asset_plan(metadata, directory, &expected_hex)?;
                 Self::download_plan(
-                    &client, &plan, &staging, metadata.file_size, &expected_hex, progress,
+                    &client, &plan, &staging, metadata.file_size, &expected_hex, raw_md5.as_deref(), progress,
                 ).await
             }
         };
@@ -349,6 +383,7 @@ impl TaxDataDownloader {
         staging: &Path,
         raw_size: u64,
         raw_hex: &str,
+        raw_md5: Option<&str>,
         progress: &mut F,
     ) -> AssetOutcome
     where
@@ -377,7 +412,7 @@ impl TaxDataDownloader {
                 Ok(received) if received == plan.expected_size => {
                     // 资产字节完整后的校验/解压属于内容完整性问题，与链路抖动
                     // 无关；压缩路径的资产损坏可降级，原始路径只能报错。
-                    return match Self::finalize_snapshot(plan, staging, raw_size, raw_hex) {
+                    return match Self::finalize_snapshot(plan, staging, raw_size, raw_hex, raw_md5) {
                         Ok(()) => AssetOutcome::Installed,
                         Err(error) if plan.compressed => AssetOutcome::AssetUnavailable(error),
                         Err(error) => AssetOutcome::Failed(error),
@@ -420,6 +455,16 @@ impl TaxDataDownloader {
         Ok(hex.to_ascii_lowercase())
     }
 
+    /// "md5:<32 位 hex>" → 归一化小写 hex；格式异常返回 None（辅助校验，
+    /// 只告警不阻断）。
+    fn parse_md5(value: &str) -> Option<String> {
+        let hex = value.strip_prefix("md5:")?;
+        if hex.len() != 32 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return None;
+        }
+        Some(hex.to_ascii_lowercase())
+    }
+
     /// 决定本次要下载的资产：清单带 zstd 压缩块则取压缩包；格式不被识别
     /// 或压缩块字段异常时**降级原始快照**（保证对纯 db 发布形态的兼容），
     /// 只有版本号本身非法才报错。
@@ -447,10 +492,18 @@ impl TaxDataDownloader {
                     log::warn!("压缩资产名称异常（{asset}），回退原始快照下载");
                     return Self::raw_asset_plan(metadata, directory, raw_hex);
                 }
+                let expected_md5 = compressed.md5.as_deref().and_then(|value| {
+                    let parsed = Self::parse_md5(value);
+                    if parsed.is_none() {
+                        log::warn!("压缩资产 md5 字段异常（{value}），跳过 MD5 第二重校验");
+                    }
+                    parsed
+                });
                 Ok(AssetPlan {
                     url: format!("{}/{}/{}", RELEASE_BASE, metadata.version, asset),
                     expected_size: compressed.file_size,
                     expected_hex,
+                    expected_md5,
                     staging: directory.join(format!("tariffs.staging-{}.db.zst", metadata.version)),
                     compressed: true,
                 })
@@ -474,20 +527,22 @@ impl TaxDataDownloader {
             url: Self::release_url(&metadata.version)?,
             expected_size: metadata.file_size,
             expected_hex: raw_hex.to_string(),
+            expected_md5: metadata.file_md5.as_deref().and_then(Self::parse_md5),
             staging: directory.join(format!("tariffs.staging-{}.db", metadata.version)),
             compressed: false,
         })
     }
 
     /// 资产字节完整后的本地收尾：压缩资产先验自身哈希（尽早暴露传输损坏），
-    /// 流式解压到最终 staging，再对（解压后的）快照做尺寸 + SHA-256 终验。
-    /// 任一校验失败都会清掉 staging 内容——绝不让坏数据以「尺寸完整」的
-    /// 假象留存。只涉及本地 IO，可单元测试。
+    /// 流式解压到最终 staging，再对（解压后的）快照做尺寸 + SHA-256 + MD5
+    /// 终验。任一校验失败都会清掉 staging 内容——绝不让坏数据以「尺寸完整」
+    /// 的假象留存。只涉及本地 IO，可单元测试。
     fn finalize_snapshot(
-        plan: &AssetPlan, staging: &Path, raw_size: u64, raw_hex: &str,
+        plan: &AssetPlan, staging: &Path, raw_size: u64, raw_hex: &str, raw_md5: Option<&str>,
     ) -> Result<()> {
         if plan.compressed {
-            Self::verify_file(&plan.staging, plan.expected_size, &plan.expected_hex)
+            Self::verify_file(&plan.staging, plan.expected_size, &plan.expected_hex,
+                plan.expected_md5.as_deref())
                 .context("Compressed asset verification failed")?;
             {
                 let input = std::io::BufReader::new(std::fs::File::open(&plan.staging)?);
@@ -499,24 +554,31 @@ impl TaxDataDownloader {
             }
             let _ = std::fs::remove_file(&plan.staging);
         }
-        let verified = Self::verify_file(staging, raw_size, raw_hex);
+        let verified = Self::verify_file(staging, raw_size, raw_hex, raw_md5);
         if verified.is_err() {
             let _ = std::fs::remove_file(staging);
         }
         verified
     }
 
-    /// 单文件的尺寸 + SHA-256 校验。
-    fn verify_file(path: &Path, expected_size: u64, expected_hex: &str) -> Result<()> {
+    /// 单文件的尺寸 + SHA-256 + 可选 MD5 校验（双哈希一遍 IO 完成）。
+    fn verify_file(
+        path: &Path, expected_size: u64, expected_hex: &str, expected_md5: Option<&str>,
+    ) -> Result<()> {
         let actual_size = std::fs::metadata(path)?.len();
         ensure!(actual_size == expected_size,
             "Snapshot size mismatch: received {} expected {}", actual_size, expected_size);
         let mut file = std::fs::File::open(path)?;
-        let mut hash = Sha256::new();
-        std::io::copy(&mut file, &mut hash)?;
-        let digest = format!("{:x}", hash.finalize());
-        ensure!(digest.eq_ignore_ascii_case(expected_hex),
+        let mut hasher = DualHasher::new();
+        std::io::copy(&mut file, &mut hasher)?;
+        let sha256 = format!("{:x}", hasher.sha256.finalize());
+        ensure!(sha256.eq_ignore_ascii_case(expected_hex),
             "Snapshot SHA-256 mismatch: refusing installation");
+        if let Some(expected) = expected_md5 {
+            let md5 = format!("{:x}", hasher.md5.finalize());
+            ensure!(md5.eq_ignore_ascii_case(expected),
+                "Snapshot MD5 mismatch: refusing installation");
+        }
         Ok(())
     }
 
@@ -635,8 +697,10 @@ mod tests {
     /// 由 testdata/make_fixture.py 生成（zstd level 15）。
     const FIXTURE_RAW_SIZE: u64 = 344553;
     const FIXTURE_RAW_HASH: &str = "0b7f1ef8e191433499521dc1d64540f7338360a6b924492e1cedc15910c02c8d";
+    const FIXTURE_RAW_MD5: &str = "37780cc743d6c22a1539a7413d5241da";
     const FIXTURE_ZST_SIZE: u64 = 24911;
     const FIXTURE_ZST_HASH: &str = "d8628d4944837bc4c76e28c1ff98725827ae67bb0e57b507b55f02baa558b493";
+    const FIXTURE_ZST_MD5: &str = "dfc2330c1b0804c8be4458fcddc73508";
 
     fn test_metadata(file_hash: &str, compressed: Option<crate::models::tax::CompressedAsset>) -> RemoteMetadata {
         RemoteMetadata {
@@ -645,6 +709,7 @@ mod tests {
             last_modified: "2026-10-21T00:00:00Z".into(),
             file_size: FIXTURE_RAW_SIZE,
             file_hash: Some(file_hash.into()),
+            file_md5: Some(format!("md5:{FIXTURE_RAW_MD5}")),
             record_count: 1,
             download_urls: crate::models::tax::DownloadUrls {
                 primary: String::new(),
@@ -657,24 +722,38 @@ mod tests {
         }
     }
 
+    fn compressed_block() -> crate::models::tax::CompressedAsset {
+        crate::models::tax::CompressedAsset {
+            format: "zstd".into(),
+            asset: "tariffs.db.zst".into(),
+            file_size: FIXTURE_ZST_SIZE,
+            file_hash: format!("sha256:{FIXTURE_ZST_HASH}"),
+            md5: Some(format!("md5:{FIXTURE_ZST_MD5}")),
+        }
+    }
+
     #[test]
     fn resolve_plan_prefers_compressed_asset() {
         let metadata = test_metadata(
             &format!("sha256:{FIXTURE_RAW_HASH}"),
-            Some(crate::models::tax::CompressedAsset {
-                format: "zstd".into(),
-                asset: "tariffs.db.zst".into(),
-                file_size: FIXTURE_ZST_SIZE,
-                file_hash: format!("sha256:{FIXTURE_ZST_HASH}"),
-            }),
+            Some(compressed_block()),
         );
         let dir = tempfile::tempdir().unwrap();
         let plan = TaxDataDownloader::resolve_asset_plan(&metadata, dir.path(), FIXTURE_RAW_HASH).unwrap();
         assert!(plan.compressed);
         assert_eq!(plan.expected_size, FIXTURE_ZST_SIZE);
         assert_eq!(plan.expected_hex, FIXTURE_ZST_HASH);
+        assert_eq!(plan.expected_md5.as_deref(), Some(FIXTURE_ZST_MD5));
         assert!(plan.url.ends_with("/data-36851279616/tariffs.db.zst"));
         assert!(plan.staging.to_string_lossy().ends_with(".db.zst"));
+    }
+
+    #[test]
+    fn resolve_plan_carries_raw_md5_without_compression() {
+        let metadata = test_metadata(&format!("sha256:{FIXTURE_RAW_HASH}"), None);
+        let dir = tempfile::tempdir().unwrap();
+        let plan = TaxDataDownloader::resolve_asset_plan(&metadata, dir.path(), FIXTURE_RAW_HASH).unwrap();
+        assert_eq!(plan.expected_md5.as_deref(), Some(FIXTURE_RAW_MD5));
     }
 
     #[test]
@@ -686,6 +765,7 @@ mod tests {
                 asset: "tariffs.db.rar".into(),
                 file_size: 1,
                 file_hash: format!("sha256:{FIXTURE_ZST_HASH}"),
+                md5: None,
             }),
         );
         let dir = tempfile::tempdir().unwrap();
@@ -705,6 +785,7 @@ mod tests {
                 asset: "../latest-data/tariffs.db.zst".into(),
                 file_size: FIXTURE_ZST_SIZE,
                 file_hash: format!("sha256:{FIXTURE_ZST_HASH}"),
+                md5: None,
             }),
         );
         let dir = tempfile::tempdir().unwrap();
@@ -723,6 +804,7 @@ mod tests {
                 asset: "tariffs.db.zst".into(),
                 file_size: 0,
                 file_hash: "not-a-hash".into(),
+                md5: None,
             }),
         );
         let dir = tempfile::tempdir().unwrap();
@@ -753,10 +835,12 @@ mod tests {
             url: String::new(),
             expected_size: FIXTURE_ZST_SIZE,
             expected_hex: FIXTURE_ZST_HASH.into(),
+            expected_md5: Some(FIXTURE_ZST_MD5.into()),
             staging: zst_path,
             compressed: true,
         };
-        TaxDataDownloader::finalize_snapshot(&plan, &staging, FIXTURE_RAW_SIZE, FIXTURE_RAW_HASH).unwrap();
+        TaxDataDownloader::finalize_snapshot(&plan, &staging, FIXTURE_RAW_SIZE, FIXTURE_RAW_HASH,
+            Some(FIXTURE_RAW_MD5)).unwrap();
         assert_eq!(std::fs::metadata(&staging).unwrap().len(), FIXTURE_RAW_SIZE);
         // 解压完成的压缩包随即清理
         assert!(!plan.staging.exists());
@@ -767,7 +851,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let zst_path = dir.path().join("snapshot.db.zst");
         let staging = dir.path().join("snapshot.db");
-        // 篡改一个字节：资产哈希虽不在此校验，坏帧会在解压或终验处暴露
+        // 篡改一个字节：资产校验（尺寸/哈希）在此处暴露
         let mut blob = include_bytes!("testdata/snapshot-fixture.db.zst").to_vec();
         blob[100] ^= 0xff;
         std::fs::write(&zst_path, &blob).unwrap();
@@ -775,10 +859,12 @@ mod tests {
             url: String::new(),
             expected_size: FIXTURE_ZST_SIZE,
             expected_hex: FIXTURE_ZST_HASH.into(),
+            expected_md5: Some(FIXTURE_ZST_MD5.into()),
             staging: zst_path,
             compressed: true,
         };
-        assert!(TaxDataDownloader::finalize_snapshot(&plan, &staging, FIXTURE_RAW_SIZE, FIXTURE_RAW_HASH).is_err());
+        assert!(TaxDataDownloader::finalize_snapshot(&plan, &staging, FIXTURE_RAW_SIZE, FIXTURE_RAW_HASH,
+            Some(FIXTURE_RAW_MD5)).is_err());
         // 绝不让未通过校验的内容以正确尺寸假象留下
         assert!(!staging.exists() || std::fs::metadata(&staging).unwrap().len() != FIXTURE_RAW_SIZE);
     }
@@ -793,16 +879,36 @@ mod tests {
             url: String::new(),
             expected_size: raw.len() as u64,
             expected_hex: FIXTURE_RAW_HASH.into(),
+            expected_md5: Some(FIXTURE_RAW_MD5.into()),
             staging: staging.clone(),
             compressed: false,
         };
-        TaxDataDownloader::finalize_snapshot(&plan, &staging, raw.len() as u64, FIXTURE_RAW_HASH).unwrap();
+        TaxDataDownloader::finalize_snapshot(&plan, &staging, raw.len() as u64, FIXTURE_RAW_HASH,
+            Some(FIXTURE_RAW_MD5)).unwrap();
 
+        // 校验失败会清掉 staging，每条破坏性断言前都要重写
+        let refresh = |path: &Path| std::fs::write(path, &raw).unwrap();
+        refresh(&staging);
         // 尺寸不符必须拒绝
-        assert!(TaxDataDownloader::finalize_snapshot(&plan, &staging, raw.len() as u64 + 1, FIXTURE_RAW_HASH).is_err());
-        // 哈希不符必须拒绝
+        assert!(TaxDataDownloader::finalize_snapshot(&plan, &staging, raw.len() as u64 + 1, FIXTURE_RAW_HASH,
+            Some(FIXTURE_RAW_MD5)).is_err());
+        refresh(&staging);
+        // SHA-256 不符必须拒绝
         let wrong = "0".repeat(64);
-        assert!(TaxDataDownloader::finalize_snapshot(&plan, &staging, raw.len() as u64, &wrong).is_err());
+        assert!(TaxDataDownloader::finalize_snapshot(&plan, &staging, raw.len() as u64, &wrong,
+            Some(FIXTURE_RAW_MD5)).is_err());
+        refresh(&staging);
+        // MD5 不符必须拒绝（即使 SHA-256 通过）
+        assert!(TaxDataDownloader::finalize_snapshot(&plan, &staging, raw.len() as u64, FIXTURE_RAW_HASH,
+            Some(&"0".repeat(32))).is_err());
+        refresh(&staging);
+        // MD5 缺席时仅 SHA-256 生效（兼容不带 md5 字段的旧清单）
+        TaxDataDownloader::finalize_snapshot(&plan, &staging, raw.len() as u64, FIXTURE_RAW_HASH, None).unwrap();
+        refresh(&staging);
+        // 清单 MD5 与文件不一致且内容被换：错误信息应指向 MD5
+        let err = TaxDataDownloader::finalize_snapshot(&plan, &staging, raw.len() as u64, FIXTURE_RAW_HASH,
+            Some(&"f".repeat(32))).unwrap_err().to_string();
+        assert!(err.contains("MD5"), "unexpected error: {err}");
     }
 
     #[test]

@@ -112,13 +112,16 @@ pub struct BatchResult {
 /// 清单里可选的压缩快照资产；缺失时客户端按原始快照下载（向后兼容旧清单）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompressedAsset {
-    /// 压缩格式，目前仅支持 "zstd"，其他值客户端拒绝下载
+    /// 压缩格式，目前仅支持 "zstd"，其他值客户端降级原始快照下载
     pub format: String,
     /// Release 内的资产文件名
     #[serde(default = "default_compressed_asset")]
     pub asset: String,
     pub file_size: u64,
     pub file_hash: String,
+    /// 可选的 MD5 第二重校验值（"md5:<32 hex>"，与 Release 里的 .md5 文件一致）
+    #[serde(default)]
+    pub md5: Option<String>,
 }
 
 fn default_compressed_asset() -> String {
@@ -134,6 +137,9 @@ pub struct RemoteMetadata {
     pub file_size: u64,
     #[serde(default)]
     pub file_hash: Option<String>,
+    /// 原始库的可选 MD5 第二重校验值（"md5:<32 hex>"）
+    #[serde(default)]
+    pub file_md5: Option<String>,
     pub record_count: i64,
     pub download_urls: DownloadUrls,
     #[serde(default)]
