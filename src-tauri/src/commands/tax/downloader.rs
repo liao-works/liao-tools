@@ -14,10 +14,13 @@ const METADATA_URL: &str =
 const RELEASE_BASE: &str =
     "https://github.com/liao-works/cursor-tax-tools/releases/download";
 
-/// 单次快照下载的最大尝试次数（含首次）；流中断/停滞时退避后续传重试。
+/// 单次快照下载的最大尝试次数（含首次）；仅对「无进展的连续失败」计费，
+/// 每次尝试有实质推进（≥ PROGRESS_RESET_MIN_BYTES）就重置预算。
 const MAX_DOWNLOAD_ATTEMPTS: u32 = 5;
 /// 每个流式数据块的最大停滞时间；超过即视为连接已死，触发续传重试。
 const CHUNK_STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(150);
+/// 计为「实质推进」的最小新增字节数；防止慢性涓流让重试无限循环。
+const PROGRESS_RESET_MIN_BYTES: u64 = 1024 * 1024;
 
 /// Install *immutable* release assets. The current public channel stays on latest-data.
 /// Future shadow or V2 data MUST NOT use this production installer until promoted.
@@ -274,18 +277,28 @@ impl TaxDataDownloader {
         .build()?;
 
         // 到 GitHub Releases 的长链路上连接被中途重置是常态而非异常：
-        // staging 让每次尝试都能从已下载字节继续，这里自动退避续传，
-        // 重试耗尽才报失败。
+        // staging 让每次尝试都能从已下载字节继续，这里自动退避续传。
+        // 重试预算只对「无进展的连续失败」计费：慢链路下每次都有推进
+        // 就一直续传，只有反复原地失败才耗尽预算报错。
+        let mut failures_without_progress: u32 = 0;
+        let mut prev_len: u64 = std::fs::metadata(&staging).map(|meta| meta.len()).unwrap_or(0);
+        let mut attempts: u32 = 0;
         let mut last_error: Option<anyhow::Error> = None;
-        for attempt in 1..=MAX_DOWNLOAD_ATTEMPTS {
+        loop {
+            if failures_without_progress >= MAX_DOWNLOAD_ATTEMPTS {
+                break;
+            }
             if let Some(error) = last_error.as_ref() {
-                let delay = Self::retry_delay(attempt);
+                let delay = Self::retry_delay(failures_without_progress + 1);
                 log::warn!(
                     "税率数据下载第 {} 次尝试失败，{} 秒后从断点续传: {}",
-                    attempt - 1, delay.as_secs(), error
+                    attempts,
+                    delay.as_secs(),
+                    error
                 );
                 tokio::time::sleep(delay).await;
             }
+            attempts += 1;
             match Self::download_attempt(&client, &url, &staging, metadata, progress).await {
                 Ok(received) if received == metadata.file_size => {
                     // 终验以磁盘上的完整文件为准，续传/重试路径无需维护增量哈希。
@@ -306,12 +319,20 @@ impl TaxDataDownloader {
                 }
                 Err(error) => last_error = Some(error),
             }
+            let now_len = std::fs::metadata(&staging).map(|meta| meta.len()).unwrap_or(0);
+            if now_len >= prev_len.saturating_add(PROGRESS_RESET_MIN_BYTES) {
+                log::info!("本次尝试推进了 {} 字节，重置续传重试预算", now_len - prev_len);
+                failures_without_progress = 0;
+            } else {
+                failures_without_progress += 1;
+            }
+            prev_len = now_len;
         }
         let error = last_error.expect("download attempts recorded no error");
         // {:#} 保留原因链，数据更新日志里仍能看到最底层错误（如 stream failed）。
         Err(anyhow!(
-            "下载中断，自动续传重试 {} 次后仍失败；断点已保留，再次下载将从断点继续: {:#}",
-            MAX_DOWNLOAD_ATTEMPTS, error
+            "下载中断，连续 {} 次续传无进展；断点已保留，再次下载将从断点继续: {:#}",
+            failures_without_progress, error
         ))
     }
 
