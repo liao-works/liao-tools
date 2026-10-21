@@ -2,7 +2,7 @@ use crate::commands::tax::database::TaxDatabase;
 use crate::commands::update_history::database::HistoryDatabase;
 use crate::commands::update_history::diff::diff_tariffs;
 use crate::models::tax::{RemoteMetadata, TaxVersionInfo, VersionDetail};
-use anyhow::{ensure, Context, Result};
+use anyhow::{anyhow, ensure, Context, Result};
 use futures_util::StreamExt;
 use sha2::{Digest, Sha256};
 use std::io::{Seek, SeekFrom, Write};
@@ -13,6 +13,11 @@ const METADATA_URL: &str =
     "https://github.com/liao-works/cursor-tax-tools/releases/download/latest-data/metadata.json";
 const RELEASE_BASE: &str =
     "https://github.com/liao-works/cursor-tax-tools/releases/download";
+
+/// 单次快照下载的最大尝试次数（含首次）；流中断/停滞时退避后续传重试。
+const MAX_DOWNLOAD_ATTEMPTS: u32 = 5;
+/// 每个流式数据块的最大停滞时间；超过即视为连接已死，触发续传重试。
+const CHUNK_STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(150);
 
 /// Install *immutable* release assets. The current public channel stays on latest-data.
 /// Future shadow or V2 data MUST NOT use this production installer until promoted.
@@ -239,8 +244,9 @@ impl TaxDataDownloader {
     }
 
     /// 下载快照到与目标版本绑定的 staging 文件；同名 staging 已存在时发起
-    /// Range 续传（服务器不支持分段则整体重下）。最终仍以清单大小 + SHA-256
-    /// 全量校验为准，校验通过前绝不进入安装。
+    /// Range 续传（服务器不支持分段则整体重下）。流中断/停滞时自动退避续传
+    /// 重试，重试耗尽仍保留 staging 供手动续传。最终以清单大小 + 完整文件
+    /// SHA-256 全量校验为准，校验通过前绝不进入安装。
     async fn download_database<F>(
         directory: &Path, metadata: &RemoteMetadata, progress: &mut F
     ) -> Result<PathBuf>
@@ -258,13 +264,6 @@ impl TaxDataDownloader {
         let url = Self::release_url(&metadata.version)?;
         let staging = directory.join(format!("tariffs.staging-{}.db", metadata.version));
 
-        // 与目标版本一致的半成品 → 断点续传；尺寸异常（超清单）→ 丢弃重下
-        let mut resume_from: u64 = 0;
-        match std::fs::metadata(&staging) {
-            Ok(existing) if existing.len() < metadata.file_size => resume_from = existing.len(),
-            _ => { let _ = std::fs::remove_file(&staging); }
-        }
-
         // A complete tariff snapshot can exceed 400 MB. A five-minute *total*
         // request timeout rejects valid, slowly streaming downloads. Keep a
         // bounded connect timeout, plus an independent idle timeout for each
@@ -273,7 +272,76 @@ impl TaxDataDownloader {
             reqwest::Client::builder().connect_timeout(std::time::Duration::from_secs(45)),
         )
         .build()?;
-        let mut request = client.get(&url);
+
+        // 到 GitHub Releases 的长链路上连接被中途重置是常态而非异常：
+        // staging 让每次尝试都能从已下载字节继续，这里自动退避续传，
+        // 重试耗尽才报失败。
+        let mut last_error: Option<anyhow::Error> = None;
+        for attempt in 1..=MAX_DOWNLOAD_ATTEMPTS {
+            if let Some(error) = last_error.as_ref() {
+                let delay = Self::retry_delay(attempt);
+                log::warn!(
+                    "税率数据下载第 {} 次尝试失败，{} 秒后从断点续传: {}",
+                    attempt - 1, delay.as_secs(), error
+                );
+                tokio::time::sleep(delay).await;
+            }
+            match Self::download_attempt(&client, &url, &staging, metadata, progress).await {
+                Ok(received) if received == metadata.file_size => {
+                    // 终验以磁盘上的完整文件为准，续传/重试路径无需维护增量哈希。
+                    let mut staged = std::fs::File::open(&staging)?;
+                    let mut hash = Sha256::new();
+                    std::io::copy(&mut staged, &mut hash)?;
+                    let digest = format!("{:x}", hash.finalize());
+                    ensure!(digest.eq_ignore_ascii_case(expected_hex),
+                        "Snapshot SHA-256 mismatch: refusing installation");
+                    return Ok(staging);
+                }
+                Ok(received) => {
+                    // 服务器提前正常关流（截断）：按可续传失败处理。
+                    last_error = Some(anyhow!(
+                        "连接在下载完成前关闭: received {} expected {}",
+                        received, metadata.file_size
+                    ));
+                }
+                Err(error) => last_error = Some(error),
+            }
+        }
+        let error = last_error.expect("download attempts recorded no error");
+        // {:#} 保留原因链，数据更新日志里仍能看到最底层错误（如 stream failed）。
+        Err(anyhow!(
+            "下载中断，自动续传重试 {} 次后仍失败；断点已保留，再次下载将从断点继续: {:#}",
+            MAX_DOWNLOAD_ATTEMPTS, error
+        ))
+    }
+
+    /// 第 next_attempt（2 起）次尝试前的退避间隔：3s、6s、12s、24s。
+    fn retry_delay(next_attempt: u32) -> std::time::Duration {
+        std::time::Duration::from_secs(3 * (1u64 << (next_attempt - 2).min(4)))
+    }
+
+    /// 单次下载尝试：按 staging 现状发起请求（有半成品就带 Range 续传），
+    /// 流式写入直到服务器正常关流，返回累计偏移。网络中断/停滞以 Err 返回，
+    /// 由调用方决定重试；staging 内容在异常退出时仍然有效（追加写入）。
+    async fn download_attempt<F>(
+        client: &reqwest::Client,
+        url: &str,
+        staging: &Path,
+        metadata: &RemoteMetadata,
+        progress: &mut F,
+    ) -> Result<u64>
+    where
+        F: FnMut(u64, u64),
+    {
+        // 每次尝试都从 staging 实际长度出发：既覆盖上一次应用运行留下的半成品，
+        // 也覆盖本次的重试（包括上一块只写了一部分的情况）。
+        let mut resume_from: u64 = 0;
+        match std::fs::metadata(staging) {
+            Ok(existing) if existing.len() < metadata.file_size => resume_from = existing.len(),
+            _ => { let _ = std::fs::remove_file(staging); }
+        }
+
+        let mut request = client.get(url);
         if resume_from > 0 {
             request = request.header(reqwest::header::RANGE, format!("bytes={resume_from}-"));
         }
@@ -282,45 +350,37 @@ impl TaxDataDownloader {
         let resuming = resume_from > 0 && response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
         if !resuming {
             resume_from = 0;
-            let _ = std::fs::remove_file(&staging);
+            let _ = std::fs::remove_file(staging);
         }
 
         let total = response.content_length()
             .map(|len| len + resume_from)
             .unwrap_or(metadata.file_size);
         let mut received: u64 = resume_from;
-        let mut hash = Sha256::new();
-        if resuming {
-            // 续传前重算已有前缀的哈希，保证最终 SHA-256 覆盖完整文件
-            let mut prefix = std::fs::File::open(&staging)?;
-            std::io::copy(&mut prefix, &mut hash)?;
-        }
         let mut file = std::fs::OpenOptions::new()
             .write(true).create(true).truncate(false)
-            .open(&staging)?;
+            .open(staging)?;
         file.seek(SeekFrom::Start(resume_from))?;
         if resuming {
             progress(received, total);
         }
         let mut stream = response.bytes_stream();
-        while let Some(chunk) = tokio::time::timeout(
-            std::time::Duration::from_secs(150), stream.next()
-        ).await.context("Tariff data download stalled for 150 seconds")? {
-            let bytes = chunk.context("Download stream failed")?;
-            received += bytes.len() as u64;
+        loop {
+            let chunk = match tokio::time::timeout(CHUNK_STALL_TIMEOUT, stream.next()).await {
+                Ok(Some(chunk)) => chunk.context("Download stream failed")?,
+                Ok(None) => break,
+                Err(_elapsed) => return Err(anyhow!(
+                    "Tariff data download stalled for 150 seconds"
+                )),
+            };
+            received += chunk.len() as u64;
             ensure!(received <= metadata.file_size, "Snapshot larger than manifest");
-            file.write_all(&bytes)?;
-            hash.update(&bytes);
+            file.write_all(&chunk)?;
             progress(received, total);
         }
-        ensure!(received == metadata.file_size,
-            "Snapshot size mismatch: received {} expected {}", received, metadata.file_size);
-        let digest = format!("{:x}", hash.finalize());
-        ensure!(digest.eq_ignore_ascii_case(expected_hex),
-            "Snapshot SHA-256 mismatch: refusing installation");
         file.sync_all()?;
         drop(file);
-        Ok(staging) // 晋升成功后由调用方清理；失败时保留以支持再次续传
+        Ok(received)
     }
 
     fn record_full_update_diff(
@@ -344,6 +404,15 @@ impl TaxDataDownloader {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retry_delay_grows_to_capped_backoff() {
+        assert_eq!(TaxDataDownloader::retry_delay(2), std::time::Duration::from_secs(3));
+        assert_eq!(TaxDataDownloader::retry_delay(3), std::time::Duration::from_secs(6));
+        assert_eq!(TaxDataDownloader::retry_delay(4), std::time::Duration::from_secs(12));
+        assert_eq!(TaxDataDownloader::retry_delay(5), std::time::Duration::from_secs(24));
+        assert_eq!(TaxDataDownloader::retry_delay(99), std::time::Duration::from_secs(48));
+    }
 
     #[test]
     fn reject_unsafe_release_identifiers() {
