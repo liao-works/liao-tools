@@ -159,10 +159,12 @@ pub async fn download_update(url: String, version: String, app: tauri::AppHandle
     println!("开始下载更新: {}", url);
     println!("版本: {}", version);
     
+    // 安装包在弱网下同样可能超过几分钟：不用总超时（会误杀慢速但正常的
+    // 下载），改为有界的连接超时 + 每个流式数据块 150 秒停滞超时。
     let client = crate::core::http::apply_system_proxy(
         reqwest::Client::builder()
             .user_agent("liao-tools")
-            .timeout(std::time::Duration::from_secs(300)),
+            .connect_timeout(std::time::Duration::from_secs(45)),
     )
     .build()
     .map_err(|e| CommandError::new(format!("创建 HTTP 客户端失败: {}", e), "NETWORK_ERROR"))?;
@@ -230,8 +232,13 @@ pub async fn download_update(url: String, version: String, app: tauri::AppHandle
     let mut stream = response.bytes_stream();
 
     use futures_util::StreamExt;
-    
-    while let Some(chunk) = stream.next().await {
+
+    while let Some(chunk) = tokio::time::timeout(
+        std::time::Duration::from_secs(150), stream.next()
+    ).await.map_err(|_| CommandError::new(
+        "下载停滞超过 150 秒，连接已中止".to_string(),
+        "DOWNLOAD_ERROR",
+    ))? {
         let chunk = chunk
             .map_err(|e| CommandError::new(
                 format!("下载流错误: {}", e),
