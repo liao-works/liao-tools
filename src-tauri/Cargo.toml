@@ -28,6 +28,8 @@ serde_json = "1"
 sha2 = "0.10"
 # 税率快照 zstd 解压（版本与依赖树中 wreq-util 引入的 0.13 对齐，避免 Lockfile 变动）
 zstd = "0.13"
+# 快照 MD5 第二重校验（依赖树中 zip 已引入 md-5 0.10，对齐避免 Lockfile 变动）
+md-5 = "0.10"
 hmac = "0.12"
 ed25519-dalek = "2.2"
 
