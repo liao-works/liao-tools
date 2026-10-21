@@ -369,6 +369,7 @@ impl TaxDataDownloader {
             AssetOutcome::AssetUnavailable(error) => {
                 log::warn!("压缩资产不可用，降级为原始快照下载: {error:#}");
                 let _ = std::fs::remove_file(&plan.staging);
+                Self::remove_parts(&plan);
                 plan = Self::raw_asset_plan(metadata, directory, &expected_hex)?;
                 Self::download_plan(
                     &client, &plan, &staging, metadata.file_size, &expected_hex, raw_md5.as_deref(), progress,
@@ -657,10 +658,16 @@ impl TaxDataDownloader {
                 "资产不存在: HTTP {status}"
             )));
         }
-        if status != reqwest::StatusCode::PARTIAL_CONTENT {
-            // 典型情形：服务器忽略 Range 返回 200，内容起点与本段不符
+        if status == reqwest::StatusCode::OK {
+            // 服务器忽略 Range 返回 200，内容起点与本段不符——分段不可行
             return Err(AttemptFailure::RangeIgnored(anyhow!(
-                "分段请求未返回 206: HTTP {status}"
+                "分段请求被忽略: HTTP {status}"
+            )));
+        }
+        if status != reqwest::StatusCode::PARTIAL_CONTENT {
+            // 403/429/5xx 等瞬时异常按可续传处理，避免一次抖动触发模式降级
+            return Err(AttemptFailure::Retryable(anyhow!(
+                "分段请求被拒绝: HTTP {status}"
             )));
         }
         let mut file = std::fs::OpenOptions::new()
