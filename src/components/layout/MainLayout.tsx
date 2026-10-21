@@ -8,6 +8,7 @@ import { UpdateDialog } from '@/components/UpdateDialog';
 import { checkForUpdates, loadUpdateSettings, updateLastCheckTime } from '@/lib/updater';
 import { useDarkMode } from '@/hooks/use-dark-mode';
 import { useDataUpdateStatusStore } from '@/stores/data-update-status-store';
+import { useAppUpdateStatusStore } from '@/stores/app-update-status-store';
 
 export function MainLayout() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('lt-sidebar-collapsed') === '1');
@@ -44,6 +45,8 @@ export function MainLayout() {
         const info = await checkForUpdates();
         if (!active) return;
         await updateLastCheckTime();
+        // 无论是否有更新都回填，供侧边栏「应用更新」绿点与 tooltip 使用。
+        useAppUpdateStatusStore.getState().setUpdateStatus(info);
         if (info.has_update && promptedVersion.current !== info.latest_version) {
           promptedVersion.current = info.latest_version;
           setAutoUpdateOpen(true);

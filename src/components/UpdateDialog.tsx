@@ -27,6 +27,7 @@ import {
   type UpdateInfo,
   type DownloadProgress,
 } from '@/lib/updater';
+import { useAppUpdateStatusStore } from '@/stores/app-update-status-store';
 import { UpdateCompleteDialog } from './UpdateCompleteDialog';
 
 interface UpdateDialogProps {
@@ -64,6 +65,8 @@ export function UpdateDialog({ open, onOpenChange, autoCheck = false }: UpdateDi
     try {
       const info = await checkForUpdates();
       setUpdateInfo(info);
+      // 手动检查同样回填绿点状态，保持侧边栏提示与检查结果一致。
+      useAppUpdateStatusStore.getState().setUpdateStatus(info);
       // A local settings write failure must not turn a successful online check into an error.
       void updateLastCheckTime().catch((err: unknown) => {
         console.warn('已获取更新信息，但未能保存检查时间:', formatUpdaterError(err));

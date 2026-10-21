@@ -6,6 +6,7 @@ import {
   Boxes, PackageSearch, Ship
 } from 'lucide-react';
 import { useDataUpdateStatusStore } from '@/stores/data-update-status-store';
+import { useAppUpdateStatusStore } from '@/stores/app-update-status-store';
 
 interface SidebarProps { collapsed: boolean; onToggle: () => void; onNavigate?: () => void }
 
@@ -37,6 +38,13 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   const maintenanceTitle = dataUpdatePending
     ? '远程数据库已更新，需要更新数据'
     : (collapsed ? '数据维护' : undefined);
+
+  // 应用有新版本时，「应用更新」入口显示同样的绿点提示。
+  const appUpdate = useAppUpdateStatusStore((s) => s.hasUpdate === true);
+  const appLatestVersion = useAppUpdateStatusStore((s) => s.latestVersion);
+  const appUpdateTitle = appUpdate
+    ? (appLatestVersion ? `发现新版本 v${appLatestVersion}，需要更新应用` : '发现新版本，需要更新应用')
+    : (collapsed ? '应用更新' : undefined);
 
   return (
     <aside className={['lt-sidebar', collapsed ? 'lt-sidebar--collapsed' : ''].join(' ')} aria-label="主导航">
@@ -77,7 +85,10 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
             title={collapsed ? '使用统计' : undefined}><BarChart3 size={18}/>{!collapsed && '使用统计'}</NavLink>
           <NavLink to="/updates" onClick={onNavigate}
             className={({ isActive }) => ['lt-nav-item', isActive ? 'is-active' : ''].join(' ')}
-            title={collapsed ? '应用更新' : undefined}><RefreshCw size={18}/>{!collapsed && '应用更新'}</NavLink>
+            title={appUpdateTitle} aria-label={appUpdate ? '应用更新（发现新版本）' : undefined}>
+            <RefreshCw size={18}/>{!collapsed && '应用更新'}
+            {appUpdate && <span className="lt-nav-dot" aria-hidden="true"/>}
+          </NavLink>
           <NavLink to="/settings" onClick={onNavigate}
             className={({ isActive }) => ['lt-nav-item', isActive ? 'is-active' : ''].join(' ')}
             title={collapsed ? '偏好设置' : undefined}><Settings size={18}/>{!collapsed && '偏好设置'}</NavLink>
