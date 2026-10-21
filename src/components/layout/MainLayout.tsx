@@ -7,6 +7,7 @@ import { BackgroundTaskIndicator } from './BackgroundTaskIndicator';
 import { UpdateDialog } from '@/components/UpdateDialog';
 import { checkForUpdates, loadUpdateSettings, updateLastCheckTime } from '@/lib/updater';
 import { useDarkMode } from '@/hooks/use-dark-mode';
+import { useDataUpdateStatusStore } from '@/stores/data-update-status-store';
 
 export function MainLayout() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('lt-sidebar-collapsed') === '1');
@@ -63,6 +64,17 @@ export function MainLayout() {
       window.clearInterval(periodic);
     };
   }, []);
+
+  // 数据维护绿点：启动后静默检查远程数据库（关税 / 禁运清单）是否有更新，此后每小时复查。
+  const checkDataUpdates = useDataUpdateStatusStore((s) => s.checkAll);
+  useEffect(() => {
+    const initial = window.setTimeout(() => { void checkDataUpdates(); }, 1500);
+    const periodic = window.setInterval(() => { void checkDataUpdates(); }, 60 * 60 * 1000);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(periodic);
+    };
+  }, [checkDataUpdates]);
 
   return (
     <div className="lt-app">

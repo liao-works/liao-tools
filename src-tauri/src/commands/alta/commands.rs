@@ -3,9 +3,10 @@ use super::excel::ExcelProcessor;
 use super::scraper::AltaScraper;
 use crate::commands::update_history::database::HistoryDatabase;
 use crate::commands::update_history::diff::diff_forbidden_items;
-use crate::models::alta::{AltaQueryResult, DatabaseInfo, ExcelStats, UpdateResult};
+use crate::models::alta::{AltaQueryResult, DatabaseInfo, ExcelStats, ForbiddenItem, UpdateResult};
 use crate::AppState;
 use log::{error, info};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::State;
@@ -111,6 +112,83 @@ pub async fn update_alta_database(
         success: true,
         items_count: count,
         message: format!("成功更新 {} 条禁运数据", count),
+    })
+}
+
+/// 检查远程禁运清单是否有更新的结果
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct AltaCheckUpdateResult {
+    pub has_update: bool,
+    pub remote_count: usize,
+    pub local_count: i64,
+}
+
+/// 以 hs_code 为键比较 description / additional_info / source_url，
+/// 与更新历史的 diff 同口径；抓取结果与本地完全一致才算无更新。
+fn item_signature(items: &[ForbiddenItem]) -> HashMap<&str, (&String, &String, &String)> {
+    items
+        .iter()
+        .map(|i| (i.hs_code.as_str(), (&i.description, &i.additional_info, &i.source_url)))
+        .collect()
+}
+
+fn remote_differs_from_local(remote: &[ForbiddenItem], local: &[ForbiddenItem]) -> bool {
+    let remote_map = item_signature(remote);
+    let local_map = item_signature(local);
+
+    if remote_map.len() != local_map.len() {
+        return true;
+    }
+
+    remote_map
+        .iter()
+        .any(|(code, remote_sig)| local_map.get(code) != Some(remote_sig))
+}
+
+/// 检查远程禁运清单是否有更新（只抓取比对，不写入本地数据库）
+#[tauri::command]
+pub async fn check_alta_update(
+    state: State<'_, AppState>,
+) -> Result<AltaCheckUpdateResult, CommandError> {
+    info!("检查禁运清单远程更新");
+
+    let scraper = AltaScraper::new();
+    let remote_items = scraper.fetch_all_data().await.map_err(|e| {
+        error!("检查更新爬取失败: {}", e);
+        CommandError::new(format!("检查远程禁运清单失败: {}", e), "SCRAPER_ERROR")
+    })?;
+
+    // 抓取结果为空多半是站点改版或被拦截，视为检查失败而不是“有更新”。
+    if remote_items.is_empty() {
+        return Err(CommandError::new(
+            "远程未返回任何禁运数据",
+            "NO_DATA",
+        ));
+    }
+
+    let db = state.db.lock().map_err(|e| {
+        error!("Failed to lock database: {}", e);
+        CommandError::new("系统错误", "LOCK_ERROR")
+    })?;
+
+    let local_items = db.get_all_forbidden_items().map_err(|e| {
+        error!("读取本地禁运数据失败: {}", e);
+        CommandError::from(e)
+    })?;
+    drop(db);
+
+    let local_count = local_items.len() as i64;
+    let has_update = remote_differs_from_local(&remote_items, &local_items);
+
+    info!(
+        "禁运清单检查完成: 本地 {} 条 / 远程 {} 条, 有更新: {}",
+        local_count, remote_items.len(), has_update
+    );
+
+    Ok(AltaCheckUpdateResult {
+        has_update,
+        remote_count: remote_items.len(),
+        local_count,
     })
 }
 

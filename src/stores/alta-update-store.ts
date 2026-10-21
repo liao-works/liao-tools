@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { toast } from '@/hooks/use-toast';
 import { altaApi } from '@/lib/api/alta';
+import { useDataUpdateStatusStore } from '@/stores/data-update-status-store';
 
 interface AltaUpdateState {
   updating: boolean;
@@ -40,6 +41,8 @@ export const useAltaUpdateStore = create<AltaUpdateState>()((set, get) => ({
         ].filter(Boolean),
       });
       toast({ title: '禁运清单更新完成', description: result.message });
+      // 本地已是最新，侧边栏数据维护绿点随之消除。
+      useDataUpdateStatusStore.getState().markUpdated('alta');
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

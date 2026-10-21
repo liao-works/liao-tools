@@ -33,10 +33,13 @@
 .lt-navigation { flex:1; min-height:0; overflow:auto; padding:12px 10px 16px; }
 .lt-nav-group { margin-bottom:16px; }
 .lt-nav-label { font-size:11px; font-weight:700; color:var(--muted-foreground); padding:8px 12px 7px; letter-spacing:.035em; }
-.lt-nav-item {display:flex;align-items:center;gap:12px;min-height:38px;padding:8px 12px;color:var(--muted-foreground);font-size:13px;font-weight:520;border-radius:9px;margin:2px 0;white-space:nowrap;transition:background .16s ease,color .16s ease}
+.lt-nav-item {display:flex;align-items:center;gap:12px;min-height:38px;padding:8px 12px;color:var(--muted-foreground);font-size:13px;font-weight:520;border-radius:9px;margin:2px 0;white-space:nowrap;position:relative;transition:background .16s ease,color .16s ease}
 .lt-nav-item svg { flex:0 0 auto; }
 .lt-nav-item:hover {background:var(--muted);color:var(--foreground)}
 .lt-nav-item.is-active {background:var(--primary-subtle);color:var(--primary-fg);font-weight:700}
+/* 数据维护入口的远程数据库更新提示：展开时右对齐，折叠时悬浮在图标右上角 */
+.lt-nav-dot {margin-left:auto;flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 0 3px var(--success-subtle)}
+.lt-sidebar--collapsed .lt-nav-dot {position:absolute;top:7px;right:7px;margin-left:0}
 .lt-sidebar--collapsed .lt-brand {padding:0 17px}
 .lt-sidebar--collapsed .lt-brand-link {display:none}
 .lt-sidebar--collapsed .lt-navigation {padding:13px 10px}

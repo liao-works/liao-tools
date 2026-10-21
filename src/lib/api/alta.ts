@@ -21,6 +21,12 @@ export interface UpdateResult {
   message: string;
 }
 
+export interface AltaCheckUpdateResult {
+  has_update: boolean;
+  remote_count: number;
+  local_count: number;
+}
+
 export interface DatabaseInfo {
   total_items: number;
   last_update?: string;
@@ -73,6 +79,13 @@ export const altaApi = {
       console.error('更新数据库失败:', error);
       throw error;
     }
+  },
+
+  /**
+   * 检查远程禁运清单是否有更新（只比对，不写库）
+   */
+  async checkForUpdate(): Promise<AltaCheckUpdateResult> {
+    return invoke<AltaCheckUpdateResult>('check_alta_update');
   },
 
   /**

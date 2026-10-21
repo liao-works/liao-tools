@@ -118,6 +118,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             query_hs_code,
             update_alta_database,
+            check_alta_update,
             batch_process_excel,
             get_database_info,
             download_template,

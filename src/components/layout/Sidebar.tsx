@@ -5,6 +5,7 @@ import {
   CheckCheck, Languages, Settings, Database, Calculator, PanelLeftClose, PanelLeftOpen, RefreshCw,
   Boxes, PackageSearch, Ship
 } from 'lucide-react';
+import { useDataUpdateStatusStore } from '@/stores/data-update-status-store';
 
 interface SidebarProps { collapsed: boolean; onToggle: () => void; onNavigate?: () => void }
 
@@ -29,6 +30,14 @@ const groups = [
 ];
 
 export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
+  // 任一远程数据库（关税 / 禁运清单）有更新时，数据维护入口显示绿点并在悬停时提示。
+  const dataUpdatePending = useDataUpdateStatusStore(
+    (s) => s.tax.hasUpdate === true || s.alta.hasUpdate === true,
+  );
+  const maintenanceTitle = dataUpdatePending
+    ? '远程数据库已更新，需要更新数据'
+    : (collapsed ? '数据维护' : undefined);
+
   return (
     <aside className={['lt-sidebar', collapsed ? 'lt-sidebar--collapsed' : ''].join(' ')} aria-label="主导航">
       <div className="lt-brand">
@@ -59,7 +68,10 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
           {!collapsed && <div className="lt-nav-label">管理</div>}
           <NavLink to="/data-maintenance" onClick={onNavigate}
             className={({ isActive }) => ['lt-nav-item', isActive ? 'is-active' : ''].join(' ')}
-            title={collapsed ? '数据维护' : undefined}><Database size={18}/>{!collapsed && '数据维护'}</NavLink>
+            title={maintenanceTitle} aria-label={dataUpdatePending ? '数据维护（远程数据库有更新）' : undefined}>
+            <Database size={18}/>{!collapsed && '数据维护'}
+            {dataUpdatePending && <span className="lt-nav-dot" aria-hidden="true"/>}
+          </NavLink>
           <NavLink to="/usage" onClick={onNavigate}
             className={({ isActive }) => ['lt-nav-item', isActive ? 'is-active' : ''].join(' ')}
             title={collapsed ? '使用统计' : undefined}><BarChart3 size={18}/>{!collapsed && '使用统计'}</NavLink>

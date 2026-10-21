@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { toast } from '@/hooks/use-toast';
 import { taxApi } from '@/lib/api/tax';
+import { useDataUpdateStatusStore } from '@/stores/data-update-status-store';
 import type { TaxVersionInfo } from '@/types';
 
 export function formatBytes(bytes: number) {
@@ -123,6 +124,8 @@ export const useTaxUpdateStore = create<TaxUpdateState>()((set, get) => ({
       get().addLog('税率更新命令已确认成功');
       set({ versionInfo: null }); // Previous remote comparison is no longer valid after installation.
       await get().refreshLocalVersion();
+      // 本地已是最新，侧边栏数据维护绿点随之消除。
+      useDataUpdateStatusStore.getState().markUpdated('tax');
       toast({
         title: '税率数据更新已完成',
         description: '请查看本地版本；需要最新远程对比可再次点击检查更新。',
