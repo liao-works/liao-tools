@@ -13,6 +13,9 @@ use crate::models::exchange::{CnParity, CnParityItem, ExchangeRates};
 
 const CACHE_KEY_LATEST: &str = "latest";
 const CACHE_KEY_CN_PARITY: &str = "cn-parity";
+const CACHE_KEY_CN_PARITY_FAILED_AT: &str = "cn-parity-failed-at";
+/// 中间价失败退避窗口：避免对被限流的主源反复施压
+const PARITY_FAILURE_BACKOFF_MS: i64 = 5 * 60 * 1000;
 const FRANKFURTER_URL: &str = "https://api.frankfurter.dev/v1/latest?base=CNY";
 const ER_API_URL: &str = "https://open.er-api.com/v6/latest/CNY";
 const CURRENCY_API_URL: &str =
@@ -89,6 +92,16 @@ fn cache_write(app_handle: &tauri::AppHandle, key: &str, payload: &str) {
          ON CONFLICT(cache_key) DO UPDATE SET payload = ?2, updated_at = ?3",
         rusqlite::params![key, payload, Utc::now().timestamp_millis()],
     );
+}
+
+fn cache_delete(app_handle: &tauri::AppHandle, key: &str) {
+    let Some(path) = db_path(app_handle).ok() else {
+        return;
+    };
+    let Ok(conn) = crate::core::database::create_connection(&path) else {
+        return;
+    };
+    let _ = conn.execute("DELETE FROM exchange_cache WHERE cache_key = ?1", [key]);
 }
 
 // ---------------------------------------------------------------------------
@@ -219,6 +232,126 @@ fn json_snippet(value: &Value) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// 备用源：国家外汇管理局中间价查询（转发 CFETS 数据，数值一致）
+// ---------------------------------------------------------------------------
+
+const SAFE_QUERY_URL: &str = "https://www.safe.gov.cn/AppStructured/hlw/RMBQuery.do";
+const SAFE_REFERER: &str = "https://www.safe.gov.cn/safe/rmbhlzjj/index.html";
+/// 外管局表格列 → 货币对。除日元外均按「100 单位外币」报价，需除以 100
+const SAFE_COLUMN_MAP: &[(&str, &str, f64)] = &[
+    ("USD/CNY", "美元", 100.0),
+    ("EUR/CNY", "欧元", 100.0),
+    ("100JPY/CNY", "日元", 1.0),
+    ("HKD/CNY", "港元", 100.0),
+    ("GBP/CNY", "英镑", 100.0),
+    ("AUD/CNY", "澳元", 100.0),
+    ("NZD/CNY", "新西兰元", 100.0),
+    ("SGD/CNY", "新加坡元", 100.0),
+    ("CHF/CNY", "瑞士法郎", 100.0),
+    ("CAD/CNY", "加元", 100.0),
+];
+
+/// 解析外管局查询返回的 HTML：table#InfoTable，取日期最新的一行
+fn parse_safe_parity(html: &str) -> Result<CnParity, String> {
+    let document = scraper::Html::parse_document(html);
+    let table_sel =
+        crate::core::html::HtmlParser::selector("table#InfoTable").map_err(|e| e.to_string())?;
+    let th_sel = crate::core::html::HtmlParser::selector("th").map_err(|e| e.to_string())?;
+    let td_sel = crate::core::html::HtmlParser::selector("td").map_err(|e| e.to_string())?;
+    let tr_sel = crate::core::html::HtmlParser::selector("tr").map_err(|e| e.to_string())?;
+    let table = document
+        .select(&table_sel)
+        .next()
+        .ok_or("外管局页面没有数据表格")?;
+
+    let headers: Vec<String> = table
+        .select(&th_sel)
+        .map(|th| th.text().collect::<String>().trim().to_string())
+        .collect();
+    // 数据行按日期排序取最新（ISO 格式可直接比较）；日期列不足 10 字符的是杂项行
+    let mut latest: Option<(String, Vec<String>)> = None;
+    for row in table.select(&tr_sel) {
+        let cells: Vec<String> = row
+            .select(&td_sel)
+            .map(|td| td.text().collect::<String>().trim().to_string())
+            .collect();
+        let Some(first) = cells.first() else { continue };
+        if first.len() != 10 || !first.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+            continue;
+        }
+        if latest.as_ref().is_none_or(|(date, _)| *first > *date) {
+            latest = Some((first.clone(), cells));
+        }
+    }
+    let (date, cells) = latest.ok_or("外管局表格中没有数据行")?;
+
+    let mut items = Vec::new();
+    for (pair, column, divisor) in SAFE_COLUMN_MAP {
+        let Some(index) = headers.iter().position(|header| header == column) else {
+            continue;
+        };
+        let Some(value) = cells
+            .get(index)
+            .and_then(|raw| raw.replace(',', "").parse::<f64>().ok())
+            .filter(|value| *value > 0.0)
+        else {
+            continue;
+        };
+        items.push(CnParityItem {
+            pair: pair.to_string(),
+            value: value / divisor,
+        });
+    }
+    if !items.iter().any(|item| item.pair == "USD/CNY") {
+        return Err("外管局表格缺少美元中间价".into());
+    }
+    Ok(CnParity { date, items })
+}
+
+async fn fetch_safe_parity(client: &Client) -> Result<CnParity, String> {
+    let end = beijing_now();
+    let start = end - chrono::Duration::days(10);
+    let body = format!(
+        "startDate={}&endDate={}&queryYN=true",
+        start.format("%Y-%m-%d"),
+        end.format("%Y-%m-%d"),
+    );
+    let response = client
+        .post(SAFE_QUERY_URL)
+        .header(reqwest::header::REFERER, SAFE_REFERER)
+        .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .body(body)
+        .send()
+        .await;
+    let response = match response {
+        Ok(response) => response,
+        Err(error) => {
+            log::warn!("外管局中间价请求失败: {error}");
+            return Err(format!("请求失败: {error}"));
+        }
+    };
+    if !response.status().is_success() {
+        log::warn!("外管局中间价返回 HTTP {}", response.status());
+        return Err(format!("HTTP {}", response.status()));
+    }
+    let html = match response.text().await {
+        Ok(html) => html,
+        Err(error) => {
+            log::warn!("外管局中间价响应读取失败: {error}");
+            return Err(format!("响应读取失败: {error}"));
+        }
+    };
+    let parity = parse_safe_parity(&html);
+    if let Err(error) = &parity {
+        log::warn!(
+            "外管局中间价解析失败: {error}; HTML 片段: {}",
+            html.chars().take(300).collect::<String>()
+        );
+    }
+    parity
+}
+
+// ---------------------------------------------------------------------------
 // 数据源抓取
 // ---------------------------------------------------------------------------
 
@@ -291,7 +424,38 @@ pub async fn get_latest_rates(app_handle: &tauri::AppHandle) -> Result<ExchangeR
     }
 }
 
-/// 人民币中间价（中国外汇交易中心），同一天内使用缓存。
+/// 主源：中国外汇交易中心中间价接口（高频请求会触发限流，返回信封正常但 records 为空）
+async fn fetch_cfets_parity(client: &Client) -> Result<CnParity, String> {
+    let end = beijing_now();
+    let start = end - chrono::Duration::days(7);
+    let url = format!(
+        "https://www.chinamoney.com.cn/ags/ms/cm-u-bk-ccpr/CcprHisNew?startDate={}&endDate={}&currency={}",
+        start.format("%Y-%m-%d"),
+        end.format("%Y-%m-%d"),
+        CN_PARITY_PAIRS.join("%2C"),
+    );
+    match fetch_json(client, &url, Some(CHINAMONEY_REFERER)).await {
+        Ok(value) => {
+            let outcome = parse_cn_parity(CN_PARITY_PAIRS, &value);
+            if let Err(error) = &outcome {
+                log::warn!("中间价解析失败: {error}; 响应片段: {}", json_snippet(&value));
+            }
+            outcome
+        }
+        Err(error) => Err(format!("中间价接口请求失败: {error}")),
+    }
+}
+
+/// 备源：国家外汇管理局（转发 CFETS 数据，无限流 observed）
+async fn fetch_safe_parity_logged(client: &Client) -> Result<CnParity, String> {
+    let parity = fetch_safe_parity(client).await;
+    if parity.is_ok() {
+        log::info!("中间价经外管局备用源获取成功");
+    }
+    parity
+}
+
+/// 人民币中间价：同日缓存 → CFETS 主源 → 外管局备源 → 历史缓存回退 + 5 分钟失败退避
 pub async fn get_cn_parity(app_handle: &tauri::AppHandle) -> Result<CnParity, String> {
     if let Some(payload) = cache_read(app_handle, CACHE_KEY_CN_PARITY) {
         if let Ok(parity) = serde_json::from_str::<CnParity>(&payload) {
@@ -301,39 +465,48 @@ pub async fn get_cn_parity(app_handle: &tauri::AppHandle) -> Result<CnParity, St
         }
     }
 
-    let client = create_client_with_timeout(10);
-    let end = beijing_now();
-    let start = end - chrono::Duration::days(7);
-    let url = format!(
-        "https://www.chinamoney.com.cn/ags/ms/cm-u-bk-ccpr/CcprHisNew?startDate={}&endDate={}&currency={}",
-        start.format("%Y-%m-%d"),
-        end.format("%Y-%m-%d"),
-        CN_PARITY_PAIRS.join("%2C"),
-    );
-    let parity = match fetch_json(&client, &url, Some(CHINAMONEY_REFERER)).await {
-        Ok(value) => {
-            let outcome = parse_cn_parity(CN_PARITY_PAIRS, &value);
-            if let Err(error) = &outcome {
-                log::warn!("中间价解析失败: {error}; 响应片段: {}", json_snippet(&value));
+    let now = Utc::now().timestamp_millis();
+    let in_backoff = cache_read(app_handle, CACHE_KEY_CN_PARITY_FAILED_AT)
+        .and_then(|payload| payload.parse::<i64>().ok())
+        .is_some_and(|failed_at| now - failed_at < PARITY_FAILURE_BACKOFF_MS);
+
+    let outcome = if in_backoff {
+        Err("接口暂时不可用，正在等待重试窗口".into())
+    } else {
+        let client = create_client_with_timeout(10);
+        let result = match fetch_cfets_parity(&client).await {
+            Ok(parity) => Ok(parity),
+            Err(primary_error) => {
+                log::info!("中间价主源不可用（{primary_error}），回退外管局备用源");
+                fetch_safe_parity_logged(&client).await
             }
-            outcome
+        };
+        match &result {
+            Ok(_) => cache_delete(app_handle, CACHE_KEY_CN_PARITY_FAILED_AT),
+            Err(_) => cache_write(
+                app_handle,
+                CACHE_KEY_CN_PARITY_FAILED_AT,
+                &now.to_string(),
+            ),
         }
-        Err(error) => Err(format!("中间价接口请求失败: {error}")),
+        result
     };
-    if let Ok(parity) = &parity {
-        if let Ok(payload) = serde_json::to_string(parity) {
+
+    if let Ok(parity) = outcome {
+        if let Ok(payload) = serde_json::to_string(&parity) {
             cache_write(app_handle, CACHE_KEY_CN_PARITY, &payload);
         }
-        return Ok(parity.clone());
+        return Ok(parity);
     }
 
-    // 抓取失败（含当日尚未发布）回退缓存；注意中间价日期天然落后，直接回退不比较日期
+    // 全部失败：回退任意历史缓存（中间价日期天然落后，不比较日期）
     if let Some(payload) = cache_read(app_handle, CACHE_KEY_CN_PARITY) {
         if let Ok(parity) = serde_json::from_str::<CnParity>(&payload) {
+            log::warn!("中间价抓取失败，回退 {} 的缓存", parity.date);
             return Ok(parity);
         }
     }
-    parity
+    outcome
 }
 
 #[cfg(test)]
@@ -426,6 +599,43 @@ mod tests {
         // 限流响应：信封字段齐全但缺 records
         let sample = serde_json::json!({ "head": { "rep_code": "200" }, "data": { "total": 3 } });
         assert!(parse_cn_parity(&["USD/CNY"], &sample).is_err());
+    }
+
+    const SAFE_HTML_SAMPLE: &str = r#"<html><body><table class="list" id="InfoTable">
+        <tr><th>日期</th><th>美元</th><th>欧元</th><th>日元</th><th>港元</th><th>英镑</th><th>澳元</th><th>新西兰元</th><th>新加坡元</th><th>瑞士法郎</th><th>加元</th><th>澳门元</th></tr>
+        <tr><td>2026-10-23</td><td>671.80</td><td>751.40</td><td>4.2793</td><td>85.696</td><td>897.49</td><td>469.82</td><td>380.58</td><td>524.58</td><td>817.10</td><td>478.04</td><td>120.27</td></tr>
+        <tr><td>2026-10-22</td><td>671.95</td><td>752.44</td><td>4.2381</td><td>85.679</td><td>899.11</td><td>471.19</td><td>380.61</td><td>524.36</td><td>813.32</td><td>478.61</td><td>120.23</td></tr>
+    </table></body></html>"#;
+
+    #[test]
+    fn parse_safe_parity_extracts_latest_row_with_unit_conversion() {
+        let parity = parse_safe_parity(SAFE_HTML_SAMPLE).expect("解析成功");
+        assert_eq!(parity.date, "2026-10-23"); // 取日期最新一行
+        assert_eq!(parity.items.len(), 10); // 澳门元不在映射表中被忽略
+        let by_pair = |pair: &str| {
+            parity
+                .items
+                .iter()
+                .find(|item| item.pair == pair)
+                .map(|item| item.value)
+                .unwrap()
+        };
+        assert!((by_pair("USD/CNY") - 6.7180).abs() < 1e-9); // 671.80 / 100
+        assert!((by_pair("100JPY/CNY") - 4.2793).abs() < 1e-9); // 日元列本身就是每 100 日元
+        assert!((by_pair("HKD/CNY") - 0.85696).abs() < 1e-9);
+        assert!((by_pair("CAD/CNY") - 4.7804).abs() < 1e-9);
+    }
+
+    #[test]
+    fn parse_safe_parity_rejects_table_without_usd() {
+        let sample = r#"<html><table id="InfoTable"><tr><th>日期</th><th>欧元</th></tr>
+            <tr><td>2026-10-23</td><td>751.40</td></tr></table></html>"#;
+        assert!(parse_safe_parity(sample).is_err());
+    }
+
+    #[test]
+    fn parse_safe_parity_rejects_missing_table() {
+        assert!(parse_safe_parity("<html><body>无数据</body></html>").is_err());
     }
 
     #[test]
