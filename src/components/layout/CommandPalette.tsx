@@ -7,6 +7,7 @@ const commands = [
   { label:'英国 / 北爱关税查询', detail:'HS Code 单码与批量', path:'/tax', keywords:'tax tariff 税率 HS' },
   { label:'Alta 禁运查询', detail:'禁运条目及例外', path:'/alta', keywords:'禁止 出口 合规' },
   { label:'Amazon 商品查询', detail:'ASIN、尺寸与价格', path:'/revcal', keywords:'亚马逊 收益 计算器' },
+  { label:'汇率查询', detail:'货币换算与人民币中间价', path:'/exchange', keywords:'汇率 exchange currency 美元 人民币 换算 中间价' },
   { label:'Excel 数据拆分', detail:'海铁、空运工作簿', path:'/excel', keywords:'表格 图片 合并单元格' },
   { label:'系统工具', detail:'常用及自定义程序', path:'/system-tools', keywords:'工具箱 launcher' },
   { label:'Todo 清单', detail:'待办与桌面小组件', path:'/todo', keywords:'task 任务' },

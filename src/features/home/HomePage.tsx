@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import {
   ArrowRight, Search, ShieldCheck, Boxes, FileSpreadsheet,
-  Wrench, CheckCheck, Languages, Database, Clock3, ArrowUpRight, BookOpen, Info, PackageSearch, Ship, Type,
+  Wrench, CheckCheck, Languages, Database, Clock3, ArrowUpRight, BookOpen, Info, PackageSearch, Ship, Coins, Type,
 } from 'lucide-react';
 import { taxApi } from '@/lib/api/tax';
 import { altaApi } from '@/lib/api/alta';
@@ -21,6 +21,7 @@ const tools = [
   { name: '体积 / 计费重', text: 'CBM、体积重与装柜试算', to: '/cbm', icon: Boxes, accent: 'green' },
   { name: '运单轨迹', text: '批量轨迹查询与预计送达', to: '/tracking', icon: PackageSearch, accent: 'orange' },
   { name: '船司查询', text: '船司官网与货物跟踪入口', to: '/shipping', icon: Ship, accent: 'blue' },
+  { name: '汇率查询', text: '汇率换算与人民币中间价', to: '/exchange', icon: Coins, accent: 'green' },
 ];
 
 type Snapshot = { kind: 'loading' | 'ready' | 'unavailable'; label: string };

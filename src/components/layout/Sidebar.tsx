@@ -3,7 +3,7 @@ import {
   BarChart3,
   Home, Search, ShieldCheck, FileSpreadsheet, Wrench,
   CheckCheck, Languages, Settings, Database, Calculator, PanelLeftClose, PanelLeftOpen, RefreshCw,
-  Boxes, PackageSearch, Ship, Type
+  Boxes, PackageSearch, Ship, Coins, Type
 } from 'lucide-react';
 import { useDataUpdateStatusStore } from '@/stores/data-update-status-store';
 import { useAppUpdateStatusStore } from '@/stores/app-update-status-store';
@@ -19,6 +19,7 @@ const groups = [
     { label: '体积 / 计费重', href: '/cbm', icon: Boxes },
     { label: '运单轨迹', href: '/tracking', icon: PackageSearch },
     { label: '船司查询', href: '/shipping', icon: Ship },
+    { label: '汇率查询', href: '/exchange', icon: Coins },
   ] },
   { label: '文件处理', items: [
     { label: 'Excel 数据拆分', href: '/excel', icon: FileSpreadsheet },

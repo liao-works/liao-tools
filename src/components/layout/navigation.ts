@@ -2,6 +2,7 @@ import {
   BarChart3,
   Boxes,
   CheckCircle2,
+  Coins,
   Database,
   FileBarChart,
   FileSpreadsheet,
@@ -47,6 +48,7 @@ export const navGroups: ToolNavigationGroup[] = [
       { title: '体积 / 计费重', href: '/cbm', icon: Boxes, description: 'CBM、体积重与计费重试算', keywords: ['cbm', '体积', '体积重', '计费重', '装柜', '柜型', '空运', '海运', '快递'] },
       { title: '运单轨迹', href: '/tracking', icon: PackageSearch, description: '批量查询运单轨迹与预计送达', keywords: ['轨迹', 'tracking', '运单', '单号', '17track', '物流', '签收', '承运商'] },
       { title: '船司查询', href: '/shipping', icon: Ship, description: '船司名录、官网与单号识别直达官方查询', keywords: ['船司', '船公司', '船东', 'shipping', '官网', '货物追踪', '集装箱', '提单', '柜号', '单号识别'] },
+      { title: '汇率查询', href: '/exchange', icon: Coins, description: '货币换算、对人民币汇率与中间价', keywords: ['汇率', 'exchange', '货币', '美元', '人民币', '中间价', '换算', '外汇'] },
     ],
   },
   {

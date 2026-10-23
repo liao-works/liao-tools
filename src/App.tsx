@@ -18,6 +18,7 @@ import { TodoWidget } from './features/todo/TodoWidget';
 import { TrackingPage } from './features/tracking/TrackingPage';
 import { ShippingLinesPage } from './features/shipping/ShippingLinesPage';
 import { TranslatePage } from './features/translate/TranslatePage';
+import { ExchangePage } from './features/exchange/ExchangePage';
 import { TextToolsPage } from './features/text-tools/TextToolsPage';
 import { Toaster } from './components/ui/toaster';
 import { UpdateHistoryHost } from './components/update-history/UpdateHistoryHost';
@@ -74,6 +75,7 @@ function App() {
           <Route path="cbm" element={<CbmPage />} />
           <Route path="tracking" element={<TrackingPage />} />
           <Route path="shipping" element={<ShippingLinesPage />} />
+          <Route path="exchange" element={<ExchangePage />} />
           <Route path="excel" element={<ExcelPage />} />
           <Route path="revcal" element={<RevCalPage />} />
           <Route path="translate" element={<TranslatePage />} />
