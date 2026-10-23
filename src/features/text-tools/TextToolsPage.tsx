@@ -14,15 +14,17 @@ import {
 
 interface Snapshot { input: string; output: string }
 
-const TOOLS: Array<{ label: string; run: (text: string, delimiter: string) => string }> = [
-  { label: '优化格式', run: (text, delimiter) => optimizeFormat(text, delimiter) },
-  { label: '分割元素', run: (text) => splitElements(text) },
-  { label: 'Tab 竖排', run: (text) => verticalizeTabbed(text) },
-  { label: '尺寸合并 CBM', run: (text) => mergeDimensionsCbm(text) },
-  { label: '数字规整', run: (text) => normalizeNumbers(text) },
-  { label: '标题格式', run: (text) => toTitleCase(text) },
-  { label: '转大写', run: (text) => toUpperCase(text) },
-  { label: '转小写', run: (text) => toLowerCase(text) },
+// 按钮标签与顺序对齐原 exe 的真实绑定（反汇编确认）：
+// 优化格式=key:value 整理、分割元素=竖排、CBM=尺寸合并、无=数字规整、隔开=按分隔符合并
+const TOOLS: Array<{ label: string; title: string; run: (text: string, delimiter: string) => string }> = [
+  { label: '合并一行', title: '把换行替换为左侧分隔符（原「隔开」按钮）', run: (text, delimiter) => optimizeFormat(text, delimiter) },
+  { label: '优化格式', title: '把「标签<空格/Tab>值」行整理为「标签: 值」', run: (text) => splitElements(text) },
+  { label: '分割元素', title: '把一行按 Tab / 连续空格拆分成多行竖排', run: (text) => verticalizeTabbed(text) },
+  { label: 'CBM', title: '尺寸数字规整后用 * 合并，行尾加 CBM', run: (text) => mergeDimensionsCbm(text) },
+  { label: '数字规整', title: '同 CBM 合并，但不加 CBM 后缀', run: (text) => normalizeNumbers(text) },
+  { label: '标题格式', title: '每个单词首字母大写', run: (text) => toTitleCase(text) },
+  { label: '转大写', title: '整段转为大写', run: (text) => toUpperCase(text) },
+  { label: '转小写', title: '整段转为小写', run: (text) => toLowerCase(text) },
 ];
 
 const HISTORY_LIMIT = 50;
@@ -120,10 +122,10 @@ export function TextToolsPage() {
 
       <div className="flex flex-wrap items-center gap-2">
         <Input value={delimiter} onChange={(event) => setDelimiter(event.target.value)}
-          placeholder="分隔符（优化格式用）" className="h-8 w-40 text-sm" />
+          placeholder="分隔符（合并一行用）" className="h-8 w-40 text-sm" />
         {TOOLS.map((tool) => (
           <Button key={tool.label} type="button" variant="outline" size="sm" className="h-8"
-            disabled={!input.trim()} onClick={() => apply(tool.run)}>
+            title={tool.title} disabled={!input.trim()} onClick={() => apply(tool.run)}>
             {tool.label}
           </Button>
         ))}
