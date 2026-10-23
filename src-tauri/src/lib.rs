@@ -9,6 +9,7 @@ use commands::cbm::commands::*;
 use commands::tracking::commands::*;
 use commands::alta::matcher::HSCodeMatcher;
 use commands::excel::*;
+use commands::exchange::commands::{exchange_cn_parity, exchange_latest};
 use commands::file_utils::open_file_with_default_app;
 use commands::icon_extractor::extract_icon;
 use commands::installed_apps::get_installed_apps;
@@ -156,6 +157,9 @@ pub fn run() {
             tracking_export_results,
             // Shipping commands
             shipping_track_lookup,
+            // Exchange commands
+            exchange_latest,
+            exchange_cn_parity,
             // Update history commands
             get_update_sessions,
             get_update_details,

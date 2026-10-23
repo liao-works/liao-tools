@@ -2,6 +2,7 @@ pub mod alta;
 pub mod cbm;
 pub mod error;
 pub mod excel;
+pub mod exchange;
 pub mod icon_extractor;
 pub mod installed_apps;
 pub mod shipping;
