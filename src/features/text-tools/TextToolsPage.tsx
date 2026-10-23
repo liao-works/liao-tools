@@ -155,7 +155,9 @@ export function TextToolsPage() {
 
         <div className="flex min-h-0 flex-col rounded-lg border border-border bg-card">
           <Textarea value={output} readOnly onKeyDown={handleUndoHotkey}
-            placeholder="处理结果会出现在这里…"
+            placeholder={output || !input.trim()
+              ? '处理结果会出现在这里…'
+              : '结果为空：输入中没有可识别的行（需要「标签<空格/Tab>值」格式）'}
             className="min-h-[300px] flex-1 resize-none rounded-lg border-0 text-sm shadow-none focus-visible:ring-0" />
           <div className="flex items-center justify-between border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
             <span>{lineCount ? `${lineCount} 行` : ''}</span>

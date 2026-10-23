@@ -5,25 +5,38 @@ export function optimizeFormat(text: string, delimiter: string): string {
   return text.trim().replace(/\n/g, delimiter);
 }
 
-/** 分割元素：`key<TAB>value` 行整理为 `key: value`（key 去除 *；无 Tab 或字段为空的行跳过） */
+/**
+ * 行内字段分隔符定位：优先 Tab（与原程序一致），退化为连续 2+ 空格、单个空格。
+ * 返回分隔符起始下标；无分隔符返回 -1。
+ * 只在第一个分隔符处分割，值内部的连续空格 / Tab 原样保留（与原程序 split('\t', 1) 语义对齐）。
+ */
+function findSeparator(line: string): number {
+  const tabAt = line.indexOf('\t');
+  if (tabAt >= 0) return tabAt;
+  const multiSpace = / {2,}/.exec(line);
+  if (multiSpace?.index !== undefined) return multiSpace.index;
+  return line.indexOf(' ');
+}
+
+/** 分割元素：`key<分隔符>value` 行整理为 `key: value`（key 去除 *；无分隔符或字段为空的行跳过） */
 export function splitElements(text: string): string {
   const result: string[] = [];
   for (const line of text.trim().split('\n')) {
-    const tabAt = line.indexOf('\t');
-    if (tabAt < 0) continue;
-    const key = line.slice(0, tabAt).trim().replace(/\*/g, '');
-    const value = line.slice(tabAt + 1).trim();
+    const separatorAt = findSeparator(line);
+    if (separatorAt < 0) continue;
+    const key = line.slice(0, separatorAt).trim().replace(/\*/g, '');
+    const value = line.slice(separatorAt).trim();
     if (!key || !value) continue;
     result.push(`${key}: ${value}`);
   }
   return result.join('\n');
 }
 
-/** Tab 竖排：含 Tab 的行按 Tab 拆分、滤掉空字段后竖排（其余行原样保留） */
+/** Tab 竖排：含 Tab 或连续空格的行按字段拆分、滤掉空字段后竖排（其余行原样保留） */
 export function verticalizeTabbed(text: string): string {
   return text.trim().split('\n').map((line) => {
-    if (!line.includes('\t')) return line;
-    return line.split('\t').map((part) => part.trim()).filter(Boolean).join('\n');
+    if (!/\t| {2,}/.test(line)) return line;
+    return line.split(/\t| {2,}/).map((part) => part.trim()).filter(Boolean).join('\n');
   }).join('\n');
 }
 

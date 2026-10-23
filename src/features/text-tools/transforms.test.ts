@@ -54,6 +54,43 @@ describe('splitElements 分割元素', () => {
   it('多行逐行处理并换行连接', () => {
     expect(splitElements('品名\t杯子\n数量\t24')).toBe('品名: 杯子\n数量: 24');
   });
+
+  it('连续空格分隔同样识别（网页 / PDF 复制场景）', () => {
+    expect(splitElements('收件邮编*   07007\n收件人姓名*  chaomei chen')).toBe(
+      '收件邮编: 07007\n收件人姓名: chaomei chen',
+    );
+  });
+
+  it('单空格分隔可兜底识别', () => {
+    expect(splitElements('国家代码* ES')).toBe('国家代码: ES');
+  });
+
+  it('Tab 优先于空格，值内部空格原样保留', () => {
+    expect(splitElements('a\t  b  c')).toBe('a: b  c');
+  });
+
+  it('真实场景回归：空格分隔的收件信息块（原版仅支持 Tab 时整块失效）', () => {
+    const input = [
+      '收件人姓名*      chaomei chen',
+      '收件人电话*      695212461',
+      '收件人洲省*',
+      '收件城市*',
+      '收件地址*      C/DEL CAMP DE EU 3 LLEVANT 07007 PALMA   ILLES BALE SRS',
+      '收件邮编*      07007',
+      '收件邮箱      460619588@qq.com',
+      '国家代码*      ES',
+    ].join('\n');
+    expect(splitElements(input)).toBe(
+      [
+        '收件人姓名: chaomei chen',
+        '收件人电话: 695212461',
+        '收件地址: C/DEL CAMP DE EU 3 LLEVANT 07007 PALMA   ILLES BALE SRS',
+        '收件邮编: 07007',
+        '收件邮箱: 460619588@qq.com',
+        '国家代码: ES',
+      ].join('\n'),
+    );
+  });
 });
 
 describe('verticalizeTabbed Tab 竖排', () => {
@@ -71,6 +108,10 @@ describe('verticalizeTabbed Tab 竖排', () => {
 
   it('字段首尾空白去除', () => {
     expect(verticalizeTabbed(' a \t b ')).toBe('a\nb');
+  });
+
+  it('连续空格分隔同样竖排', () => {
+    expect(verticalizeTabbed('a  b  c\n纯文本')).toBe('a\nb\nc\n纯文本');
   });
 });
 
