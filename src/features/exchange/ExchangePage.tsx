@@ -211,11 +211,6 @@ export function ExchangePage() {
             <CardContent>
               {parityLoading && !parity ? (
                 <LoadingSpinner size="sm" text="正在获取中间价…" />
-              ) : parityError && !parity ? (
-                <div className="flex flex-col items-start gap-2">
-                  <p className="text-xs text-destructive">{parityError}</p>
-                  <Button type="button" variant="outline" size="sm" onClick={() => void loadParity()}>重试</Button>
-                </div>
               ) : parity ? (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                   {parity.items.map((item) => (
@@ -225,7 +220,16 @@ export function ExchangePage() {
                     </div>
                   ))}
                 </div>
-              ) : null}
+              ) : (
+                <div className="flex flex-col items-start gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    中间价暂时无法获取：{parityError}。上方汇率表为市场参考汇率，可正常使用。
+                  </p>
+                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => void loadParity()}>
+                    重试
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </>

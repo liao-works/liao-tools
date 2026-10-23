@@ -182,14 +182,16 @@ fn normalize_currency_api(value: &Value, fetched_at: i64) -> Result<ExchangeRate
 }
 
 /// 解析中国外汇交易中心中间价：取记录中最新一天，按请求的货币对顺序对齐 values。
+/// 注意该接口对高频请求返回「信封正常但 records 为空」的限流响应，这里必须软处理。
 fn parse_cn_parity(pairs: &[&str], value: &Value) -> Result<CnParity, String> {
-    let records = value
+    let Some(records) = value
         .pointer("/data/records")
         .and_then(Value::as_array)
-        .ok_or("中间价接口返回结构异常")?;
-    let latest = records
-        .first()
-        .ok_or("区间内没有中间价发布记录（非交易日？）")?;
+        .filter(|records| !records.is_empty())
+    else {
+        return Err("接口未返回发布记录（可能触发限流或当日尚未发布）".into());
+    };
+    let latest = records.first().expect("非空已检查");
     let date = latest
         .get("date")
         .and_then(Value::as_str)
@@ -208,6 +210,12 @@ fn parse_cn_parity(pairs: &[&str], value: &Value) -> Result<CnParity, String> {
         .filter_map(|(pair, v)| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|n| CnParityItem { pair: pair.to_string(), value: n }))
         .collect();
     Ok(CnParity { date, items })
+}
+
+/// 截取 JSON 响应片段用于日志排查
+fn json_snippet(value: &Value) -> String {
+    let text = value.to_string();
+    text.chars().take(300).collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -303,7 +311,13 @@ pub async fn get_cn_parity(app_handle: &tauri::AppHandle) -> Result<CnParity, St
         CN_PARITY_PAIRS.join("%2C"),
     );
     let parity = match fetch_json(&client, &url, Some(CHINAMONEY_REFERER)).await {
-        Ok(value) => parse_cn_parity(CN_PARITY_PAIRS, &value),
+        Ok(value) => {
+            let outcome = parse_cn_parity(CN_PARITY_PAIRS, &value);
+            if let Err(error) = &outcome {
+                log::warn!("中间价解析失败: {error}; 响应片段: {}", json_snippet(&value));
+            }
+            outcome
+        }
         Err(error) => Err(format!("中间价接口请求失败: {error}")),
     };
     if let Ok(parity) = &parity {
@@ -404,6 +418,13 @@ mod tests {
     #[test]
     fn parse_cn_parity_rejects_empty_records() {
         let sample = serde_json::json!({ "data": { "records": [] } });
+        assert!(parse_cn_parity(&["USD/CNY"], &sample).is_err());
+    }
+
+    #[test]
+    fn parse_cn_parity_soft_handles_throttled_envelope() {
+        // 限流响应：信封字段齐全但缺 records
+        let sample = serde_json::json!({ "head": { "rep_code": "200" }, "data": { "total": 3 } });
         assert!(parse_cn_parity(&["USD/CNY"], &sample).is_err());
     }
 
