@@ -13,6 +13,7 @@ import {
   Settings,
   Ship,
   ShoppingBag,
+  Type,
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
@@ -60,6 +61,7 @@ export const navGroups: ToolNavigationGroup[] = [
       { title: '系统工具', href: '/system-tools', icon: Wrench, description: '启动系统程序与自定义工具', keywords: ['系统', '软件', '程序', '启动'] },
       { title: 'Todo 清单', href: '/todo', icon: CheckCircle2, description: '记录任务与桌面小组件', keywords: ['todo', '待办', '任务', '小组件'] },
       { title: '翻译', href: '/translate', icon: Languages, description: '邮件翻译、润色与语气解读', keywords: ['翻译', 'translate', '邮件', '润色', '解释', 'deepseek', 'gemini'] },
+      { title: '文本处理', href: '/text-tools', icon: Type, description: '分割元素、尺寸合并与数字统计等文本整理', keywords: ['文本', 'text', '分割', '格式化', '尺寸', 'cbm', '统计', '大小写'] },
     ],
   },
   {

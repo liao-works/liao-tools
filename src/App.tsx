@@ -18,6 +18,7 @@ import { TodoWidget } from './features/todo/TodoWidget';
 import { TrackingPage } from './features/tracking/TrackingPage';
 import { ShippingLinesPage } from './features/shipping/ShippingLinesPage';
 import { TranslatePage } from './features/translate/TranslatePage';
+import { TextToolsPage } from './features/text-tools/TextToolsPage';
 import { Toaster } from './components/ui/toaster';
 import { UpdateHistoryHost } from './components/update-history/UpdateHistoryHost';
 import { useDarkMode } from './hooks/use-dark-mode';
@@ -76,6 +77,7 @@ function App() {
           <Route path="excel" element={<ExcelPage />} />
           <Route path="revcal" element={<RevCalPage />} />
           <Route path="translate" element={<TranslatePage />} />
+          <Route path="text-tools" element={<TextToolsPage />} />
           <Route path="system-tools" element={<SystemToolsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="data-maintenance" element={<DataMaintenancePage />} />

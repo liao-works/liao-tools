@@ -81,6 +81,7 @@ export const USAGE_TOOL_LABELS: Record<string, string> = {
   translate: '翻译',
   tracking: '轨迹查询',
   shipping: '船司查询',
+  texttools: '文本处理',
 };
 
 export function formatDuration(ms: number): string {

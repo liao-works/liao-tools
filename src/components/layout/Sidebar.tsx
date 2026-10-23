@@ -3,7 +3,7 @@ import {
   BarChart3,
   Home, Search, ShieldCheck, FileSpreadsheet, Wrench,
   CheckCheck, Languages, Settings, Database, Calculator, PanelLeftClose, PanelLeftOpen, RefreshCw,
-  Boxes, PackageSearch, Ship
+  Boxes, PackageSearch, Ship, Type
 } from 'lucide-react';
 import { useDataUpdateStatusStore } from '@/stores/data-update-status-store';
 import { useAppUpdateStatusStore } from '@/stores/app-update-status-store';
@@ -27,6 +27,7 @@ const groups = [
     { label: '系统工具', href: '/system-tools', icon: Wrench },
     { label: 'Todo 清单', href: '/todo', icon: CheckCheck },
     { label: '翻译', href: '/translate', icon: Languages },
+    { label: '文本处理', href: '/text-tools', icon: Type },
   ] },
 ];
 

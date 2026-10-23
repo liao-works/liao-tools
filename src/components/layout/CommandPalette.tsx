@@ -10,6 +10,7 @@ const commands = [
   { label:'Excel 数据拆分', detail:'海铁、空运工作簿', path:'/excel', keywords:'表格 图片 合并单元格' },
   { label:'系统工具', detail:'常用及自定义程序', path:'/system-tools', keywords:'工具箱 launcher' },
   { label:'Todo 清单', detail:'待办与桌面小组件', path:'/todo', keywords:'task 任务' },
+  { label:'文本处理', detail:'分割元素、尺寸合并与数字统计', path:'/text-tools', keywords:'文本 文本处理 text 格式化 cbm 尺寸' },
   { label:'数据维护', detail:'税率数据库与审计', path:'/tax?tab=update', keywords:'同步 更新 审计' },
   { label:'应用更新', detail:'检查版本、完整性验证、安装', path:'/updates', keywords:'升级 自动更新 release version' },
   { label:'偏好设置', detail:'主题与应用配置', path:'/settings', keywords:'settings 外观' },
