@@ -14,6 +14,14 @@ export default defineConfig({
   // WRITERS.md 是写手规范文档，不是教程页，不进入站点
   srcExclude: ['WRITERS.md'],
 
+  vite: {
+    css: {
+      // 内联空 PostCSS 配置：阻止 Vite 向上查找到仓库根目录的 postcss.config.js
+      // （根配置依赖主应用的 @tailwindcss/postcss，CI 只装 website 依赖时不可用）
+      postcss: { plugins: [] }
+    }
+  },
+
   themeConfig: {
     siteTitle: 'Liao Tools 使用教程',
 
