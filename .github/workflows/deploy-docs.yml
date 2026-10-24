@@ -1,0 +1,73 @@
+# 部署在线教程（VitePress）到 GitHub Pages
+# 线上地址：https://liao-works.github.io/liao-tools/
+name: deploy-docs
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'website/**'
+      - '.github/workflows/deploy-docs.yml'
+  workflow_dispatch:
+
+# GitHub Pages 部署所需的最小权限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只保留一次部署，避免并发覆盖
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 构建站点
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+
+      - name: 安装 website 依赖
+        run: pnpm --dir website install --frozen-lockfile
+
+      - name: 构建站点
+        run: pnpm --dir website run docs:build
+
+      - name: 配置 GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: 上传构建产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/.vitepress/dist
+
+  deploy:
+    name: 部署到 GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 部署
+        id: deployment
+        uses: actions/deploy-pages@v4
