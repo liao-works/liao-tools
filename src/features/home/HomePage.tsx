@@ -8,6 +8,7 @@ import { taxApi } from '@/lib/api/tax';
 import { altaApi } from '@/lib/api/alta';
 import { openUrlPath } from '@/lib/file-opener';
 import { getTutorialUrl } from '@/lib/tutorial-links';
+import { useToast } from '@/hooks/use-toast';
 import { HomeTodoCalendar } from '@/features/todo/components/HomeTodoCalendar';
 import { RecentTranslations } from '@/features/translate/components/RecentTranslations';
 
@@ -29,6 +30,7 @@ const tools = [
 type Snapshot = { kind: 'loading' | 'ready' | 'unavailable'; label: string };
 
 export function HomePage() {
+  const { toast } = useToast();
   const [tax, setTax] = useState<Snapshot>({ kind: 'loading', label: '正在读取本地数据…' });
   const [alta, setAlta] = useState<Snapshot>({ kind: 'loading', label: '正在读取本地数据…' });
 
@@ -61,6 +63,11 @@ export function HomePage() {
               event.preventDefault();
               void openUrlPath(getTutorialUrl('home')).catch((error: unknown) => {
                 console.error('打开教程失败:', error);
+                toast({
+                  title: '打开教程失败',
+                  description: error instanceof Error ? error.message : String(error),
+                  variant: 'destructive',
+                });
               });
             }}>
             <BookOpen size={17}/> 使用教程
