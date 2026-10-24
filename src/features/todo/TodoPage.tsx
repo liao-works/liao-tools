@@ -221,7 +221,7 @@ export function TodoPage() {
               <ExternalLink className="h-4 w-4" />
               桌面小部件
             </Button>
-            <TutorialLink featureId="todo" />
+            <TutorialLink featureId="todo" variant="outline" />
             <Button
               variant="ghost"
               size="icon"
