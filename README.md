@@ -2,6 +2,8 @@
 
 一个集成多功能的桌面工具应用，使用 Tauri 2.0 + React + TypeScript 构建。
 
+> 📖 **在线教程**：<https://liao-works.github.io/liao-tools/> —— 各功能的逐步操作说明与截图。
+
 ## 功能模块
 
 ### 1. Alta禁运商品查询系统

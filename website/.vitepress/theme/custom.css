@@ -1,0 +1,23 @@
+/*
+ * 站点主题色取自应用默认外观「暖陶橙 · PR3」
+ * （见仓库 src/lib/themes.ts 中 terracotta: '#c65435'）。
+ * 深浅色模式分别取值，保证两种模式下链接与按钮都有足够对比度。
+ */
+:root {
+  --vp-c-brand-1: #b34a2c;
+  --vp-c-brand-2: #a34125;
+  --vp-c-brand-3: #c65435;
+  --vp-c-brand-soft: rgba(198, 84, 53, 0.14);
+
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #b34a2c, #d97b52);
+}
+
+.dark {
+  --vp-c-brand-1: #e89a7e;
+  --vp-c-brand-2: #f0ab90;
+  --vp-c-brand-3: #c65435;
+  --vp-c-brand-soft: rgba(232, 154, 126, 0.16);
+
+  --vp-home-hero-name-background: linear-gradient(120deg, #e89a7e, #d97b52);
+}
