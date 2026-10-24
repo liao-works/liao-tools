@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { AlertCircle, Grid3x3, List, Loader2, Plus, RefreshCw, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -203,7 +204,7 @@ export function SystemToolsPage() {
 
   return (
     <div className="lt-feature mx-auto max-w-6xl space-y-6 pb-10">
-      <FeatureHeader eyebrow="UTILITIES / LAUNCHER" title="系统工具" description="启动系统程序、管理自己的工具和快捷键。" illustrationSrc="/illustrations/tools-empty.svg" />
+      <FeatureHeader eyebrow="UTILITIES / LAUNCHER" title="系统工具" description="启动系统程序、管理自己的工具和快捷键。" illustrationSrc="/illustrations/tools-empty.svg" action={<TutorialLink featureId="system-tools" variant="outline" />} />
       <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="flex flex-wrap gap-2">
           <Button variant={viewMode === 'grid' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('grid')}><Grid3x3 className="h-4 w-4" />工具列表</Button>

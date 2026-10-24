@@ -1,4 +1,5 @@
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { useState } from 'react';
 import { Calculator, Download, FileSpreadsheet, Loader2, Plus, Search, Trash2, ExternalLink, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -262,7 +263,7 @@ export function RevCalPage() {
 
   return (
     <div className="lt-feature space-y-6">
-      <FeatureHeader eyebrow="PRODUCT / AMAZON" title="Amazon 商品查询" description="查询商品尺寸、重量、价格与商品信息。支持单码、多站点和 Excel 批量导出；结果来自第三方公开接口。" illustrationSrc="/illustrations/product-lookup.svg"/>
+      <FeatureHeader eyebrow="PRODUCT / AMAZON" title="Amazon 商品查询" description="查询商品尺寸、重量、价格与商品信息。支持单码、多站点和 Excel 批量导出；结果来自第三方公开接口。" illustrationSrc="/illustrations/product-lookup.svg" action={<TutorialLink featureId="revcal" variant="outline" />}/>
 
       <div className="lt-product-toolbar">
         <div><span className="lt-step-index">01</span>

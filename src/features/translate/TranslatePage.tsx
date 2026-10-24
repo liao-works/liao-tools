@@ -4,6 +4,7 @@ import { History, Languages, Settings2, SquarePen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { translateApi } from '@/lib/api/translate';
 import { useToast } from '@/hooks/use-toast';
 import { detectSourceLang, LanguageSelect, langLabel } from './components/LanguageSelect';
@@ -154,6 +155,7 @@ export function TranslatePage() {
         title="翻译"
         description="邮件翻译、润色与语气解读，支持 DeepSeek / Gemini"
         icon={<Languages size={32} />}
+        action={<TutorialLink featureId="translate" variant="outline" />}
       />
       <div className="flex flex-wrap items-center gap-2">
         {/* 左组：模式 + 随模式变化的上下文控件 */}

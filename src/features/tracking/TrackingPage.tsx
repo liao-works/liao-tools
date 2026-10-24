@@ -9,6 +9,7 @@ import {
   Save,
 } from 'lucide-react';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -124,7 +125,8 @@ export function TrackingPage() {
     <div className="lt-feature space-y-6">
       <FeatureHeader eyebrow="LOGISTICS / TRACKING" title="运单轨迹查询"
         description="通过 17TRACK 开放接口批量查询运单轨迹：自动识别承运商、里程碑状态与预计送达；需要自备 API Key。"
-        illustrationSrc="/illustrations/trade-scene.svg"/>
+        illustrationSrc="/illustrations/trade-scene.svg"
+        action={<TutorialLink featureId="tracking" variant="outline" />}/>
 
       <Card>
         <CardHeader>

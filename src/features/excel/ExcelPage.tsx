@@ -1,4 +1,5 @@
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -116,7 +117,7 @@ export function ExcelPage() {
 
   return (
     <div className="lt-feature space-y-6">
-      <FeatureHeader eyebrow="FILES / SPREADSHEETS" title="Excel 数据拆分" description="处理海铁或空运工作簿的合并单元格、重量分配及图片，保留原有模板和列配置。" illustrationSrc="/illustrations/file-workflow.svg"/>
+      <FeatureHeader eyebrow="FILES / SPREADSHEETS" title="Excel 数据拆分" description="处理海铁或空运工作簿的合并单元格、重量分配及图片，保留原有模板和列配置。" illustrationSrc="/illustrations/file-workflow.svg" action={<TutorialLink featureId="excel" variant="outline" />}/>
 
       <Tabs defaultValue="process" className="w-full">
         <TabsList>

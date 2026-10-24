@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { RefreshCw, ShieldCheck, PackageCheck, ArrowUpRight } from 'lucide-react';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { UpdateDialog } from '@/components/UpdateDialog';
 import { Button } from '@/components/ui/button';
 
@@ -19,6 +20,7 @@ export function UpdateCenter() {
         title="应用更新"
         description="了解最新桌面版本、查看更新内容并由系统安装程序完成升级。"
         illustrationSrc="/illustrations/update-scene.svg"
+        action={<TutorialLink featureId="updates" variant="outline" />}
       />
       <section className="rounded-xl border border-border bg-card p-6 sm:p-8">
         <div className="mb-5 flex items-start gap-3">

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { exchangeApi } from '@/lib/api/exchange';
 import type { CnParity, ExchangeRates } from '@/lib/api/exchange';
@@ -98,6 +99,7 @@ export function ExchangePage() {
         title="汇率查询"
         description="常用货币换算、对人民币汇率与人民币中间价，每日更新且离线可用"
         icon={<Coins size={26} strokeWidth={1.8} />}
+        action={<TutorialLink featureId="exchange" variant="outline" />}
       />
 
       {rates && (

@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { taxApi } from '@/lib/api/tax';
 import { altaApi } from '@/lib/api/alta';
+import { openUrlPath } from '@/lib/file-opener';
+import { getTutorialUrl } from '@/lib/tutorial-links';
 import { HomeTodoCalendar } from '@/features/todo/components/HomeTodoCalendar';
 import { RecentTranslations } from '@/features/translate/components/RecentTranslations';
 
@@ -54,6 +56,15 @@ export function HomePage() {
         <div className="lt-hero-actions">
           <Link className="lt-primary-link" to="/tax"><Search size={17}/> 开始查询 <ArrowRight size={16}/></Link>
           <Link className="lt-secondary-link" to="/excel"><BookOpen size={17}/> 处理 Excel</Link>
+          <a className="lt-secondary-link" href={getTutorialUrl('home')}
+            onClick={(event) => {
+              event.preventDefault();
+              void openUrlPath(getTutorialUrl('home')).catch((error: unknown) => {
+                console.error('打开教程失败:', error);
+              });
+            }}>
+            <BookOpen size={17}/> 使用教程
+          </a>
         </div>
       </div>
       <img className="lt-hero-art" src="/illustrations/trade-hero.svg"

@@ -19,6 +19,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { DueDatePopover } from './components/DueDatePopover';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import type { TodoPriority } from './types';
 import { PRIORITY_COLORS, PRIORITY_LABELS } from './types';
 import { groupTasksByCreatedDate } from './utils/taskGroups';
@@ -220,6 +221,7 @@ export function TodoPage() {
               <ExternalLink className="h-4 w-4" />
               桌面小部件
             </Button>
+            <TutorialLink featureId="todo" />
             <Button
               variant="ghost"
               size="icon"

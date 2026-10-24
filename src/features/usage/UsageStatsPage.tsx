@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BarChart3, Clock, Database, FileSearch, Loader2, RefreshCw, type LucideIcon } from 'lucide-react';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -76,6 +77,7 @@ export function UsageStatsPage() {
         title="使用统计"
         description="本机各工具的查询次数、查询数据量、处理数据量与处理时长统计，支持按周/月视图查看；数据仅保存在本地。"
         illustrationSrc="/illustrations/update-scene.svg"
+        action={<TutorialLink featureId="usage" variant="outline" />}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">

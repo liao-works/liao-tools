@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { QueryTab } from './components/QueryTab';
 import { BatchTab } from './components/BatchTab';
 import { DataManageTab } from './components/DataManageTab';
@@ -14,7 +15,8 @@ export function AltaPage() {
     <div className="lt-feature space-y-6">
       <FeatureHeader eyebrow="COMPLIANCE / ALTA" title="Alta 禁运商品查询"
         description="按 HS Code 匹配禁运条目。请同时核对匹配位数、适用范围和例外条件；未命中不等于全面合规。"
-        illustrationSrc="/illustrations/alta-inspection.svg"/>
+        illustrationSrc="/illustrations/alta-inspection.svg"
+        action={<TutorialLink featureId="alta" variant="outline" />}/>
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="query">单码检查</TabsTrigger>

@@ -4,6 +4,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { AlertCircle, Check, Database, Download, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
@@ -78,7 +79,7 @@ export function SettingsPage() {
 
   return (
     <div className="lt-feature mx-auto max-w-5xl space-y-6 pb-10">
-      <FeatureHeader eyebrow="PREFERENCES" title="偏好设置" description="外观、应用版本及实际生效的更新选项。" />
+      <FeatureHeader eyebrow="PREFERENCES" title="偏好设置" description="外观、应用版本及实际生效的更新选项。" action={<TutorialLink featureId="settings" variant="outline" />} />
 
       <Card className="shadow-none">
         <CardHeader className="pb-3">
@@ -198,9 +199,12 @@ export function SettingsPage() {
               </p>
             </div>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => void openRepository()}>
-            <ExternalLink className="h-4 w-4" />GitHub 仓库
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <TutorialLink featureId="settings" showLabel label="在线教程" variant="outline" />
+            <Button type="button" variant="outline" size="sm" onClick={() => void openRepository()}>
+              <ExternalLink className="h-4 w-4" />GitHub 仓库
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

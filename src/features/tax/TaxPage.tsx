@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { SingleQueryTab } from './components/SingleQueryTab';
 import { CalcTab } from './components/CalcTab';
 import { BatchQueryTab } from './components/BatchQueryTab';
@@ -16,7 +17,8 @@ export function TaxPage() {
     <div className="lt-feature space-y-6">
       <FeatureHeader eyebrow="TRADE / TARIFF" title="英国 / 北爱尔兰关税查询"
         description="输入商品编码，查询中国原产商品进入英国与北爱尔兰的普通第三国税率；暂无数据时显示 —。"
-        illustrationSrc="/illustrations/tariff-hero.svg"/>
+        illustrationSrc="/illustrations/tariff-hero.svg"
+        action={<TutorialLink featureId="tax" variant="outline" />}/>
       <Tabs value={tab} onValueChange={value => setParams(value === 'single' ? {} : { tab: value })} className="space-y-4">
         <TabsList>
           <TabsTrigger value="single">单码查询</TabsTrigger>

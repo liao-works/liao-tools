@@ -10,6 +10,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -221,7 +222,8 @@ export function CbmPage() {
     <div className="lt-feature space-y-6">
       <FeatureHeader eyebrow="LOGISTICS / CBM" title="体积 / 计费重计算"
         description="按包裹尺寸计算 CBM、体积重与计费重（实重与体积重取大），并估算常用柜型装柜数量；纯本地计算。"
-        illustrationSrc="/illustrations/trade-scene.svg"/>
+        illustrationSrc="/illustrations/trade-scene.svg"
+        action={<TutorialLink featureId="cbm" variant="outline" />}/>
 
       <Card>
         <CardHeader>

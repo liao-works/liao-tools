@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { UpdateTab } from '@/features/tax/components/UpdateTab';
 import { DataManageTab } from '@/features/alta/components/DataManageTab';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { openUpdateHistory } from '@/hooks/use-update-history';
 
 type DataModule = 'tax' | 'alta';
@@ -49,6 +50,7 @@ export function DataMaintenancePage() {
             <Button type="button" variant="outline" size="sm" asChild>
               <Link to={module === 'tax' ? '/tax' : '/alta'}>返回业务查询</Link>
             </Button>
+            <TutorialLink featureId="data-maintenance" showLabel variant="outline" />
           </div>
         </div>
         <TabsContent value="tax" className="space-y-4">

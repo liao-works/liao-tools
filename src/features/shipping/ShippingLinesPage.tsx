@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Globe, Loader2, PackageSearch, Search, Ship, X } from 'lucide-react';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -370,6 +371,7 @@ export function ShippingLinesPage() {
         title="船司查询"
         description={`收录 ${SHIPPING_LINES.length} 家船司的官网与货物跟踪入口，支持单号识别直达官方查询页`}
         icon={<Ship size={26} strokeWidth={1.8} />}
+        action={<TutorialLink featureId="shipping" variant="outline" />}
       />
 
       <Tabs defaultValue="lines" className="space-y-4">

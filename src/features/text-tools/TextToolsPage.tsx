@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { FeatureHeader } from '@/components/layout/FeatureHeader';
+import { TutorialLink } from '@/components/common/TutorialLink';
 import { useToast } from '@/hooks/use-toast';
 import { recordUsage } from '@/lib/api/usage';
 import {
@@ -118,6 +119,7 @@ export function TextToolsPage() {
         title="文本处理"
         description="分割元素、尺寸合并、数字统计等常用文本整理，全部本地完成"
         icon={<Type size={26} strokeWidth={1.8} />}
+        action={<TutorialLink featureId="text-tools" variant="outline" />}
       />
 
       <div className="flex flex-wrap items-center gap-2">
