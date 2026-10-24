@@ -37,7 +37,7 @@ export default defineConfig({
         text: '快速上手',
         items: [
           { text: '教程首页', link: '/' },
-          { text: '认识工作台', link: '/guide/home' }
+          { text: '工作台', link: '/guide/home' }
         ]
       },
       {

@@ -106,7 +106,7 @@ features:
 
 ## 推荐的阅读路径
 
-- **第一次使用**：先看 [认识工作台](/guide/home) 了解整体布局，再按需进入各功能教程。
+- **第一次使用**：先看 [工作台](/guide/home) 了解整体布局，再按需进入各功能教程。
 - **查税与合规**：[关税查询](/guide/tax) → [Alta 禁运筛查](/guide/alta) → [数据维护](/guide/data-maintenance)。
 - **发货与物流**：[体积 / 计费重计算](/guide/cbm) → [船司查询](/guide/shipping) → [运单轨迹查询](/guide/tracking)。
 - **采购与行情**：[Amazon 商品查询](/guide/revcal) 与 [汇率查询](/guide/exchange)。
