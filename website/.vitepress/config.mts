@@ -11,6 +11,9 @@ export default defineConfig({
   // GitHub Pages 子路径部署
   base: '/liao-tools/',
 
+  // 页脚显示「最后更新于」（部署工作流 checkout fetch-depth: 0，能取到真实提交时间）
+  lastUpdated: true,
+
   // WRITERS.md 是写手规范文档，不是教程页，不进入站点
   srcExclude: ['WRITERS.md'],
 
@@ -116,6 +119,13 @@ export default defineConfig({
 
     outline: { level: [2, 3], label: '本页目录' },
     docFooter: { prev: '上一篇', next: '下一篇' },
+    lastUpdated: {
+      text: '最后更新于'
+    },
+    editLink: {
+      pattern: 'https://github.com/liao-works/liao-tools/edit/master/website/:path',
+      text: '在 GitHub 上编辑此页'
+    },
     returnToTopLabel: '回到顶部',
     sidebarMenuLabel: '目录',
     darkModeSwitchLabel: '外观',
