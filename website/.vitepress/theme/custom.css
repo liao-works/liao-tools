@@ -21,3 +21,57 @@
 
   --vp-home-hero-name-background: linear-gradient(120deg, #e89a7e, #d97b52);
 }
+
+/*
+ * 排版微调：针对中文长教程页的可读性
+ * （列表呼吸感、序号强调、标题锚点、行距），均使用主题变量保证深浅色一致。
+ */
+
+/* 中文正文行距：默认 1.7 对 CJK 偏挤 */
+.vp-doc p,
+.vp-doc li {
+  line-height: 1.85;
+}
+
+/* 列表呼吸感：条目间留间隙，序号用品牌色加粗 */
+.vp-doc ol > li,
+.vp-doc ul > li {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+.vp-doc ol > li::marker {
+  color: var(--vp-c-brand-1);
+  font-weight: 600;
+}
+
+/* 列表条目内的段落不再额外撑高 */
+.vp-doc li > p {
+  margin: 0.35em 0;
+}
+
+/* 标题锚点（#）默认隐藏，悬停或键盘聚焦时才出现 */
+.vp-doc .header-anchor {
+  opacity: 0;
+}
+.vp-doc .header-anchor:focus,
+.vp-doc :is(h1, h2, h3, h4, h5, h6):hover .header-anchor {
+  opacity: 1;
+}
+
+/* 三级标题与二级拉开层级：上方多留空白 */
+.vp-doc h3 {
+  padding-top: 1.6em;
+}
+
+/* 表格更紧凑，长表格更好扫读 */
+.vp-doc table th,
+.vp-doc table td {
+  padding: 8px 14px;
+}
+
+/* 提示容器行距与正文一致 */
+.vp-doc .tip,
+.vp-doc .warning,
+.vp-doc .danger {
+  line-height: 1.85;
+}
