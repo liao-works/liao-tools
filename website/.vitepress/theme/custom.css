@@ -75,3 +75,80 @@
 .vp-doc .danger {
   line-height: 1.85;
 }
+
+/* ─────────── 全面 UI 设计层 ─────────── */
+
+/* 文档页截图：圆角 + 描边 + 柔和投影，让界面截图从正文中「浮」出来 */
+.vp-doc p > img {
+  border-radius: 12px;
+  border: 1px solid var(--vp-c-divider);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+}
+.dark .vp-doc p > img {
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* 首页 Hero 主视觉：品牌色光晕 + 圆角截图 */
+:root {
+  --vp-home-hero-image-background: rgba(198, 84, 53, 0.12);
+}
+.dark {
+  --vp-home-hero-image-background: rgba(232, 154, 126, 0.1);
+}
+.VPImage.image-src {
+  border-radius: 16px;
+  border: 1px solid var(--vp-c-divider);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+}
+.dark .VPImage.image-src {
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Hero 标语排版 */
+.VPHero .tagline {
+  max-width: 560px;
+  line-height: 1.8;
+}
+
+/* 功能卡片：悬停浮起 + 品牌描边 */
+.VPFeature {
+  border-radius: 12px;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+.VPFeature:hover {
+  transform: translateY(-3px);
+  border-color: var(--vp-c-brand-1);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.09);
+}
+.dark .VPFeature:hover {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+.VPFeature .icon {
+  font-size: 22px;
+}
+.VPFeature .title {
+  font-weight: 600;
+}
+.VPFeature .link-text {
+  color: var(--vp-c-brand-1);
+  font-weight: 500;
+}
+
+/* 代码块与提示容器圆角，与卡片一致 */
+.vp-doc div[class*='language-'] {
+  border-radius: 10px;
+}
+.vp-doc .custom-block {
+  border-radius: 10px;
+}
+
+/* 首页下半部分（推荐阅读路径）：去掉生硬的 h2 分隔线 */
+.VPHome .vp-doc h2 {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 3em;
+}

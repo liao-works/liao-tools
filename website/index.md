@@ -5,6 +5,9 @@ hero:
   name: Liao Tools
   text: 跨境贸易日常工作桌面工具箱
   tagline: 关税与禁运查询、Amazon 商品信息、体积与计费重试算、运单轨迹、船司与汇率查询，加上 Excel 拆分、翻译和文本处理，全部收纳进同一个侧边栏应用。查询与文件处理默认在本机完成、离线可用；再配合 Todo 清单桌面小组件、使用统计和可换肤的外观，让每天的高频操作更快、更顺手。
+  image:
+    src: /images/tax/tax-overview.png
+    alt: Liao Tools 关税查询页界面截图
   actions:
     - theme: brand
       text: 开始上手
@@ -15,6 +18,9 @@ hero:
     - theme: alt
       text: 处理 Excel
       link: /guide/excel
+    - theme: alt
+      text: 下载应用
+      link: https://github.com/liao-works/liao-tools/releases/latest
 
 features:
   - icon: 🧭
