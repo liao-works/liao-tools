@@ -76,6 +76,12 @@
 }
 
 /* ═══ 3. 基础排版 ═══ */
+
+/* 锚点定位补偿固定导航高度：目录点击与 # 深链的落点不再被导航遮挡 */
+html {
+  scroll-padding-top: calc(var(--vp-nav-height) + 12px);
+}
+
 .vp-doc {
   font-size: var(--lt-fs-body);
 }
@@ -142,8 +148,10 @@
 
 /* ═══ 4. 组件层 ═══ */
 
-/* 文档截图卡片：圆角 + 描边 + 柔和投影 */
+/* 文档截图卡片：圆角 + 描边 + 柔和投影；窄于栏宽的小图（如竖版小组件）居中 */
 .vp-doc p > img {
+  display: block;
+  margin-inline: auto;
   border-radius: var(--lt-radius-lg);
   border: 1px solid var(--vp-c-divider);
   box-shadow: var(--lt-shadow-1);
