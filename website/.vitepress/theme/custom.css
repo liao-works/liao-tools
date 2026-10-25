@@ -1,9 +1,48 @@
-/*
- * 站点主题色取自应用默认外观「暖陶橙 · PR3」
- * （见仓库 src/lib/themes.ts 中 terracotta: '#c65435'）。
- * 深浅色模式分别取值，保证两种模式下链接与按钮都有足够对比度。
+/**
+ * Liao Tools 教程站设计令牌与全局样式
+ *
+ * 结构：
+ *   1. 设计令牌（:root / .dark）——字阶、行高、圆角、间距、阴影、品牌色
+ *   2. VitePress 变量覆写——字体族
+ *   3. 基础排版——正文、标题字阶、行内代码、表格、列表、标题锚点
+ *   4. 组件层——截图卡片、Hero 主视觉、功能卡、代码块与提示容器、首页下部
+ *
+ * 规则：组件层一律消费令牌（--lt-* / --vp-*），不写魔法数；
+ *       深浅色差异只出现在令牌定义处，不散落在组件规则里。
  */
+
+/* ═══ 1. 设计令牌 ═══ */
 :root {
+  /* 字阶：以 16px 正文为基准的模块化字阶 */
+  --lt-fs-body: 16px;
+  --lt-fs-code: 0.9em; /* 行内代码，相对正文 */
+  --lt-fs-table: 0.94em; /* 表格正文，相对正文（数据密度高一档） */
+  --lt-fs-h1: 30px;
+  --lt-fs-h2: 22px;
+  --lt-fs-h3: 18px;
+  --lt-fs-h4: 16px;
+
+  /* 行高 */
+  --lt-lh-body: 1.85; /* CJK 正文 */
+  --lt-lh-heading: 1.35;
+
+  /* 圆角 */
+  --lt-radius-sm: 8px;
+  --lt-radius-md: 10px;
+  --lt-radius-lg: 12px;
+  --lt-radius-xl: 16px;
+
+  /* 间距 */
+  --lt-space-2: 8px;
+  --lt-space-3: 12px;
+  --lt-space-4: 16px;
+
+  /* 阴影（浅色模式基准，深色模式在下方覆写） */
+  --lt-shadow-1: 0 6px 24px rgba(0, 0, 0, 0.08); /* 文档截图 */
+  --lt-shadow-2: 0 10px 28px rgba(0, 0, 0, 0.09); /* 功能卡悬停 */
+  --lt-shadow-3: 0 16px 40px rgba(0, 0, 0, 0.12); /* Hero 主视觉 */
+
+  /* 品牌色：应用默认外观「暖陶橙 · PR3」（src/lib/themes.ts terracotta #c65435） */
   --vp-c-brand-1: #b34a2c;
   --vp-c-brand-2: #a34125;
   --vp-c-brand-3: #c65435;
@@ -11,42 +50,85 @@
 
   --vp-home-hero-name-color: transparent;
   --vp-home-hero-name-background: linear-gradient(120deg, #b34a2c, #d97b52);
+  --vp-home-hero-image-background: rgba(198, 84, 53, 0.12);
 }
-
 .dark {
+  /* 深色模式只覆写有差异的令牌 */
+  --lt-shadow-1: 0 6px 24px rgba(0, 0, 0, 0.45);
+  --lt-shadow-2: 0 10px 28px rgba(0, 0, 0, 0.45);
+  --lt-shadow-3: 0 16px 40px rgba(0, 0, 0, 0.5);
+
   --vp-c-brand-1: #e89a7e;
   --vp-c-brand-2: #f0ab90;
   --vp-c-brand-3: #c65435;
   --vp-c-brand-soft: rgba(232, 154, 126, 0.16);
 
   --vp-home-hero-name-background: linear-gradient(120deg, #e89a7e, #d97b52);
+  --vp-home-hero-image-background: rgba(232, 154, 126, 0.1);
 }
 
-/*
- * 排版微调：针对中文长教程页的可读性
- * （列表呼吸感、序号强调、标题锚点、行距），均使用主题变量保证深浅色一致。
- */
+/* ═══ 2. VitePress 变量覆写：字体族（CJK 友好的系统栈） ═══ */
+:root {
+  --vp-font-family-base: system-ui, -apple-system, 'Segoe UI', 'PingFang SC',
+    'HarmonyOS Sans SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --vp-font-family-mono: 'Cascadia Code', 'JetBrains Mono', Consolas, Menlo,
+    monospace;
+}
 
-/* 中文正文行距：默认 1.7 对 CJK 偏挤 */
+/* ═══ 3. 基础排版 ═══ */
+.vp-doc {
+  font-size: var(--lt-fs-body);
+}
 .vp-doc p,
 .vp-doc li {
-  line-height: 1.85;
+  line-height: var(--lt-lh-body);
 }
 
-/* 列表呼吸感：条目间留间隙，序号用品牌色加粗 */
+/* 标题字阶 */
+.vp-doc h1 {
+  font-size: var(--lt-fs-h1);
+  line-height: var(--lt-lh-heading);
+}
+.vp-doc h2 {
+  font-size: var(--lt-fs-h2);
+  line-height: var(--lt-lh-heading);
+}
+.vp-doc h3 {
+  font-size: var(--lt-fs-h3);
+  line-height: var(--lt-lh-heading);
+  padding-top: 1.6em; /* 与二级标题拉开层级 */
+}
+.vp-doc h4 {
+  font-size: var(--lt-fs-h4);
+  line-height: var(--lt-lh-heading);
+}
+
+/* 行内代码 */
+.vp-doc :not(pre) > code {
+  font-size: var(--lt-fs-code);
+}
+
+/* 表格：数据密度高一档 */
+.vp-doc table {
+  font-size: var(--lt-fs-table);
+}
+.vp-doc table th,
+.vp-doc table td {
+  padding: var(--lt-space-2) 14px;
+}
+
+/* 列表呼吸感与序号强调 */
 .vp-doc ol > li,
 .vp-doc ul > li {
-  margin-top: 0.5em;
-  margin-bottom: 0.5em;
+  margin-top: var(--lt-space-2);
+  margin-bottom: var(--lt-space-2);
 }
 .vp-doc ol > li::marker {
   color: var(--vp-c-brand-1);
   font-weight: 600;
 }
-
-/* 列表条目内的段落不再额外撑高 */
 .vp-doc li > p {
-  margin: 0.35em 0;
+  margin: 6px 0;
 }
 
 /* 标题锚点（#）默认隐藏，悬停或键盘聚焦时才出现 */
@@ -58,62 +140,32 @@
   opacity: 1;
 }
 
-/* 三级标题与二级拉开层级：上方多留空白 */
-.vp-doc h3 {
-  padding-top: 1.6em;
-}
+/* ═══ 4. 组件层 ═══ */
 
-/* 表格更紧凑，长表格更好扫读 */
-.vp-doc table th,
-.vp-doc table td {
-  padding: 8px 14px;
-}
-
-/* 提示容器行距与正文一致 */
-.vp-doc .tip,
-.vp-doc .warning,
-.vp-doc .danger {
-  line-height: 1.85;
-}
-
-/* ─────────── 全面 UI 设计层 ─────────── */
-
-/* 文档页截图：圆角 + 描边 + 柔和投影，让界面截图从正文中「浮」出来 */
+/* 文档截图卡片：圆角 + 描边 + 柔和投影 */
 .vp-doc p > img {
-  border-radius: 12px;
+  border-radius: var(--lt-radius-lg);
   border: 1px solid var(--vp-c-divider);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
-}
-.dark .vp-doc p > img {
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--lt-shadow-1);
 }
 
-/* 首页 Hero 主视觉：品牌色光晕 + 圆角截图 */
-:root {
-  --vp-home-hero-image-background: rgba(198, 84, 53, 0.12);
-}
-.dark {
-  --vp-home-hero-image-background: rgba(232, 154, 126, 0.1);
-}
+/* 首页 Hero 主视觉 */
 .VPImage.image-src {
-  border-radius: 16px;
+  border-radius: var(--lt-radius-xl);
   border: 1px solid var(--vp-c-divider);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--lt-shadow-3);
 }
-.dark .VPImage.image-src {
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+.VPHero .name {
+  line-height: var(--lt-lh-heading);
 }
-
-/* Hero 标语排版 */
 .VPHero .tagline {
   max-width: 560px;
-  line-height: 1.8;
+  line-height: var(--lt-lh-body);
 }
 
 /* 功能卡片：悬停浮起 + 品牌描边 */
 .VPFeature {
-  border-radius: 12px;
+  border-radius: var(--lt-radius-lg);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
@@ -122,10 +174,7 @@
 .VPFeature:hover {
   transform: translateY(-3px);
   border-color: var(--vp-c-brand-1);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.09);
-}
-.dark .VPFeature:hover {
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--lt-shadow-2);
 }
 .VPFeature .icon {
   font-size: 22px;
@@ -138,12 +187,13 @@
   font-weight: 500;
 }
 
-/* 代码块与提示容器圆角，与卡片一致 */
+/* 代码块与提示容器 */
 .vp-doc div[class*='language-'] {
-  border-radius: 10px;
+  border-radius: var(--lt-radius-md);
 }
 .vp-doc .custom-block {
-  border-radius: 10px;
+  border-radius: var(--lt-radius-md);
+  line-height: var(--lt-lh-body);
 }
 
 /* 首页下半部分（推荐阅读路径）：去掉生硬的 h2 分隔线 */
