@@ -1,3 +1,11 @@
+## [0.0.31](https://github.com/liao-works/liao-tools/compare/v0.0.30...v0.0.31) (2026-10-26)
+
+### 🔒 依赖安全修复
+
+* 升级受影响依赖至修复版本，安装包内 Rust 运行时与前端构建链随本版生效：`openssl` 0.10.75 → 0.10.81（8 条告警，含多条高危）、`rand` → 0.8.6 / 0.9.3、`time` → 0.3.55、`serde_with` → 3.21.0、`thin-vec` → 0.2.21、前端 `vite` → 7.3.7。
+* `glib` 一项（medium）暂无法修复：修复版需要 GTK 0.20 栈，当前 Tauri 2 锁定 0.18，待后续升级 Tauri 时一并处理。
+* 教程站 website 锁文件入库并刷新，CI 构建的依赖版本确定化。
+
 ## [0.0.30](https://github.com/liao-works/liao-tools/compare/v0.0.29...v0.0.30) (2026-10-25)
 
 ### 📖 在线教程（全新）
